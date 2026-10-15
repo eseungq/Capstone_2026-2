@@ -1,7 +1,22 @@
+# Gradle
 .gradle/
 build/
 out/
+
+# IntelliJ
 .idea/
 *.iml
+
+# macOS
 .DS_Store
-storage/
+
+# 로컬 이미지 저장소 (app.storage.local-root). 루트의 폴더만 무시 (storage 패키지는 추적)
+/storage/
+
+# Python (mock-ai)
+__pycache__/
+.venv/
+
+# 로컬 설정·로그
+.env
+*.log
