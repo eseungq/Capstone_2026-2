@@ -23,6 +23,8 @@ import com.capstone.inspection.domain.user.UserRepository;
 import com.capstone.inspection.inspection.ImageInspector.ImageInfo;
 import com.capstone.inspection.storage.StorageService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class InspectionIntakeService {
 
+    private static final Logger log = LoggerFactory.getLogger(InspectionIntakeService.class);
     private static final DateTimeFormatter DATE_PATH = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
     private final AppProperties props;
@@ -109,6 +112,8 @@ public class InspectionIntakeService {
         }
         imageRepository.save(new ImageStorage(inspection, ImageType.ORIGINAL, storageKey, info.contentType(),
                 image.length, info.width(), info.height(), checksum));
+
+        log.info("접수 {} {} part={} source={}", inspection.getInspectionNo(), inspection.getId(), part.getPartCode(), source);
 
         // 5) 커밋 후 분석 시작 (AnalysisDispatcher가 받음)
         eventPublisher.publishEvent(new InspectionReceivedEvent(inspection.getId()));
