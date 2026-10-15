@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: inspection-backend
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:inspection}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USER:inspection}
+    password: ${DB_PASSWORD:inspection}
+  jpa:
+    hibernate:
+      ddl-auto: none          # 스키마는 Flyway 마이그레이션이 관리
+    open-in-view: false
+  flyway:
+    enabled: true
+    # db/seed-dev: 개발·시연용 테스트 계정과 Mock 모델·예시 정책. 운영 배포 시 이 위치를 빼야 함
+    locations: classpath:db/migration,classpath:db/seed-dev
+  servlet:
+    multipart:
+      max-file-size: 20MB     # 업로드 한도 (TBD-08, app.upload.max-bytes와 맞출 것)
+      max-request-size: 21MB
+  jackson:
+    time-zone: Asia/Seoul
+
+server:
+  port: 8080
+
+logging:
+  pattern:
+    level: "%5p [%X{traceId:-}]"   # 로그마다 traceId 출력
+
+app:
+  upload:
+    allowed-content-types:        # 허용 형식 (TBD-08)
+      - image/jpeg
+      - image/png
+    max-bytes: 20971520           # 20MB (TBD-08)
+    min-width: 0                  # 최소 해상도, 0이면 검사 안 함 (TBD-08)
+    min-height: 0
+  ai:
+    base-url: http://localhost:8090   # 개발 중에는 Mock AI 서버 주소 (TBD-01)
+    connect-timeout-ms: 2000
+    read-timeout-ms: 10000            # 실행 타임아웃, 실측 후 조정 (TBD-01)
+    retry-count: 1                    # 연결 실패·5xx만 재시도 (계약 7.3). 4xx·타임아웃·규격 위반은 재시도 안 함
+    image-size-check-enabled: false   # AI 응답 이미지 크기와 저장 원본 대조 (TBD-09 결정 후 켜기)
+  storage:
+    type: local                       # 개발용 로컬 저장, 운영 방식은 TBD-01
+    local-root: ./storage
+    access-url-ttl-seconds: 600
+    public-base-url: ${PUBLIC_BASE_URL:http://localhost:8080}   # 이미지 접근 주소의 앞부분 (AI 서버·앱이 접근할 주소)
+  inspection:
+    analysis-pool-size: 2             # AI 동시 호출 수 (계약 5장, 실측 후 조정)
+    analysis-queue-capacity: 500      # 분석 대기열 크기
+  auth:
+    jwt-secret: ${JWT_SECRET:change-this-dev-secret-key-to-32-bytes-or-more}
+    access-token-ttl-seconds: 1800
+    refresh-token-ttl-seconds: 1209600
+    login-lock-threshold: 5           # 로그인 실패 잠금 횟수 (TBD-10)
