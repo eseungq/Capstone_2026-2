@@ -2,12 +2,14 @@ package com.capstone.inspection.inspection;
 
 import com.capstone.inspection.auth.security.AuthUser;
 import com.capstone.inspection.common.api.ApiResponse;
+import com.capstone.inspection.common.api.PageResponse;
 import com.capstone.inspection.common.error.BusinessException;
 import com.capstone.inspection.common.error.ErrorCode;
 import com.capstone.inspection.common.time.Times;
 import com.capstone.inspection.inspection.dto.ConfirmRequest;
 import com.capstone.inspection.inspection.dto.ConfirmResponse;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse;
+import com.capstone.inspection.inspection.dto.InspectionHistoryItem;
 import com.capstone.inspection.inspection.dto.InspectionReceiptResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,7 +35,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 
-@Tag(name = "검사", description = "사진 접수(비동기)·검사 상세·작업자 확인")
+@Tag(name = "검사", description = "사진 접수(비동기)·검사 이력·상세·작업자 확인")
 @RestController
 @RequestMapping("/api/v1/inspections")
 @RequiredArgsConstructor
@@ -54,9 +56,23 @@ public class InspectionController {
             @RequestParam(required = false) String capturedAt,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) throws IOException {
         InspectionIntakeService.Receipt receipt = intakeService.receive(user, partCode, image.getBytes(), lineCode,
-                parseCapturedAt(capturedAt), idempotencyKey);
+                parseTime("capturedAt", capturedAt), idempotencyKey);
         HttpStatus status = receipt.replayed() ? HttpStatus.OK : HttpStatus.ACCEPTED;
         return ResponseEntity.status(status).body(ApiResponse.of(InspectionReceiptResponse.of(receipt.inspection())));
+    }
+
+    @Operation(summary = "검사 이력", description = "WORKER·ADMIN. 전체 검사를 접수 시각 최신순으로 조회. "
+            + "from·to는 오프셋 포함 ISO-8601(receivedAt 기준, from ≤ receivedAt < to), page는 0부터, size 최대 100")
+    @GetMapping
+    public ApiResponse<PageResponse<InspectionHistoryItem>> search(
+            @RequestParam(required = false) String partCode,
+            @RequestParam(required = false) DisplayState displayState,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.of(queryService.search(partCode, displayState, parseTime("from", from), parseTime("to", to),
+                page, size));
     }
 
     @Operation(summary = "검사 상세", description = "WORKER·ADMIN. 분석 중이면 displayState=ANALYZING. 이미지 주소는 만료되므로 만료 후 다시 조회")
@@ -74,15 +90,15 @@ public class InspectionController {
         return ApiResponse.of(confirmService.confirm(user, inspectionId, request));
     }
 
-    // 촬영 시각: 오프셋 포함 ISO-8601 (예: 2026-10-16T09:00:00+09:00)
-    private static LocalDateTime parseCapturedAt(String value) {
+    // 시각 파라미터: 오프셋 포함 ISO-8601 (예: 2026-10-16T09:00:00+09:00)
+    private static LocalDateTime parseTime(String name, String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
         try {
             return Times.toLocal(OffsetDateTime.parse(value.trim()));
         } catch (DateTimeParseException e) {
-            throw new BusinessException(ErrorCode.INVALID_PARAMETER, "capturedAt은 2026-10-16T09:00:00+09:00 형식이어야 합니다.");
+            throw new BusinessException(ErrorCode.INVALID_PARAMETER, name + "은(는) 2026-10-16T09:00:00+09:00 형식이어야 합니다.");
         }
     }
 }

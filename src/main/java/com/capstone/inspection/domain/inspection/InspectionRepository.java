@@ -1,13 +1,14 @@
 package com.capstone.inspection.domain.inspection;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface InspectionRepository extends JpaRepository<Inspection, String> {
+public interface InspectionRepository extends JpaRepository<Inspection, String>, JpaSpecificationExecutor<Inspection> {
 
     // 상세 조회용: 연관 엔티티 함께 로딩 (LAZY 프록시 직렬화 문제·N+1 방지)
     @Query("select i from Inspection i join fetch i.part join fetch i.item join fetch i.model "

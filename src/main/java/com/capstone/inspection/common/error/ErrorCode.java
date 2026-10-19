@@ -60,6 +60,15 @@ public enum ErrorCode {
         this.analysisFailure = analysisFailure;
     }
 
+    // 검사에 저장된 오류 코드 이름 → ErrorCode (모르는 값이면 INTERNAL_SERVER_ERROR)
+    public static ErrorCode fromStored(String name) {
+        try {
+            return name == null ? INTERNAL_SERVER_ERROR : valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return INTERNAL_SERVER_ERROR;
+        }
+    }
+
     public HttpStatus getStatus() {
         return status;
     }
