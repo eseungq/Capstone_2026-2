@@ -7,7 +7,8 @@ import java.util.List;
 // application.yml의 app.* 값을 묶어 두는 설정 객체
 // 미확정(TBD) 값은 전부 여기로 모아 코드 수정 없이 바꿀 수 있게 함
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(Upload upload, Ai ai, Storage storage, Auth auth, Inspection inspection) {
+public record AppProperties(Upload upload, Ai ai, Storage storage, Auth auth, Inspection inspection,
+                            Monitoring monitoring) {
 
     // 업로드 제한 (TBD-08)
     public record Upload(List<String> allowedContentTypes, long maxBytes, int minWidth, int minHeight) {
@@ -29,5 +30,9 @@ public record AppProperties(Upload upload, Ai ai, Storage storage, Auth auth, In
 
     // 비동기 분석 스레드 풀 (계약 5장)
     public record Inspection(int analysisPoolSize, int analysisQueueCapacity) {
+    }
+
+    // 모니터링 화면 (계약 6.3): 부품별 최근 검사 표시 건수
+    public record Monitoring(int recentSize) {
     }
 }

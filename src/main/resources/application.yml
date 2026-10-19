@@ -49,6 +49,8 @@ app:
   inspection:
     analysis-pool-size: 2             # AI 동시 호출 수 (계약 5장, 실측 후 조정)
     analysis-queue-capacity: 500      # 분석 대기열 크기
+  monitoring:
+    recent-size: 10                   # 부품별 최근 검사 표시 건수 (계약 6.3)
   auth:
     jwt-secret: ${JWT_SECRET:change-this-dev-secret-key-to-32-bytes-or-more}
     access-token-ttl-seconds: 1800
