@@ -16,6 +16,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 
 // REVIEW 검사에 대한 작업자 최종 판정 (AI 결과와 분리 저장)
 @Entity
@@ -45,4 +47,13 @@ public class WorkerConfirmation {
 
     @Column(length = 200)
     private String comment;            // 작업자 메모 (선택)
+
+    public WorkerConfirmation(Inspection inspection, User worker, Judgement finalJudgement, String comment) {
+        this.id = UUID.randomUUID().toString();
+        this.inspection = inspection;
+        this.worker = worker;
+        this.finalJudgement = finalJudgement;
+        this.comment = comment;
+        this.confirmedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
+    }
 }

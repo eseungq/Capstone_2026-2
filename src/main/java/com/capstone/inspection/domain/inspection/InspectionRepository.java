@@ -1,6 +1,7 @@
 package com.capstone.inspection.domain.inspection;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
@@ -19,4 +20,12 @@ public interface InspectionRepository extends JpaRepository<Inspection, String> 
 
     // 서버 재시작 시 남은 건 정리
     List<Inspection> findByStatus(InspectionStatus status);
+
+    // 작업자 판정 기록. 아직 판정 전인 REVIEW 건일 때만 갱신되므로 동시 제출 중 1건만 1을 받음 (계약 6.7)
+    @Modifying(flushAutomatically = true)
+    @Query("update Inspection i set i.finalJudgement = :judgement, i.judgedBy = com.capstone.inspection.domain.inspection.JudgedBy.WORKER "
+            + "where i.id = :id and i.status = com.capstone.inspection.domain.inspection.InspectionStatus.COMPLETED "
+            + "and i.recommendedAction = com.capstone.inspection.domain.inspection.RecommendedAction.REVIEW "
+            + "and i.finalJudgement is null")
+    int markWorkerJudgement(String id, Judgement judgement);
 }
