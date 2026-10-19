@@ -35,7 +35,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 
-@Tag(name = "검사", description = "사진 접수(비동기)·검사 이력·상세·작업자 확인")
+@Tag(name = "검사", description = "사진 접수(비동기)·검사 이력·상세·작업자 확인·재검사")
 @RestController
 @RequestMapping("/api/v1/inspections")
 @RequiredArgsConstructor
@@ -44,6 +44,7 @@ public class InspectionController {
     private final InspectionIntakeService intakeService;
     private final InspectionQueryService queryService;
     private final InspectionConfirmService confirmService;
+    private final InspectionRetryService retryService;
 
     @Operation(summary = "사진 접수", description = "DEVICE(시연용 ADMIN). 원본 저장 후 202와 inspectionId를 바로 반환하고 분석은 비동기로 진행. "
             + "같은 Idempotency-Key 재전송이면 기존 검사를 200으로 반환")
@@ -88,6 +89,15 @@ public class InspectionController {
                                                 @PathVariable String inspectionId,
                                                 @Valid @RequestBody ConfirmRequest request) {
         return ApiResponse.of(confirmService.confirm(user, inspectionId, request));
+    }
+
+    @Operation(summary = "재검사", description = "WORKER·ADMIN. FAILED 건을 저장된 원본으로 다시 분석. 새 inspectionId로 202 반환(retryOf=원래 ID), "
+            + "원래 FAILED 기록은 그대로. FAILED가 아니면 409 NOT_RETRYABLE, 이미 재검사했으면 409 ALREADY_RETRIED")
+    @PostMapping("/{inspectionId}/retry")
+    public ResponseEntity<ApiResponse<InspectionReceiptResponse>> retry(@AuthenticationPrincipal AuthUser user,
+                                                                        @PathVariable String inspectionId) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(ApiResponse.of(InspectionReceiptResponse.of(retryService.retry(user, inspectionId))));
     }
 
     // 시각 파라미터: 오프셋 포함 ISO-8601 (예: 2026-10-16T09:00:00+09:00)

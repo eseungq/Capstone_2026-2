@@ -20,6 +20,9 @@ public interface InspectionRepository extends JpaRepository<Inspection, String>,
     @Query("select i from Inspection i join fetch i.part where i.user.id = :userId and i.clientRequestId = :key")
     Optional<Inspection> findByUserIdAndClientRequestId(String userId, String key);
 
+    // 이미 재검사한 FAILED인지
+    boolean existsByRetryOfInspectionId(String retryOfInspectionId);
+
     // 서버 재시작 시 남은 건 정리
     List<Inspection> findByStatus(InspectionStatus status);
 
