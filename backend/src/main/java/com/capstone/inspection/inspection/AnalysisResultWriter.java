@@ -1,6 +1,7 @@
 package com.capstone.inspection.inspection;
 
 import com.capstone.inspection.ai.AiClient;
+import com.capstone.inspection.ai.AiJson;
 import com.capstone.inspection.ai.AiPredictResponse;
 import com.capstone.inspection.domain.inspection.GradcamStatus;
 import com.capstone.inspection.domain.inspection.ImageStorage;
@@ -14,7 +15,6 @@ import com.capstone.inspection.domain.model.AutomationPolicyRepository;
 import com.capstone.inspection.inspection.ImageInspector.ImageInfo;
 import com.capstone.inspection.storage.StorageService;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Base64;
 
 // 분석 단계별 DB 기록. AI 호출은 트랜잭션 밖에서 하고, 시작·완료·실패 기록만 짧은 트랜잭션으로 처리
 @Component
@@ -38,7 +37,7 @@ public class AnalysisResultWriter {
     private final ImageStorageRepository imageRepository;
     private final AutomationPolicyRepository policyRepository;
     private final StorageService storageService;
-    private final ObjectMapper objectMapper;
+    private final AiJson aiJson;
 
     // AI 요청에 필요한 값
     public record Started(String inspectionId, String partCode, String modelVersion, String modelId,
@@ -105,22 +104,18 @@ public class AnalysisResultWriter {
         return new Outcome(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(), i.getStatus(), false);
     }
 
-    // Grad-CAM 저장. 형식이 맞지 않거나 저장에 실패해도 검사는 실패시키지 않고 FAILED 상태만 기록
+    // DEFECT 예측의 Grad-CAM: 응답 해석(GradcamParser) 후 GENERATED만 저장. 저장 실패도 검사는 실패시키지 않고 FAILED로 기록
     private GradcamStatus saveGradcam(Inspection i, AiPredictResponse.Gradcam g) {
-        if (g == null || g.imageBase64() == null || !"DEFECT".equals(g.targetClass())
-                || !"png".equalsIgnoreCase(g.format())) {
-            return GradcamStatus.FAILED;
+        GradcamParser.Parsed parsed = GradcamParser.parse(i.getId(), g);
+        if (parsed.status() != GradcamStatus.GENERATED) {
+            return parsed.status();
         }
+        ImageInfo info = parsed.info();
         try {
-            byte[] png = Base64.getDecoder().decode(g.imageBase64());
-            ImageInfo info = ImageInspector.inspect(png);
-            if (info == null || !"image/png".equals(info.contentType())) {
-                return GradcamStatus.FAILED;
-            }
-            String key = "gradcam/" + LocalDate.now().format(DATE_PATH) + "/" + i.getId() + ".png";
-            storageService.save(key, png);
-            imageRepository.save(new ImageStorage(i, ImageType.GRADCAM, key, info.contentType(), png.length,
-                    info.width(), info.height(), Hashes.sha256(png)));
+            String key = "gradcam/" + LocalDate.now().format(DATE_PATH) + "/" + i.getId() + "." + info.extension();
+            storageService.save(key, parsed.bytes());
+            imageRepository.save(new ImageStorage(i, ImageType.GRADCAM, key, info.contentType(), parsed.bytes().length,
+                    info.width(), info.height(), Hashes.sha256(parsed.bytes())));
             return GradcamStatus.GENERATED;
         } catch (Exception e) {
             log.warn("Grad-CAM 저장 실패 {}: {}", i.getId(), e.getMessage());
@@ -131,12 +126,12 @@ public class AnalysisResultWriter {
     // ai_response_json에는 이미지 데이터를 빼고 저장 (계약 7.2)
     private String stripImageData(String rawBody) {
         try {
-            JsonNode root = objectMapper.readTree(rawBody);
+            JsonNode root = aiJson.mapper().readTree(rawBody);
             JsonNode gradcam = root.path("gradcam");
             if (gradcam instanceof ObjectNode g && g.has("imageBase64")) {
                 g.put("imageBase64", "<omitted " + g.path("imageBase64").asText("").length() + " chars>");
             }
-            return objectMapper.writeValueAsString(root);
+            return aiJson.mapper().writeValueAsString(root);
         } catch (Exception e) {
             return null;
         }

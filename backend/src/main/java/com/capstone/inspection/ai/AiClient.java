@@ -33,7 +33,7 @@ public class AiClient {
     private final ObjectMapper objectMapper;
     private final int retryCount;
 
-    public AiClient(AppProperties props, ObjectMapper objectMapper) {
+    public AiClient(AppProperties props, AiJson aiJson) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofMillis(props.ai().connectTimeoutMs()));
         factory.setReadTimeout(Duration.ofMillis(props.ai().readTimeoutMs()));
@@ -41,7 +41,7 @@ public class AiClient {
                 .baseUrl(props.ai().baseUrl())
                 .requestFactory(factory)
                 .build();
-        this.objectMapper = objectMapper;
+        this.objectMapper = aiJson.mapper();
         this.retryCount = Math.max(0, props.ai().retryCount());
     }
 

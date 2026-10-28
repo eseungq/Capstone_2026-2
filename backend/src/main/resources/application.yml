@@ -41,6 +41,7 @@ app:
     read-timeout-ms: 10000            # 실행 타임아웃, 실측 후 조정 (TBD-01)
     retry-count: 1                    # 연결 실패·5xx만 재시도 (계약 7.3). 4xx·타임아웃·규격 위반은 재시도 안 함
     image-size-check-enabled: false   # AI 응답 이미지 크기와 저장 원본 대조 (TBD-09 결정 후 켜기)
+    max-response-string-chars: 50000000  # AI 응답 문자열 최대 길이. 실제 DEFECT CAM base64 약 1,546만 자 (Jackson 기본 2,000만)
   storage:
     type: local                       # 개발용 로컬 저장, 운영 방식은 TBD-01
     local-root: ./storage

@@ -12,6 +12,8 @@ public record AiPredictResponse(String inspectionId,
                                 Gradcam gradcam,                   // DEFECT 예측만, 실패·GOOD이면 null
                                 Integer inferenceTimeMs) {
 
-    public record Gradcam(String targetClass, String format, String imageBase64) {
+    // status: GENERATED / NO_ACTIVATION (없으면 이미지 유무로 판단), mapType: NO_ACTIVATION일 때 ZERO_MAP / CONSTANT_MAP
+    // format: png / jpeg (NO_ACTIVATION이면 null) (합의 10/28)
+    public record Gradcam(String targetClass, String status, String mapType, String format, String imageBase64) {
     }
 }
