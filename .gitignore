@@ -24,3 +24,6 @@ __pycache__/
 # Node·Expo (mobile)
 node_modules/
 .expo/
+
+# 실제 AI DEFECT 응답 샘플 (15MB, AI 측 요청으로 저장소에 올리지 않음. 없으면 테스트 건너뜀)
+backend/src/test/resources/ai-samples/02_DEFECT.json

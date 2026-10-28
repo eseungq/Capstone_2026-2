@@ -1,0 +1,12 @@
+{
+  "inspectionId": "c6437dcf-1498-5c8c-988a-147224ba1dd7",
+  "modelVersion": "door-swin-tiny-e20-8d042c7bfab2",
+  "predictedQuality": "GOOD",
+  "rawDefectProbability": 0.00020049081649631262,
+  "calibratedDefectProbability": null,
+  "calibratorVersion": null,
+  "imageWidth": 4032,
+  "imageHeight": 1816,
+  "gradcam": null,
+  "inferenceTimeMs": 107
+}

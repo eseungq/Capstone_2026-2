@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "IMAGE_ACCESS_FAILED",
+    "message": "Image could not be retrieved.",
+    "traceId": "aebeb913354448acb330c21cd70d6723",
+    "inspectionId": "749f4308-d0bf-5dd3-81e3-0c9e53c9580e"
+  }
+}
