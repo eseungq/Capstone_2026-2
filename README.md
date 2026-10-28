@@ -1,106 +1,81 @@
-# inspection-backend (3조 김이홍 · 백엔드 API)
+# AI 기반 자동차 부품 품질검사 플랫폼
 
-AI 기반 자동차 부품 품질검사 플랫폼의 백엔드. 기준 문서는 **백엔드 API 계약 v4** (`04_6주차_방향수정/백엔드_API계약_v4_초안_1015.md`).
+캡스톤디자인 2026-2 · 3조 김이홍
 
-현재 구현 범위 (7주차)
-- 인증: 로그인·토큰 재발급·로그아웃, 역할(WORKER·ADMIN·DEVICE)별 접근 제어, 로그인 5회 실패 잠금
-- 사진 접수(비동기): `POST /api/v1/inspections` → 202, 스레드 풀(2개)에서 AI 호출·응답 검증·정책 적용
-- 검사 상세: `GET /api/v1/inspections/{id}` (AI·정책·판정·이미지 블록, 만료되는 이미지 주소)
-- Mock AI 서버 (`mock-ai/`, Python)
+공정에서 촬영한 부품 사진을 AI가 분석하고, 기준을 만족한 건만 자동 통과시키고 나머지는 작업자가 앱에서 확인해 최종 판정하는 시스템입니다.
 
-아직 없음: 모니터링·확인 필요 목록, 작업자 확인(confirm), 재검사(retry), 관리자 정책 API, Expo 푸시 발송
+## 팀 구성
 
-## 실행 방법
+| 파트 | 담당 | 폴더 | 하는 일 |
+|---|---|---|---|
+| 백엔드 API | 이승규 | [`backend/`](backend/) | 사진 접수, AI 호출, 자동 통과 판정, 검사 기록·작업자 확인·재검사, 관리자 정책, 알림 |
+| AI | 김도현 | [`ai/`](ai/) | 불량 분류 모델, 확률 보정, Grad-CAM, 추론 서버, 정책 검증 자료 |
+| 모바일 앱 | 홍승인 | [`mobile/`](mobile/) | 작업자·관리자 앱 (모니터링, 상세, 판정, 재검사, 정책 화면) |
+| DB | 김남균 | [`db/`](db/) | 저장 구조 설계, 제약·조회 검증 |
 
-필요한 것: JDK 17 또는 21, Docker, Python 3.10 이상
+## 시스템 구성
 
-```bash
-docker compose up -d                 # MySQL 8.4 (DB/계정/비밀번호: inspection)
-./gradlew build                      # 컴파일 + 단위 테스트
-./gradlew bootRun                    # Flyway가 V1~V4와 개발용 시드(db/seed-dev) 적용
-
-# 다른 터미널에서 Mock AI
-cd mock-ai
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --port 8090
+```mermaid
+flowchart LR
+    CAM["사진 입력 프로그램<br/>(공정 촬영 모사)"] -- "사진 접수" --> BE["백엔드 API<br/>Spring Boot"]
+    BE -- "추론 요청" --> AI["AI 추론 서버"]
+    AI -- "예측·보정 확률·Grad-CAM" --> BE
+    BE <--> DB[("MySQL")]
+    APP["모바일 앱<br/>작업자·관리자"] -- "조회·판정·재검사" --> BE
+    BE -. "푸시 알림" .-> APP
 ```
 
-- Swagger UI: http://localhost:8080/swagger-ui.html (오른쪽 위 Authorize에 Access Token 입력)
-- 이미 V1·V2만 적용된 DB에서도 그대로 실행하면 V3·V4가 추가 적용된다
+검사 흐름
 
-## 테스트 계정 (개발용, `src/main/resources/db/seed-dev`)
+1. 입력 프로그램이 사진을 올리면 백엔드가 원본을 저장하고 바로 접수 번호를 돌려줍니다 (분석은 비동기)
+2. 백엔드가 AI 서버에 분석을 요청하고, 응답과 활성 정책으로 **자동 통과(AUTO_PASS)** 또는 **작업자 확인(REVIEW)** 을 정합니다
+3. REVIEW·분석 실패 건은 앱에 알림이 가고, 작업자가 사진과 판단 근거(Grad-CAM)를 보고 PASS·FAIL을 확정합니다
+4. 분석에 실패한 건은 같은 사진으로 재검사합니다 (원래 기록은 그대로 두고 새 검사 생성)
 
-| 계정 | 비밀번호 | 역할 |
+자세한 규칙은 [docs/백엔드_API계약_v4.md](docs/백엔드_API계약_v4.md)를 기준으로 합니다.
+
+## 폴더 구조
+
+```
+.
+├── backend/   백엔드 API (Spring Boot 3.5, Java 17, MySQL 8.4) + 개발용 Mock AI
+├── ai/        AI 추론 서버·모델
+├── mobile/    모바일 앱 (React Native, Expo)
+├── db/        DB 설계 SQL·ERD
+└── docs/      공통 기준 문서 (API 계약 등)
+```
+
+각 폴더의 README에 실행 방법을 적습니다.
+
+## 통합 실행 순서
+
+같은 와이파이에서 개발 PC 한 대로 띄우는 기준입니다.
+
+| 순서 | 무엇 | 방법 |
 |---|---|---|
-| worker01 | Worker1234! | WORKER |
-| admin01 | Admin1234! | ADMIN |
-| device-door | Device1234! | DEVICE (사진 입력 프로그램) |
+| 1 | MySQL | `backend/`에서 `docker compose up -d` |
+| 2 | AI 서버 | 실제 서버는 [`ai/`](ai/) 안내, 없으면 [`backend/mock-ai`](backend/mock-ai/) (포트 8090) |
+| 3 | 백엔드 | `backend/`에서 `./gradlew bootRun` (포트 8080, Swagger: `/swagger-ui.html`) |
+| 4 | 앱 | [`mobile/`](mobile/) 안내. 백엔드 주소는 `localhost`가 아니라 PC의 내부 IP |
 
-시드에는 Mock 모델 `mock-door-swin-t-v1`(보정기 `mock-cal-v1`)과 예시 정책 `example-door-p1`(passThreshold 0.05, 검증 범위 0.02~0.08, ready·active)도 들어 있다. 실제 검증 값이 아니다.
-**운영 배포 시 `spring.flyway.locations`에서 `classpath:db/seed-dev`를 빼야 한다.**
+명령과 테스트 계정은 [backend/README.md](backend/README.md)에 있습니다.
 
-## 동작 확인 (curl)
+## 진행 현황
 
-```bash
-# 1) 로그인 (DEVICE)
-DEV=$(curl -s -X POST localhost:8080/api/v1/auth/login -H 'Content-Type: application/json' \
-  -d '{"loginId":"device-door","password":"Device1234!"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["accessToken"])')
-
-# 2) 사진 접수 → 202, inspectionId 반환
-curl -s -X POST localhost:8080/api/v1/inspections -H "Authorization: Bearer $DEV" \
-  -F image=@sample.jpg -F partCode=DOOR
-
-# 3) 작업자 로그인 후 상세 조회 (분석 중이면 displayState=ANALYZING, 1초 뒤 다시 조회)
-WK=$(curl -s -X POST localhost:8080/api/v1/auth/login -H 'Content-Type: application/json' \
-  -d '{"loginId":"worker01","password":"Worker1234!"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["accessToken"])')
-curl -s localhost:8080/api/v1/inspections/<inspectionId> -H "Authorization: Bearer $WK"
-```
-
-| 확인 | 기대 결과 |
+| 파트 | 현재 상태 |
 |---|---|
-| 토큰 없이 `GET /api/v1/parts` | 401 `AUTH_TOKEN_INVALID` |
-| WORKER 토큰으로 `POST /api/v1/inspections` | 403 `ACCESS_DENIED` |
-| 비밀번호 5회 틀림 | 5번째부터 423 `AUTH_ACCOUNT_LOCKED` |
-| 같은 `Idempotency-Key`·같은 사진 재전송 | 200, 기존 inspectionId |
-| 같은 키·다른 사진 | 422 `IDEMPOTENCY_KEY_MISMATCH` |
-| Mock 시나리오별 결과 | `mock-ai/README.md` 표 참고 (AUTO_PASS, REVIEW 사유별, FAILED 오류별) |
-| 이미지 주소 | 상세의 `images.original.url`을 브라우저로 열면 원본 표시, 10분 뒤 404 |
+| 백엔드 | 인증, 사진 접수(비동기), AI 연동·판정, 검사 상세·이력, 모니터링, 작업자 확인, 재검사 구현. 관리자 정책 API·푸시 알림 진행 예정 |
+| AI | |
+| 모바일 앱 | |
+| DB | |
 
-응답 헤더 `X-Trace-Id`와 서버 로그의 `[traceId]`가 같으면 추적 ID 연결이 정상이다. 분석 로그도 접수 요청과 같은 traceId로 남는다.
+각 파트 담당자가 직접 갱신합니다.
 
-## 구조
+## 협업 규칙
 
-```
-auth/                로그인·재발급·로그아웃, JWT 필터, 401·403 공통 오류 응답
-ai/                  AI 클라이언트, 요청·응답 형식, 응답 계약 검증
-inspection/          접수(InspectionIntakeService), 비동기 분석(AnalysisDispatcher → InspectionAnalysisService),
-                     정책 판정(PolicyEvaluator), 결과 저장(AnalysisResultWriter), 상세 조회, 재시작 정리
-storage/             로컬 이미지 저장, 서명된 만료 주소, 이미지 제공 API
-config/              AppProperties(app.*), Security, 분석 스레드 풀, Swagger
-common/              공통 응답·오류, traceId, 시각 변환
-domain/              엔티티·리포지토리
-resources/db/migration   V1 스키마, V2 부품, V3 인증, V4 모니터링·비동기·Grad-CAM
-resources/db/seed-dev    개발용 계정·Mock 모델·예시 정책
-mock-ai/             Mock AI 추론 서버 (FastAPI)
-```
-
-## 미확정(TBD) 값 위치
-
-모두 `application.yml`의 `app.*`에 있으며 코드 수정 없이 바꿀 수 있다.
-
-| 설정 | TBD |
-|---|---|
-| `app.upload.*` 허용 형식·용량·최소 해상도 | TBD-08 |
-| `app.ai.base-url`, `read-timeout-ms`, `retry-count` | TBD-01 |
-| `app.storage.type`(local), `public-base-url` | TBD-01 |
-| `app.auth.login-lock-threshold` | TBD-10 |
-| `app.inspection.analysis-pool-size` | 실측 후 조정 |
-| 검사항목 코드 `SCRATCH` (V2 시드) | TBD-04 |
-
-## 문제 해결
-
-- `Public Key Retrieval is not allowed` 오류: 데이터소스 URL 끝에 `&allowPublicKeyRetrieval=true` 추가 (로컬 개발에서만)
-- Flyway 체크섬 오류: 이미 적용된 마이그레이션 파일을 수정한 경우. 개발 중이면 `docker compose down -v`로 DB 볼륨을 지우고 다시 실행
-- 분석이 계속 ANALYZING: Mock AI 서버가 켜져 있는지, `app.ai.base-url` 확인. 서버를 재시작하면 ANALYZING 건은 FAILED로 정리됨
-- Mock AI가 이미지를 못 읽음(422 → FAILED `AI_REQUEST_REJECTED`): `app.storage.public-base-url`이 Mock AI에서 접근 가능한 주소인지 확인
+- **main에 직접 push하지 않습니다.** 파트별 브랜치에서 작업하고 Pull Request로 합칩니다
+  - 브랜치 이름: `backend/작업명`, `ai/작업명`, `mobile/작업명`, `db/작업명`
+- 다른 파트 폴더를 고쳐야 하면 그 파트 담당자에게 먼저 알리고 PR 리뷰를 받습니다
+- API 형식·상태 값·판정 규칙을 바꿀 때는 `docs/`의 계약 문서를 먼저 고칩니다
+- 커밋 메시지는 한국어로 짧게, 한 커밋에는 한 가지 변경만
+- **공개 저장소입니다.** 비밀번호·토큰·`.env`, 실제 공정 사진, 개인정보, 큰 모델 파일은 올리지 않습니다
