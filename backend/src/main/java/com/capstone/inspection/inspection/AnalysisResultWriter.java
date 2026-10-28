@@ -128,7 +128,7 @@ public class AnalysisResultWriter {
         try {
             JsonNode root = aiJson.mapper().readTree(rawBody);
             JsonNode gradcam = root.path("gradcam");
-            if (gradcam instanceof ObjectNode g && g.has("imageBase64")) {
+            if (gradcam instanceof ObjectNode g && g.path("imageBase64").isTextual()) { // null(NO_ACTIVATION)은 그대로
                 g.put("imageBase64", "<omitted " + g.path("imageBase64").asText("").length() + " chars>");
             }
             return aiJson.mapper().writeValueAsString(root);
