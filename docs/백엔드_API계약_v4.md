@@ -1,15 +1,17 @@
 # 백엔드 API 계약 v4 (초안)
 
-3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성
+3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장)
 
 - 기준 1: 「자동차부품_공정모니터링_개발계획서_최종합의반영」(10/14 합의본)
 - 기준 2: 「요구사항명세서_패치검사_개정본3」(9/30)의 규칙 중 합의본과 충돌하지 않는 것은 그대로 승계
 - 기준 3: 10/15 팀 회신 (김도현 AI 답변, 홍승인 정리, 김남균 DB 주간보고)
+- 기준 4: 10/28 합의 (AI 김도현·모바일 홍승인·DB 김남균 확인): 실제 DOOR 모델 버전, Grad-CAM 0맵·상수맵, JPEG 허용, V5 무결성 제약
 
 표기
 - **[확정]** 합의본에 명시된 내용
 - **[승계]** 명세서 개정본3에서 이미 정한 규칙을 그대로 유지
 - **[합의 10/15]** 10/15 팀 회신으로 확정된 내용
+- **[합의 10/28]** 10/28 팀 확인으로 확정된 내용
 - **[제안]** 합의본이 백엔드에 결정을 맡긴 부분. 이의가 없으면 이대로 구현
 - **[TBD-xx]** 미확정. 명세서 11장 번호 체계를 따름 (12장 목록)
 
@@ -358,7 +360,8 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
   - `GENERATED`: DEFECT 예측이고 Grad-CAM 생성 성공 → `images.gradcam`에 접근 정보
   - `NOT_REQUIRED`: GOOD 예측이라 생성하지 않음 → 앱은 원본과 AI 결과만 표시
   - `FAILED`: DEFECT 예측인데 생성 실패 → "판단 근거 이미지 없음" 표시. 검사는 COMPLETED 유지
-  - 셋 다 판정에는 영향 없음
+  - `NO_ACTIVATION` [합의 10/28]: DEFECT 예측, Grad-CAM 계산은 성공했지만 위치별 강조 반응 없음(0맵·상수맵) → `images.gradcam = null`. 앱은 "AI 예측은 완료됐지만, 위치별 강조 반응이 없어 판단 근거 이미지를 제공하기 어렵습니다." 안내. 생성 실패(FAILED)·GOOD 미생성(NOT_REQUIRED)과 구분하며, 정상의 증거로 쓰지 않음
+  - 넷 다 판정에는 영향 없음
 - 이미지 접근 정보는 만료됨. 만료되면 상세를 다시 조회 [승계]. 저장소가 로컬이든 S3든 앱 쪽 계약은 같음 (TBD-01)
 - `width`·`height`는 방향 보정된 표시 기준 [승계]. 원본과 Grad-CAM의 방향을 맞추는 처리 지점은 [TBD-09]
 - FAILED이면 `ai`·`policy`는 null, `error`에 `{ "code", "message", "retryable" }`
@@ -441,6 +444,8 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 
 ### 7.2 정상 응답
 
+실제 DOOR 모델 버전 [합의 10/28]: `door-swin-tiny-e20-8d042c7bfab2` (보정기 미준비 → `calibratedDefectProbability`·`calibratorVersion` null, 정책 없음 → 분석 성공 건은 REVIEW). 개발 중 기본 활성 모델은 Mock `mock-door-swin-t-v1`
+
 ```json
 {
   "inspectionId": "8f3c1e2a-...",
@@ -465,11 +470,42 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 | `calibratedDefectProbability` | N | 보정기 준비 전이면 null → 백엔드가 REVIEW 처리. null 허용과 계약 위반은 구분 [승계] |
 | `calibratorVersion` | N | 보정값이 있으면 필수, 없으면 둘 다 null [합의 10/15] |
 | `imageWidth`, `imageHeight` | Y | 방향 보정된 표시 기준 크기 [승계, TBD-09] |
-| `gradcam` | N | **DEFECT 예측 건만 생성**. `{ targetClass: "DEFECT", format: "png", imageBase64 }`. GOOD 예측이거나 생성 실패면 null [합의 10/15] |
-| `inferenceTimeMs` | Y | AI 서버가 요청을 받은 시점부터 응답 직전까지(이미지 읽기·전처리·추론·Grad-CAM 생성 포함, 모델 최초 로드 제외) [제안, 측정 범위 AI 확인] |
+| `gradcam` | N | **DEFECT 예측 건만 생성**. GOOD 예측이거나 생성 오류면 null [합의 10/15]. 형식은 아래 표 [합의 10/28] |
+| `inferenceTimeMs` | Y | AI handler 진입부터 응답 JSON 직렬화 직전까지의 정수 ms (이미지 읽기·전처리·추론·Grad-CAM 생성 포함, 모델 최초 로드·직렬화·전송 제외) [합의 10/28, AI 확인] |
 
-- Grad-CAM 전달: 응답 안에 base64 PNG로 포함 [합의 10/15]. 용량 문제가 생기면 multipart로 변경
-- `gradcam = null`일 때 백엔드가 `gradcamStatus`를 정함: GOOD 예측이면 `NOT_REQUIRED`, DEFECT 예측이면 `FAILED`. 어느 쪽도 검사를 FAILED로 만들지 않음 [합의 10/15]
+`gradcam` 객체 [합의 10/28]
+
+| 필드 | 값 | 규칙 |
+|---|---|---|
+| `targetClass` | `DEFECT` | 항상 DEFECT |
+| `status` | `GENERATED` / `NO_ACTIVATION` | 10/28 추가. 없으면 이미지 유무로 판단(이전 형식 호환) |
+| `mapType` | `ZERO_MAP` / `CONSTANT_MAP` | `NO_ACTIVATION`일 때만. 백엔드는 `ai_response_json`에만 보관 |
+| `format` | `png` / `jpeg` | 대소문자 무시, `jpg`도 jpeg로 인정. 실제 이미지 형식과 같아야 함. `NO_ACTIVATION`이면 null |
+| `imageBase64` | base64 문자열 | 원본(방향 보정 후)과 같은 크기의 표시용 이미지. `NO_ACTIVATION`이면 null |
+
+```json
+// 정상 생성
+"gradcam": { "targetClass": "DEFECT", "status": "GENERATED", "format": "png", "imageBase64": "..." }
+// 0맵·상수맵
+"gradcam": { "targetClass": "DEFECT", "status": "NO_ACTIVATION", "mapType": "ZERO_MAP", "format": null, "imageBase64": null }
+// 생성 오류
+"gradcam": null
+```
+
+백엔드 처리 (DEFECT 예측일 때) [합의 10/28]
+
+| AI 응답 | `gradcamStatus` | 이미지 저장 |
+|---|---|---|
+| `gradcam` null | `FAILED` | 없음 |
+| `status: NO_ACTIVATION` | `NO_ACTIVATION` | 없음 |
+| `status: GENERATED`(또는 없음) + 유효한 png·jpeg | `GENERATED` | 저장 (`image/png`·`image/jpeg`) |
+| 그 외 (알 수 없는 status, targetClass ≠ DEFECT, 지원하지 않는 format, 디코딩 실패, 선언과 실제 형식 불일치) | `FAILED` | 없음 |
+
+- 어느 경우도 검사를 FAILED로 만들지 않음. 분류 결과·REVIEW는 그대로 [합의 10/15 승계]
+- 응답이 큼: 실제 DEFECT 샘플 15.5MB(base64 약 1,546만 자). 백엔드는 AI 응답 파싱의 문자열 한도를 5,000만 자로 설정 (`app.ai.max-response-string-chars`, Jackson 기본 2,000만 자) [합의 10/28]
+
+- Grad-CAM 전달: 응답 안에 base64로 포함 [합의 10/15], 형식은 PNG 또는 JPEG [합의 10/28]. 용량 문제가 생기면 multipart로 변경
+- GOOD 예측이면 응답과 관계없이 `gradcamStatus = NOT_REQUIRED`. DEFECT 예측이면 위 표대로 정함. 어느 쪽도 검사를 FAILED로 만들지 않음 [합의 10/15·10/28]
 - 원본과 Grad-CAM은 같은 표시 방향·크기 기준. 학습 전처리 여백 제거와 원본 크기 복원은 AI에서 수행 [합의 10/15]
 - 학습과 같은 EXIF 방향 처리·리사이즈·여백·정규화는 AI 쪽에서 수행 [확정]
 - 백엔드는 Grad-CAM 이미지를 저장소에 따로 보관하고, `ai_response_json`에는 이미지 데이터를 빼고 나머지 응답만 저장 [제안]
@@ -541,7 +577,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 |---|---|
 | `part` | 그대로. 라인 마스터 테이블은 만들지 않음, partCode가 모니터링 단위 [제안] |
 | `inspection_item` | 유지. 모델이 정상·불량 전체를 분류하므로 항목 코드 이름은 AI·DB가 정함 (예: `APPEARANCE`) [TBD-04] |
-| `inspection` | `inspection_no`(UNIQUE, NOT NULL, 표시용 번호 `INS-000006`) 추가 · `user_id` → nullable, `source`(DEVICE/ADMIN) 추가 · `status`에 RECEIVED 추가 · `review_reason`, `judged_by`, `pass_threshold_applied`(스냅숏), `gradcam_status`(GENERATED·NOT_REQUIRED·FAILED), `calibrator_version`, `received_at`, `retry_of_inspection_id` 추가 · **`line_code`(nullable), `captured_at` 추가 (9.1)** · 개정본3 속성 중 V1에 없는 `client_request_id`, `ai_response_json`, `error_detail`, `trace_id` 추가 [승계] · `patch_inspection_supported`는 신규 기록에서 미사용 |
+| `inspection` | `inspection_no`(UNIQUE, NOT NULL, 표시용 번호 `INS-000006`) 추가 · `user_id` → nullable, `source`(DEVICE/ADMIN) 추가 · `status`에 RECEIVED 추가 · `review_reason`, `judged_by`, `pass_threshold_applied`(스냅숏), `gradcam_status`(GENERATED·NOT_REQUIRED·FAILED·NO_ACTIVATION [합의 10/28]), `calibrator_version`, `received_at`, `retry_of_inspection_id` 추가 · **`line_code`(nullable), `captured_at` 추가 (9.1)** · 개정본3 속성 중 V1에 없는 `client_request_id`, `ai_response_json`, `error_detail`, `trace_id` 추가 [승계] · `patch_inspection_supported`는 신규 기록에서 미사용 |
 | `image_storage` | `storage_uri`는 저장소 상대 키 [합의 10/15] · `image_type`(ORIGINAL/GRADCAM) 추가, `inspection_id` UNIQUE → (`inspection_id`, `image_type`) UNIQUE · `exif_orientation` 추가 [승계, V1에 없음] |
 | `automation_policy` | `target_miss_rate` → nullable (과거 기록 보존), `validated_min`·`validated_max`·`calibrator_version`·`activated_at` 추가. `metrics_json`은 AI 평가 근거로 계속 사용 [승계]. 조정 시 행 수정 대신 새 행 |
 | `defect_detection` | 신규 기록 중단, 테이블은 유지 (과거 기록 보존) [확정] |
@@ -549,6 +585,13 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 | `worker_confirmation` | `comment` 추가. 그 외 그대로 |
 | `recalculation_run`·`recalculation_result` | 제외 [합의 10/15, TBD-15 해소] |
 | **신규** `device_token` | id, user_id, token(UNIQUE), platform, created_at, last_seen_at |
+
+적용 현황 [합의 10/28]
+- Flyway V1~V5 적용. V3 인증, V4 모니터링·비동기·Grad-CAM·정책 버전(위 표), **V5 무결성 제약**(김남균 작성, 이승규 수정: `gradcam_status`에 `NO_ACTIVATION` 추가, FAILED면 `predicted_quality` NULL)
+- V5 내용: 복합 FK 2(검사 부품–검사항목, 정책 모델–검사항목), 검사항목당 active 모델 1개·모델당 active 정책 1개(생성 컬럼 UNIQUE), 허용값·확률 범위 CHECK, 상태별 값 규칙(RECEIVED·ANALYZING·COMPLETED·FAILED), AUTO_PASS 조건 강화(GOOD 예측·정책·보정 확률 ≤ 기준치), REVIEW 사유와 값 일관성, Grad-CAM 상태(GOOD → NOT_REQUIRED, DEFECT → GENERATED·FAILED·NO_ACTIVATION), 보정 확률·보정기 버전 짝, 정책 ready 시 기준치·검증 범위·보정기 필수
+- CHECK로 막을 수 없는 테이블 간 규칙 12개는 점검 SQL(`V5_integrity_checks.sql`)로 확인
+- 개발 시드 V5_1: 실제 DOOR 모델 `door-swin-tiny-e20-8d042c7bfab2`를 비활성으로 등록 (Mock 모델과 동시 active 불가)
+- 이미 적용된 마이그레이션은 수정하지 않고 다음 버전으로 추가
 
 제약·인덱스
 - 복합 FK 유지: 검사의 부품–검사항목, 정책의 모델–검사항목 일치를 DB에서 보장 [승계]
@@ -614,7 +657,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 | TBD-02 | 목표 미검출률 지정 방식 | **폐지** | 합의본에서 passThreshold 조정 방식으로 대체 | — |
 | TBD-03 | ready 판정 기준 값·최소 표본 수 | 일부 확정 | 설정 주체는 확정(검증 자료 등록 시 기준 충족 여부로 결정). 기준 값은 AI 평가 후 제공 | 김도현 |
 | TBD-04 | 검사항목 코드 이름 | 일부 확정 | 테이블 유지, API 비노출. 이름만 결정 (예: APPEARANCE) | 김남균·김도현 |
-| TBD-05 | AI 응답 세부·오류 본문·Grad-CAM 전달 | **해소** | base64 PNG, DEFECT 예측만 생성, 오류는 공통 형식 (7장) | — |
+| TBD-05 | AI 응답 세부·오류 본문·Grad-CAM 전달 | **해소** | base64 PNG·JPEG [합의 10/28], DEFECT 예측만 생성, 오류는 공통 형식 (7장) | — |
 | TBD-06 | predictedQuality와 정책 판정의 충돌 처리 | **해소** | DEFECT 예측은 항상 REVIEW, GOOD 예측만 AUTO_PASS 후보 (4장) | — |
 | TBD-07 | rawDefectProbability 명칭 | 유지 | 현재 명칭 유지 | 전체 |
 | TBD-08 | 업로드 형식·용량·해상도 | 유지 | JPEG·PNG, 20MB, 최소 해상도 검사 없음 | 이승규·김도현 |
@@ -625,3 +668,5 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 | TBD-13 | 입력 프로그램 인증 | **해소** | DEVICE 역할 계정 로그인 → JWT | — |
 | TBD-14 | iOS 종료·백그라운드 푸시 포함 여부 | 일부 확정 | RN + Expo 확정. 앱 실행 중 폴링 필수, Android 푸시 권장, iOS 푸시는 Apple Developer 계정 여부에 따라 결정 (8.1) | 전체 |
 | TBD-15 | 과거 결과 재계산 설계 유지 여부 | **해소** | 제외 | — |
+| — | Grad-CAM 0맵·상수맵 처리 | **해소** [합의 10/28] | `gradcamStatus = NO_ACTIVATION`, 이미지 없음, 분류·REVIEW 유지 (6.5, 7.2) | — |
+| — | `inferenceTimeMs` 측정 범위 | **해소** [합의 10/28] | AI handler 진입~응답 직렬화 직전, 모델 최초 로드 제외 (7.2) | — |

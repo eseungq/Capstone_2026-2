@@ -23,7 +23,7 @@
 ```bash
 docker compose up -d                 # MySQL 8.4 (DB/계정/비밀번호: inspection)
 ./gradlew build                      # 컴파일 + 단위 테스트
-./gradlew bootRun                    # Flyway가 V1~V4와 개발용 시드(db/seed-dev) 적용
+./gradlew bootRun                    # Flyway가 V1~V5와 개발용 시드(db/seed-dev) 적용
 
 # 다른 터미널에서 Mock AI
 cd mock-ai
@@ -33,7 +33,8 @@ uvicorn main:app --port 8090
 ```
 
 - Swagger UI: http://localhost:8080/swagger-ui.html (오른쪽 위 Authorize에 Access Token 입력)
-- 이미 V1·V2만 적용된 DB에서도 그대로 실행하면 V3·V4가 추가 적용된다
+- 이미 V1·V2만 적용된 DB에서도 그대로 실행하면 V3 이후가 추가 적용된다
+- V5(무결성 제약)는 기존 행이 제약을 어기면 적용 중간에 실패한다. 오래된 개발 DB라면 먼저 김남균 `V5_precheck.sql`로 위반 0건을 확인하고, 위반이 있으면 `docker compose down -v`로 초기화
 
 ## 테스트 계정 (개발용, `src/main/resources/db/seed-dev`)
 
@@ -43,7 +44,8 @@ uvicorn main:app --port 8090
 | admin01 | Admin1234! | ADMIN |
 | device-door | Device1234! | DEVICE (사진 입력 프로그램) |
 
-시드에는 Mock 모델 `mock-door-swin-t-v1`(보정기 `mock-cal-v1`)과 예시 정책 `example-door-p1`(passThreshold 0.05, 검증 범위 0.02~0.08, ready·active)도 들어 있다. 실제 검증 값이 아니다.
+시드에는 Mock 모델 `mock-door-swin-t-v1`(보정기 `mock-cal-v1`, active)과 예시 정책 `example-door-p1`(passThreshold 0.05, 검증 범위 0.02~0.08, ready·active)도 들어 있다. 실제 검증 값이 아니다.
+실제 DOOR 모델 `door-swin-tiny-e20-8d042c7bfab2`(보정기 없음, 정책 없음)도 **비활성**으로 등록되어 있다 (아래 "실제 AI 연결").
 **운영 배포 시 `spring.flyway.locations`에서 `classpath:db/seed-dev`를 빼야 한다.**
 
 ## 동작 확인 (curl)
@@ -70,10 +72,34 @@ curl -s localhost:8080/api/v1/inspections/<inspectionId> -H "Authorization: Bear
 | 비밀번호 5회 틀림 | 5번째부터 423 `AUTH_ACCOUNT_LOCKED` |
 | 같은 `Idempotency-Key`·같은 사진 재전송 | 200, 기존 inspectionId |
 | 같은 키·다른 사진 | 422 `IDEMPOTENCY_KEY_MISMATCH` |
-| Mock 시나리오별 결과 | `mock-ai/README.md` 표 참고 (AUTO_PASS, REVIEW 사유별, FAILED 오류별) |
+| Mock 시나리오별 결과 | `mock-ai/README.md` 표 참고 (AUTO_PASS, REVIEW 사유별, Grad-CAM GENERATED·FAILED·NO_ACTIVATION·JPEG, FAILED 오류별) |
 | 이미지 주소 | 상세의 `images.original.url`을 브라우저로 열면 원본 표시, 10분 뒤 404 |
 
 응답 헤더 `X-Trace-Id`와 서버 로그의 `[traceId]`가 같으면 추적 ID 연결이 정상이다. 분석 로그도 접수 요청과 같은 traceId로 남는다.
+
+## 실제 AI 연결
+
+계약 v4 7장 규격의 실제 AI 서버로 바꾸는 방법. 모델 버전은 `door-swin-tiny-e20-8d042c7bfab2` (보정기 미준비, 정책 없음 → 분석 성공 건은 모두 REVIEW가 정상: GOOD은 `NO_ACTIVE_POLICY`, DEFECT는 `DEFECT_PREDICTED`).
+
+1. 활성 모델 전환 (검사항목당 active 모델은 1개, V5 제약). 순서대로 실행
+   ```sql
+   UPDATE ai_model SET active = FALSE WHERE model_version = 'mock-door-swin-t-v1';
+   UPDATE ai_model SET active = TRUE  WHERE model_version = 'door-swin-tiny-e20-8d042c7bfab2';
+   ```
+   Mock 모델에 걸린 예시 정책 `example-door-p1`은 그대로 두면 "비활성 모델의 active 정책"으로 무결성 점검(I12)에 걸린다. 함께 중지하고, Mock으로 돌아올 때 다시 켠다
+   ```sql
+   UPDATE automation_policy SET active = FALSE WHERE policy_version = 'example-door-p1';
+   ```
+   Mock으로 되돌리기: 위 두 모델의 TRUE·FALSE를 바꿔(실제 모델 FALSE를 먼저) 실행하고 `example-door-p1`을 `active = TRUE`로
+2. 백엔드를 AI 서버 주소와 함께 실행. AI 서버가 원본 사진을 내려받을 수 있도록 `PUBLIC_BASE_URL`은 **AI 서버에서 접근 가능한 이 PC의 주소**로
+   ```bash
+   APP_AI_BASEURL=http://<AI서버주소>:<포트> PUBLIC_BASE_URL=http://<이 PC 내부 IP>:8080 ./gradlew bootRun
+   ```
+   실제 추론이 오래 걸리면 `APP_AI_READTIMEOUTMS`(기본 10000)도 함께 조정
+3. 확인: `GET {AI}/internal/v1/models`에 위 모델 버전이 있는지, 접수 후 상세의 `ai.modelVersion`
+
+- 실제 DEFECT 응답은 Grad-CAM base64가 약 1,546만 자(15.5MB)로 크다. AI 응답 파싱 문자열 한도는 `app.ai.max-response-string-chars`(기본 5,000만 자, Jackson 기본 2,000만 자)
+- 실제 응답 원문 3종 회귀 테스트: `src/test/resources/ai-samples/` (15MB `02_DEFECT.json`은 저장소에 올리지 않음. 파일이 없으면 해당 테스트는 건너뜀)
 
 ## 구조
 
@@ -86,8 +112,8 @@ storage/             로컬 이미지 저장, 서명된 만료 주소, 이미지
 config/              AppProperties(app.*), Security, 분석 스레드 풀, Swagger
 common/              공통 응답·오류, traceId, 시각 변환
 domain/              엔티티·리포지토리
-resources/db/migration   V1 스키마, V2 부품, V3 인증, V4 모니터링·비동기·Grad-CAM
-resources/db/seed-dev    개발용 계정·Mock 모델·예시 정책
+resources/db/migration   V1 스키마, V2 부품, V3 인증, V4 모니터링·비동기·Grad-CAM, V5 무결성 제약(김남균)
+resources/db/seed-dev    개발용 계정·Mock 모델·예시 정책, 실제 DOOR 모델(비활성)
 mock-ai/             Mock AI 추론 서버 (FastAPI)
 ```
 
