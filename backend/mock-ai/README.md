@@ -22,8 +22,10 @@ uvicorn main:app --port 8090
 | GOOD_CALIBRATED | GOOD, 보정 0.021 | COMPLETED · AUTO_PASS (최종 PASS, SYSTEM) |
 | GOOD_ABOVE_THRESHOLD | GOOD, 보정 0.2 | COMPLETED · REVIEW (ABOVE_THRESHOLD) |
 | GOOD_UNCALIBRATED | GOOD, 보정 null | COMPLETED · REVIEW (CALIBRATION_UNAVAILABLE) |
-| DEFECT_GRADCAM | DEFECT, Grad-CAM PNG | COMPLETED · REVIEW (DEFECT_PREDICTED), gradcamStatus GENERATED |
+| DEFECT_GRADCAM | DEFECT, Grad-CAM PNG (`status: GENERATED`) | COMPLETED · REVIEW (DEFECT_PREDICTED), gradcamStatus GENERATED |
 | DEFECT_GRADCAM_FAIL | DEFECT, Grad-CAM null | COMPLETED · REVIEW (DEFECT_PREDICTED), gradcamStatus FAILED |
+| DEFECT_NO_ACTIVATION | DEFECT, 0맵 (`status: NO_ACTIVATION`, `mapType: ZERO_MAP`, 이미지 null) | COMPLETED · REVIEW (DEFECT_PREDICTED), gradcamStatus NO_ACTIVATION, CAM 이미지 없음 |
+| DEFECT_GRADCAM_JPEG | DEFECT, Grad-CAM JPEG (`format: jpeg`) | COMPLETED · REVIEW (DEFECT_PREDICTED), gradcamStatus GENERATED, `image/jpeg`로 저장 |
 | ERROR_4XX | 422 오류 본문 | FAILED · AI_REQUEST_REJECTED (재시도 없음) |
 | ERROR_5XX | 500 오류 본문 | 1회 재시도 후 FAILED · AI_SERVER_ERROR |
 | TIMEOUT | 15초 대기 | FAILED · AI_SERVER_TIMEOUT (백엔드 read-timeout 10초) |
@@ -47,3 +49,6 @@ curl localhost:8090/mock/scenario
 - 모르는 모델 버전, 부품과 모델 불일치, 이미지 다운로드 실패 → 422 (백엔드는 AI_REQUEST_REJECTED)
 - Grad-CAM은 EXIF 방향 보정한 원본과 같은 크기의 PNG
 - `GET /internal/v1/models`: 로드 가능한 모델 목록
+- 모델 버전 2개: `mock-door-swin-t-v1`(보정기 `mock-cal-v1`), `door-swin-tiny-e20-8d042c7bfab2`(실제 DOOR 모델 버전, 보정기 없음).
+  보정기가 없는 모델은 어떤 시나리오든 보정 확률·보정기 버전을 null로 반환한다 (정책도 없으므로 GOOD은 REVIEW `NO_ACTIVE_POLICY`)
+- 새 시나리오 2종은 AUTO 선택 대상에 넣지 않았다 (기존 사진별 결과 유지). 직접 지정해서 사용

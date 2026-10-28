@@ -24,8 +24,9 @@ from PIL import Image, ImageOps
 from pydantic import BaseModel
 
 MODELS = {
-    # modelVersion: (partCode, calibratorVersion)
+    # modelVersion: (partCode, calibratorVersion). 보정기가 없는 모델은 보정 확률·보정기 버전을 항상 null로 반환
     "mock-door-swin-t-v1": ("DOOR", "mock-cal-v1"),
+    "door-swin-tiny-e20-8d042c7bfab2": ("DOOR", None),  # 실제 DOOR 모델 버전 (AI 10/28). 백엔드 연동 시험용
 }
 
 # 시나리오별 반환 값. raw ≥ 0.5 이면 DEFECT (계약 7.2)
@@ -35,6 +36,11 @@ SCENARIOS = {
     "GOOD_UNCALIBRATED": dict(quality="GOOD", raw=0.231044, cal=None, calibrated=False),  # REVIEW(CALIBRATION_UNAVAILABLE)
     "DEFECT_GRADCAM": dict(quality="DEFECT", raw=0.912345, cal=0.880000, calibrated=True, gradcam=True),
     "DEFECT_GRADCAM_FAIL": dict(quality="DEFECT", raw=0.871234, cal=0.830000, calibrated=True, gradcam=False),
+    # 0맵: 계산 성공·위치별 강조 반응 없음 → 백엔드 gradcamStatus NO_ACTIVATION, 이미지 없음 (합의 10/28)
+    "DEFECT_NO_ACTIVATION": dict(quality="DEFECT", raw=0.662475, cal=0.610000, calibrated=True, gradcam="NO_ACTIVATION"),
+    # 표시용 CAM을 jpeg로 보냄 → 백엔드는 image/jpeg·.jpg로 저장
+    "DEFECT_GRADCAM_JPEG": dict(quality="DEFECT", raw=0.902345, cal=0.870000, calibrated=True, gradcam=True,
+                                gradcam_format="jpeg"),
     "ERROR_4XX": dict(error=422),        # 백엔드: AI_REQUEST_REJECTED → FAILED (재시도 없음)
     "ERROR_5XX": dict(error=500),        # 백엔드: 1회 재시도 후 AI_SERVER_ERROR → FAILED
     # 백엔드 read-timeout(10초)보다 오래 대기 후 정상 응답 → 백엔드는 이미 AI_SERVER_TIMEOUT으로 FAILED (늦은 결과 무시)
@@ -105,8 +111,8 @@ def pick_scenario(image_bytes: bytes) -> str:
     return AUTO_POOL[digest[0] % len(AUTO_POOL)]
 
 
-def make_gradcam(img: Image.Image, seed: bytes) -> bytes:
-    """원본 위에 가짜 히트맵을 겹친 PNG. 원본(방향 보정 후)과 같은 크기 (계약 7.2)"""
+def make_gradcam(img: Image.Image, seed: bytes, fmt: str = "png") -> bytes:
+    """원본 위에 가짜 히트맵을 겹친 PNG 또는 JPEG. 원본(방향 보정 후)과 같은 크기 (계약 7.2)"""
     w, h = img.size
     # 계산량을 줄이려고 작은 크기에서 히트맵을 만든 뒤 원본 크기로 확대
     sw, sh = max(1, w // 8), max(1, h // 8)
@@ -125,7 +131,7 @@ def make_gradcam(img: Image.Image, seed: bytes) -> bytes:
     heat = heat.resize((w, h), Image.BILINEAR)
     overlay = Image.blend(img.convert("RGB"), heat, 0.45)
     buf = io.BytesIO()
-    overlay.save(buf, format="PNG")
+    overlay.save(buf, format="JPEG" if fmt == "jpeg" else "PNG")
     return buf.getvalue()
 
 
@@ -166,17 +172,23 @@ async def predict(req: PredictRequest, request: Request):
 
     await asyncio.sleep(DELAY_MS / 1000)
     gradcam = None
-    if s.get("gradcam"):
-        png = make_gradcam(img, hashlib.sha256(image_bytes).digest())
-        gradcam = {"targetClass": "DEFECT", "format": "png", "imageBase64": base64.b64encode(png).decode()}
+    if s.get("gradcam") == "NO_ACTIVATION":
+        gradcam = {"targetClass": "DEFECT", "status": "NO_ACTIVATION", "mapType": "ZERO_MAP",
+                   "format": None, "imageBase64": None}
+    elif s.get("gradcam"):
+        fmt = s.get("gradcam_format", "png")
+        data = make_gradcam(img, hashlib.sha256(image_bytes).digest(), fmt)
+        gradcam = {"targetClass": "DEFECT", "status": "GENERATED", "format": fmt,
+                   "imageBase64": base64.b64encode(data).decode()}
+    calibrated = s["calibrated"] and calibrator is not None
 
     body = {
         "inspectionId": iid,
         "modelVersion": req.requestedModelVersion,
         "predictedQuality": s["quality"],
         "rawDefectProbability": s["raw"],
-        "calibratedDefectProbability": s["cal"] if s["calibrated"] else None,
-        "calibratorVersion": calibrator if s["calibrated"] else None,
+        "calibratedDefectProbability": s["cal"] if calibrated else None,
+        "calibratorVersion": calibrator if calibrated else None,
         "imageWidth": img.size[0],
         "imageHeight": img.size[1],
         "gradcam": gradcam,
