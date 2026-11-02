@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 // 분석 단계별 DB 기록. AI 호출은 트랜잭션 밖에서 하고, 시작·완료·실패 기록만 짧은 트랜잭션으로 처리
@@ -46,7 +47,7 @@ public class AnalysisResultWriter {
 
     // 결과 요약 (알림 판단용)
     public record Outcome(String inspectionId, String inspectionNo, String partCode, InspectionStatus status,
-                          boolean reviewRequired) {
+                          boolean reviewRequired, LocalDateTime occurredAt) {
     }
 
     // RECEIVED → ANALYZING. 이미 처리된 건이면 null (중복 실행 방지)
@@ -89,7 +90,7 @@ public class AnalysisResultWriter {
         log.info("분석 완료 {} {} quality={} action={} reason={} gradcam={}", i.getInspectionNo(), i.getId(),
                 quality, d.action(), d.reviewReason(), gradcamStatus);
         return new Outcome(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(), i.getStatus(),
-                i.getFinalJudgement() == null);
+                i.getFinalJudgement() == null, i.getCompletedAt());
     }
 
     // FAILED 확정 (이후 변경하지 않음)
@@ -101,7 +102,7 @@ public class AnalysisResultWriter {
         }
         i.fail(errorCode, detail);
         log.warn("분석 실패 {} {} {} {}", i.getInspectionNo(), i.getId(), errorCode, detail);
-        return new Outcome(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(), i.getStatus(), false);
+        return new Outcome(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(), i.getStatus(), false, i.getCompletedAt());
     }
 
     // DEFECT 예측의 Grad-CAM: 응답 해석(GradcamParser) 후 GENERATED만 저장. 저장 실패도 검사는 실패시키지 않고 FAILED로 기록

@@ -14,6 +14,7 @@ public enum ErrorCode {
     IMAGE_RESOLUTION_TOO_LOW(HttpStatus.BAD_REQUEST, "이미지 해상도가 기준보다 낮습니다.", false),
     IMAGE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "이미지 용량이 기준을 초과했습니다.", false),
     POLICY_THRESHOLD_OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "검증 범위를 벗어난 기준치입니다.", false),
+    INVALID_DEVICE_TOKEN(HttpStatus.BAD_REQUEST, "기기 토큰 형식이 올바르지 않습니다.", false),
 
     // 401·403·423 인증·권한
     AUTH_INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.", false),

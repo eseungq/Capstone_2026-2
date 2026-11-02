@@ -38,11 +38,12 @@ public class AuthController {
         return ApiResponse.of(authService.refresh(request.refreshToken()));
     }
 
-    @Operation(summary = "로그아웃", description = "보낸 Refresh Token을 폐기")
+    @Operation(summary = "로그아웃", description = "보낸 Refresh Token을 폐기하고, deviceToken을 보내면 기기 토큰도 해제")
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(@AuthenticationPrincipal AuthUser user,
                        @RequestBody(required = false) LogoutRequest request) {
-        authService.logout(user.userId(), request == null ? null : request.refreshToken());
+        authService.logout(user.userId(), request == null ? null : request.refreshToken(),
+                request == null ? null : request.deviceToken());
     }
 }

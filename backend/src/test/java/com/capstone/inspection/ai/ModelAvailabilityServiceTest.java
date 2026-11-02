@@ -49,7 +49,7 @@ class ModelAvailabilityServiceTest {
         return new AppProperties(d.upload(), new AppProperties.Ai(a.baseUrl(), a.connectTimeoutMs(), a.readTimeoutMs(),
                 a.retryCount(), a.imageSizeCheckEnabled(), a.maxResponseStringChars(), enabled, ttl, failureTtl,
                 a.modelCheckConnectTimeoutMs(), a.modelCheckReadTimeoutMs()),
-                d.storage(), d.auth(), d.inspection(), d.monitoring(), d.policy());
+                d.storage(), d.auth(), d.inspection(), d.monitoring(), d.policy(), d.push());
     }
 
     @Test

@@ -59,6 +59,11 @@ app:
     recent-size: 10                   # 부품별 최근 검사 표시 건수 (계약 6.3)
   policy:
     min-sample-count: 0               # ready 판정의 최소 표본 수 (TBD-03 임시, AI 평가 후 조정)
+  push:
+    enabled: false                    # false면 발송하지 않고 로그만 (계약 8장)
+    expo-url: https://exp.host/--/api/v2/push/send
+    connect-timeout-ms: 3000
+    read-timeout-ms: 10000
   auth:
     jwt-secret: ${JWT_SECRET:change-this-dev-secret-key-to-32-bytes-or-more}
     access-token-ttl-seconds: 1800

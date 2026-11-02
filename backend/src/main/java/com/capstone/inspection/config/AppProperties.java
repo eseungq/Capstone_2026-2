@@ -8,7 +8,7 @@ import java.util.List;
 // 미확정(TBD) 값은 전부 여기로 모아 코드 수정 없이 바꿀 수 있게 함
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(Upload upload, Ai ai, Storage storage, Auth auth, Inspection inspection,
-                            Monitoring monitoring, Policy policy) {
+                            Monitoring monitoring, Policy policy, Push push) {
 
     // 업로드 제한 (TBD-08)
     public record Upload(List<String> allowedContentTypes, long maxBytes, int minWidth, int minHeight) {
@@ -42,5 +42,9 @@ public record AppProperties(Upload upload, Ai ai, Storage storage, Auth auth, In
 
     // 정책 등록 시 ready 판정 기준 (TBD-03 임시)
     public record Policy(int minSampleCount) {
+    }
+
+    // Expo 푸시 발송 (계약 8장). enabled=false면 로그만 남김
+    public record Push(boolean enabled, String expoUrl, int connectTimeoutMs, int readTimeoutMs) {
     }
 }

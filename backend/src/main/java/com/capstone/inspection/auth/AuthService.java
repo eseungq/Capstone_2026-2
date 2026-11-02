@@ -9,6 +9,7 @@ import com.capstone.inspection.domain.user.RefreshToken;
 import com.capstone.inspection.domain.user.RefreshTokenRepository;
 import com.capstone.inspection.domain.user.User;
 import com.capstone.inspection.domain.user.UserRepository;
+import com.capstone.inspection.notification.DeviceTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final DeviceTokenService deviceTokenService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
     private final AppProperties props;
@@ -69,7 +71,8 @@ public class AuthService {
 
     // 본인 토큰만 폐기. 없는 토큰이어도 로그아웃은 성공으로 처리 (앱이 로컬 토큰을 지우면 끝)
     @Transactional
-    public void logout(String userId, String refreshToken) {
+    public void logout(String userId, String refreshToken, String deviceToken) {
+        deviceTokenService.unregister(userId, deviceToken);
         if (refreshToken == null || refreshToken.isBlank()) {
             return;
         }

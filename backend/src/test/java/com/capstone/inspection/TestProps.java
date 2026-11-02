@@ -19,6 +19,7 @@ public final class TestProps {
                 new AppProperties.Auth("test-secret-key-for-unit-tests-32-bytes-or-more", 1800, 1209600, 5),
                 new AppProperties.Inspection(2, 500),
                 new AppProperties.Monitoring(10),
-                new AppProperties.Policy(0));
+                new AppProperties.Policy(0),
+                new AppProperties.Push(false, "http://localhost:9/push", 3000, 10000));
     }
 }
