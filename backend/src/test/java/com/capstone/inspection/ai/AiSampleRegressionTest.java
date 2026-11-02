@@ -136,7 +136,9 @@ class AiSampleRegressionTest {
         AppProperties.Ai ai = base.ai();
         AppProperties props = new AppProperties(base.upload(),
                 new AppProperties.Ai("http://127.0.0.1:" + server.getAddress().getPort(), ai.connectTimeoutMs(),
-                        ai.readTimeoutMs(), ai.retryCount(), ai.imageSizeCheckEnabled(), ai.maxResponseStringChars()),
+                        ai.readTimeoutMs(), ai.retryCount(), ai.imageSizeCheckEnabled(), ai.maxResponseStringChars(),
+                        ai.modelCheckEnabled(), ai.modelCheckTtlSeconds(), ai.modelCheckFailureTtlSeconds(),
+                        ai.modelCheckConnectTimeoutMs(), ai.modelCheckReadTimeoutMs()),
                 base.storage(), base.auth(), base.inspection(), base.monitoring());
         return new AiClient(props, aiJson);
     }

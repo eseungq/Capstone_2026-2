@@ -20,7 +20,7 @@ public class PartController {
     private final PartService partService;
 
     // WORKER·ADMIN만 호출 가능 (SecurityConfig)
-    @Operation(summary = "부품·검사항목 목록", description = "부품별 검사항목과 활성 모델의 사용 가능·패치 지원 여부")
+    @Operation(summary = "부품·검사항목 목록", description = "부품별 검사항목, 활성 모델 사용 가능 여부, 정책 적용 여부")
     @GetMapping
     public ApiResponse<List<PartResponse>> getParts() {
         return ApiResponse.of(partService.getParts());

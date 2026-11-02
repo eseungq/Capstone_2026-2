@@ -42,6 +42,11 @@ app:
     retry-count: 1                    # 연결 실패·5xx만 재시도 (계약 7.3). 4xx·타임아웃·규격 위반은 재시도 안 함
     image-size-check-enabled: false   # AI 응답 이미지 크기와 저장 원본 대조 (TBD-09 결정 후 켜기)
     max-response-string-chars: 50000000  # AI 응답 문자열 최대 길이. 실제 DEFECT CAM base64 약 1,546만 자 (Jackson 기본 2,000만)
+    model-check-enabled: true         # /internal/v1/models로 로드 확인. false면 활성 모델 있음만으로 판단
+    model-check-ttl-seconds: 30       # 조회 성공 결과 캐시
+    model-check-failure-ttl-seconds: 5  # 조회 실패 결과 캐시 (AI 장애 때 요청마다 확인하지 않게)
+    model-check-connect-timeout-ms: 500
+    model-check-read-timeout-ms: 1000
   storage:
     type: local                       # 개발용 로컬 저장, 운영 방식은 TBD-01
     local-root: ./storage

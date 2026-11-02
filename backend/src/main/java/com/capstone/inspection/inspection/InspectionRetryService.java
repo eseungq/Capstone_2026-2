@@ -1,5 +1,6 @@
 package com.capstone.inspection.inspection;
 
+import com.capstone.inspection.ai.ModelAvailabilityService;
 import com.capstone.inspection.auth.security.AuthUser;
 import com.capstone.inspection.common.error.BusinessException;
 import com.capstone.inspection.common.error.ErrorCode;
@@ -39,6 +40,7 @@ public class InspectionRetryService {
     private final InspectionRepository inspectionRepository;
     private final ImageStorageRepository imageRepository;
     private final AiModelRepository aiModelRepository;
+    private final ModelAvailabilityService modelAvailability;
     private final UserRepository userRepository;
     private final InspectionNoGenerator inspectionNoGenerator;
     private final ApplicationEventPublisher eventPublisher;
@@ -57,6 +59,7 @@ public class InspectionRetryService {
         if (models.isEmpty()) {
             throw new BusinessException(ErrorCode.MODEL_NOT_AVAILABLE);
         }
+        modelAvailability.requireNotRejected(models.get(0).getModelVersion());
         ImageStorage original = imageRepository.findByInspectionIdAndImageType(failed.getId(), ImageType.ORIGINAL)
                 .orElseThrow(() -> new IllegalStateException("원본 이미지 기록 없음 " + failed.getId()));
 

@@ -1,5 +1,6 @@
 package com.capstone.inspection.inspection;
 
+import com.capstone.inspection.ai.ModelAvailabilityService;
 import com.capstone.inspection.auth.security.AuthUser;
 import com.capstone.inspection.common.error.BusinessException;
 import com.capstone.inspection.common.error.ErrorCode;
@@ -49,6 +50,7 @@ public class InspectionIntakeService {
     private final PartRepository partRepository;
     private final InspectionItemRepository itemRepository;
     private final AiModelRepository aiModelRepository;
+    private final ModelAvailabilityService modelAvailability;
     private final UserRepository userRepository;
     private final InspectionRepository inspectionRepository;
     private final ImageStorageRepository imageRepository;
@@ -89,13 +91,14 @@ public class InspectionIntakeService {
             }
         }
 
-        // 3) 부품의 검사항목과 활성 모델 (없으면 기록 없이 422)
+        // 3) 부품의 검사항목과 활성 모델 (없거나 AI 서버에서 로드 불가면 기록 없이 422)
         InspectionItem item = itemRepository.findByPartId(part.getId()).stream().findFirst()
                 .orElseThrow(() -> new BusinessException(ErrorCode.MODEL_NOT_AVAILABLE));
         List<AiModel> models = aiModelRepository.findActiveByItemId(item.getId());
         if (models.isEmpty()) {
             throw new BusinessException(ErrorCode.MODEL_NOT_AVAILABLE);
         }
+        modelAvailability.requireNotRejected(models.get(0).getModelVersion());
 
         // 4) 검사 기록 + 원본 저장 (같은 트랜잭션. 원본 없는 검사는 만들지 않음)
         InspectionSource source = requester.role() == Role.ADMIN ? InspectionSource.ADMIN : InspectionSource.DEVICE;

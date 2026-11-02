@@ -55,6 +55,7 @@ TIMEOUT_SECONDS = float(os.getenv("MOCK_TIMEOUT_SECONDS", "15"))
 DELAY_MS = int(os.getenv("MOCK_DELAY_MS", "300"))  # 추론 시간 흉내
 
 state = {"scenario": os.getenv("MOCK_SCENARIO", "AUTO"), "once": None}
+model_states = {}  # modelVersion → NOT_LOADABLE·HIDDEN (없으면 LOADABLE)
 
 app = FastAPI(title="Mock AI 추론 서버", version="v4-mock")
 
@@ -71,6 +72,11 @@ class ScenarioRequest(BaseModel):
     once: bool = False  # true면 다음 요청 1건에만 적용
 
 
+class ModelStateRequest(BaseModel):
+    modelVersion: str
+    state: str
+
+
 def error_body(status: int, code: str, message: str, inspection_id: Optional[str]):
     # AI 오류 본문도 공통 형식 (합의 10/15)
     return JSONResponse(status_code=status, content={"error": {
@@ -79,8 +85,19 @@ def error_body(status: int, code: str, message: str, inspection_id: Optional[str
 
 @app.get("/internal/v1/models")
 def models():
-    return {"data": [{"modelVersion": v, "partCode": p, "calibratorVersion": c, "loadable": True}
-                     for v, (p, c) in MODELS.items()]}
+    return {"data": [{"modelVersion": v, "partCode": p, "calibratorVersion": c,
+                      "loadable": model_states.get(v) != "NOT_LOADABLE"}
+                     for v, (p, c) in MODELS.items() if model_states.get(v) != "HIDDEN"]}
+
+
+# 모델 목록 응답 바꾸기 (백엔드 NOT_LOADABLE 확인용). LOADABLE·NOT_LOADABLE·HIDDEN(목록에서 뺌)
+@app.put("/mock/models")
+def set_model_state(req: ModelStateRequest):
+    state_name = req.state.upper()
+    if req.modelVersion not in MODELS or state_name not in ("LOADABLE", "NOT_LOADABLE", "HIDDEN"):
+        return JSONResponse(status_code=400, content={"error": "unknown modelVersion or state"})
+    model_states[req.modelVersion] = state_name
+    return {"modelStates": model_states}
 
 
 @app.get("/mock/scenario")

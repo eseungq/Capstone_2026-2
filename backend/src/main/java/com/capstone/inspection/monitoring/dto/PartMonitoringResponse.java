@@ -8,7 +8,7 @@ import java.util.List;
 // GET /monitoring/parts 응답의 부품 1개 (계약 v4 6.3)
 public record PartMonitoringResponse(String partCode,
                                      String partName,
-                                     boolean modelAvailable,     // 활성 모델 있음 (AI 서버 로드 확인은 이후 추가)
+                                     boolean modelAvailable,     // 활성 모델 있음 + AI 서버 로드 확인됨 (/parts와 같은 판단)
                                      boolean policyActive,       // 활성 모델에 ready·active 정책 있음
                                      OffsetDateTime lastReceivedAt,
                                      long pendingReviewCount,    // REVIEW_PENDING 건수 (배지용)

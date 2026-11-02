@@ -1,5 +1,7 @@
 package com.capstone.inspection.monitoring;
 
+import com.capstone.inspection.ai.ModelAvailability;
+import com.capstone.inspection.ai.ModelAvailabilityService;
 import com.capstone.inspection.common.error.BusinessException;
 import com.capstone.inspection.common.error.ErrorCode;
 import com.capstone.inspection.common.time.Times;
@@ -49,6 +51,7 @@ public class MonitoringService {
     private final PartRepository partRepository;
     private final InspectionItemRepository itemRepository;
     private final AiModelRepository aiModelRepository;
+    private final ModelAvailabilityService modelAvailability;
     private final AutomationPolicyRepository policyRepository;
     private final InspectionRepository inspectionRepository;
     private final InspectionThumbnails thumbnails;
@@ -60,6 +63,7 @@ public class MonitoringService {
                 .collect(Collectors.groupingBy(item -> item.getPart().getId(),
                         Collectors.mapping(InspectionItem::getId, Collectors.toList())));
         Set<String> itemsWithModel = aiModelRepository.findAllActiveWithItem().stream()
+                .filter(m -> modelAvailability.check(m.getModelVersion()) == ModelAvailability.AVAILABLE)
                 .map(m -> m.getItem().getId()).collect(Collectors.toSet());
         Set<String> itemsWithPolicy = Set.copyOf(policyRepository.findItemIdsWithActivePolicy());
 

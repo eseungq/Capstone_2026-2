@@ -16,8 +16,11 @@ public record AppProperties(Upload upload, Ai ai, Storage storage, Auth auth, In
 
     // AI 서버 호출 설정 (TBD-01, TBD-09)
     // maxResponseStringChars: AI 응답 JSON의 문자열 최대 길이 (Grad-CAM base64가 큼. Jackson 기본 2,000만 자)
+    // modelCheck*: 로드 가능 모델 확인 (계약 6.1, 6.2). 성공·실패 결과 캐시 시간과 확인 전용 타임아웃
     public record Ai(String baseUrl, int connectTimeoutMs, int readTimeoutMs, int retryCount,
-                     boolean imageSizeCheckEnabled, int maxResponseStringChars) {
+                     boolean imageSizeCheckEnabled, int maxResponseStringChars,
+                     boolean modelCheckEnabled, int modelCheckTtlSeconds, int modelCheckFailureTtlSeconds,
+                     int modelCheckConnectTimeoutMs, int modelCheckReadTimeoutMs) {
     }
 
     // 이미지 저장소 설정 (TBD-01)

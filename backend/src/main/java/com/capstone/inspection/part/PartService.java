@@ -1,7 +1,10 @@
 package com.capstone.inspection.part;
 
+import com.capstone.inspection.ai.ModelAvailability;
+import com.capstone.inspection.ai.ModelAvailabilityService;
 import com.capstone.inspection.domain.model.AiModel;
 import com.capstone.inspection.domain.model.AiModelRepository;
+import com.capstone.inspection.domain.model.AutomationPolicyRepository;
 import com.capstone.inspection.domain.part.InspectionItem;
 import com.capstone.inspection.domain.part.InspectionItemRepository;
 import com.capstone.inspection.domain.part.Part;
@@ -14,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -25,6 +29,8 @@ public class PartService {
     private final PartRepository partRepository;
     private final InspectionItemRepository itemRepository;
     private final AiModelRepository aiModelRepository;
+    private final AutomationPolicyRepository policyRepository;
+    private final ModelAvailabilityService modelAvailability;
 
     // 부품 → 검사항목 → 활성 모델 상태를 묶어서 반환
     public List<PartResponse> getParts() {
@@ -38,8 +44,15 @@ public class PartService {
         Map<String, AiModel> activeModelByItemId = aiModelRepository.findAllActiveWithItem().stream()
                 .collect(Collectors.toMap(m -> m.getItem().getId(), Function.identity(), (a, b) -> a));
 
+        // 활성 모델 중 로드 확인된 것, 활성 모델에 ready·active 정책이 있는 항목
+        Set<String> availableModelIds = activeModelByItemId.values().stream()
+                .filter(m -> modelAvailability.check(m.getModelVersion()) == ModelAvailability.AVAILABLE)
+                .map(AiModel::getId).collect(Collectors.toSet());
+        Set<String> itemsWithPolicy = Set.copyOf(policyRepository.findItemIdsWithActivePolicy());
+
         return parts.stream()
-                .map(p -> PartResponse.of(p, itemsByPartId.getOrDefault(p.getId(), List.of()), activeModelByItemId))
+                .map(p -> PartResponse.of(p, itemsByPartId.getOrDefault(p.getId(), List.of()), activeModelByItemId,
+                        availableModelIds, itemsWithPolicy))
                 .toList();
     }
 }
