@@ -1,6 +1,6 @@
 # 백엔드 API 계약 v4 (초안)
 
-3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장)
+3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장) · 11/02 갱신 (구현 세부 반영: 6.1~6.4, 6.6~6.9, 7.4, 8장, 10장, 12장)
 
 - 기준 1: 「자동차부품_공정모니터링_개발계획서_최종합의반영」(10/14 합의본)
 - 기준 2: 「요구사항명세서_패치검사_개정본3」(9/30)의 규칙 중 합의본과 충돌하지 않는 것은 그대로 승계
@@ -13,6 +13,7 @@
 - **[합의 10/15]** 10/15 팀 회신으로 확정된 내용
 - **[합의 10/28]** 10/28 팀 확인으로 확정된 내용
 - **[제안]** 합의본이 백엔드에 결정을 맡긴 부분. 이의가 없으면 이대로 구현
+- **[구현 MM/DD]** 계약에 없어서 구현하면서 정한 세부. 이의가 있으면 이승규에게 알림
 - **[TBD-xx]** 미확정. 명세서 11장 번호 체계를 따름 (12장 목록)
 
 공유 대상: 홍승인(앱) · 김남균(DB) · 김도현(AI, 7장)
@@ -211,6 +212,23 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 - `/recalculations`: 개정본3에서도 "프로토타입 범위 밖, 설계만 제시". 유지 여부 [TBD-15]
 - 모델 등록·활성화 API (`POST /models`, `PUT /models/{id}/activation`): 시드 데이터·설정으로 대체하고 조회만 제공 [제안]. 로드 가능 여부 확인 규칙은 유지 [승계]
 
+`GET /parts` 응답 항목 [구현 11/02]
+
+```json
+{
+  "partCode": "DOOR",
+  "name": "도어",
+  "items": [
+    { "inspectionItemCode": "SCRATCH", "name": "...", "modelAvailable": true, "policyActive": true,
+      "activeModelVersion": "mock-door-swin-t-v1" }
+  ]
+}
+```
+
+- `modelAvailable`: 활성 모델이 있고 AI 서버 확인 결과가 AVAILABLE일 때만 true (6.2). `/monitoring/parts`와 같은 판단
+- `policyActive`: 활성 모델에 ready·active 정책이 있음
+- `patchInspectionSupported`는 제거
+
 ### 6.2 사진 접수 `POST /inspections`
 
 요청 (`multipart/form-data`)
@@ -251,7 +269,19 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 
 오류: `400 INVALID_PART_CODE`, `400 INVALID_IMAGE_FORMAT`, `400 IMAGE_RESOLUTION_TOO_LOW`, `413 IMAGE_TOO_LARGE`, `422 MODEL_NOT_AVAILABLE`, `422 IDEMPOTENCY_KEY_MISMATCH`, `500 STORAGE_UPLOAD_FAILED`
 
-- 모델이 없거나 로드할 수 없는 부품은 검사 기록을 만들기 전에 422로 거절 [승계]
+- 모델이 없거나 로드할 수 없는 부품은 검사 기록을 만들기 전에 422로 거절 [승계]. 단, AI 서버에 연결되지 않아 확인할 수 없는 경우는 거절하지 않음 [구현 11/02, 아래 표]
+
+모델 로드 확인 결과 [구현 11/02] (`GET {AI}/internal/v1/models`, 7.4)
+
+| 결과 | 조건 | 접수·재검사 | `modelAvailable` |
+|---|---|---|---|
+| AVAILABLE | 목록에 있고 `loadable = true` | 정상 접수 | true |
+| NOT_LOADABLE | 목록에 없거나 `loadable = false` | 기록·파일 저장 없이 `422 MODEL_NOT_AVAILABLE` | false |
+| UNKNOWN | 연결 실패·타임아웃·형식 오류·404 | **정상 접수**. AI 오류면 분석 단계에서 기존 규칙대로 FAILED | false |
+
+- UNKNOWN을 거절하지 않는 이유: AI가 꺼졌을 때 거절하면 사진과 기록이 남지 않아 FAILED → 재검사 흐름이 성립하지 않음
+- 결과는 성공 30초·실패 5초 캐시. 확인 전용 타임아웃(연결 500ms·읽기 1초)을 사용해 접수·모니터링을 오래 잡지 않음
+- 실제 AI에 엔드포인트가 없으면 `app.ai.model-check-enabled=false`로 끄고, 활성 모델이 있으면 AVAILABLE로 판단
 - 부품 하나에 라인 하나이므로 모니터링 단위는 `partCode` [확정]. 라인 마스터·라인 관리 API는 만들지 않고 `lineCode`는 저장만 해 둠 [제안]
 
 ### 6.3 부품별 모니터링 `GET /monitoring/parts`
@@ -277,6 +307,9 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 ```
 
 - `recent`: 부품별 최근 N건 (기본 10) [제안]
+- `modelAvailable`: `GET /parts`와 같은 판단 (6.2) [구현 11/02]. AI가 꺼져 UNKNOWN이면 false지만 접수는 가능
+- `policyActive`: 활성 모델에 ready·active 정책이 있으면 true [구현 10/19]
+- `thumbnailUrl`: 썸네일을 따로 만들지 않고 원본의 서명 주소 사용, 10분 후 만료. 6.4·6.6도 같음 [구현 10/19]
 - 통계로 확장하지 않음. 건수는 화면 배지 표시용 [확정]
 
 ### 6.4 확인 필요 목록 `GET /monitoring/queue`
@@ -304,6 +337,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 ```
 
 - 오래된 순으로 정렬 (먼저 들어온 사진부터 확인) [제안]
+- `size` 최대 100, 범위 밖은 `400 INVALID_PARAMETER`. 커서는 (receivedAt, id)를 Base64url로 인코딩한 값이고 `nextCursor`가 null이면 마지막 페이지 [구현 10/19]
 - FAILED 건 중 이미 재검사한 건은 목록에서 제외 [제안]
 - 목록 항목 선택 → `GET /inspections/{id}`로 상세 이동 [확정]
 
@@ -373,6 +407,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 응답: 6.4 항목 형식 + `finalJudgement`, `judgedBy`, `confirmedAt`
 
 - 작업자도 모든 검사를 조회 가능 [제안]. 합의본 표현은 "공통 업무 범위에서 조회"
+- receivedAt 최신순(같으면 id), 기간은 `from ≤ receivedAt < to`, `size` 최대 100, 없는 `partCode`는 `400 INVALID_PART_CODE` [구현 10/19]
 
 ### 6.7 작업자 확인 `POST /inspections/{id}/confirm`
 
@@ -385,6 +420,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - 같은 값 재전송은 기존 결과 반환(200), 다른 값 재제출은 `409 ALREADY_CONFIRMED`, 동시 제출 시 1건만 저장 [승계]
 - 오류: `409 NOT_REVIEWABLE` (AUTO_PASS·FAILED·분석 중), `403 ACCESS_DENIED` (ADMIN·DEVICE 호출)
 - `comment`는 선택, 최대 200자 [제안]
+- 재전송 비교는 `finalJudgement`만 (comment는 비교하지 않음), 공백 comment는 null로 저장 [구현 10/19]
 
 ### 6.8 재검사 `POST /inspections/{id}/retry`
 
@@ -393,6 +429,8 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - 저장된 원본을 다시 사용하므로 사진을 다시 올리지 않음. 새 검사의 `retryOf`에 원래 ID 기록 [제안]
 - 응답 `202`: 새 검사의 `{ inspectionId, inspectionNo, status: "RECEIVED", retryOf }`
 - 오류: `409 NOT_RETRYABLE` (FAILED가 아님), `409 ALREADY_RETRIED` (이미 재검사함) [제안]
+- 새 검사의 `capturedAt`·`lineCode`는 원래 검사 값을 이어 쓰고, Idempotency-Key는 받지 않음 [구현 10/19]
+- 모델 확인은 접수와 같은 규칙: NOT_LOADABLE만 `422 MODEL_NOT_AVAILABLE`, UNKNOWN은 진행 (6.2) [구현 11/02]
 
 ### 6.9 관리자: 모델·정책
 
@@ -424,6 +462,19 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - 정책은 `modelVersion`과 `calibratorVersion`이 모두 맞는 검사에만 적용 [합의 10/15]
 - 모델 가중치·보정값 수정 API는 만들지 않음 [확정]
 - `GET /admin/models`: 모델 버전, 부품, AI 서버 로드 가능 여부, 활성 여부 조회만 제공 [제안]
+
+구현 세부 [구현 11/02]
+
+- **`GET /admin/models`** 항목: `{ modelVersion, partCode, calibratorVersion, active, loadable }`. `loadable`은 확인 결과 true·false, 확인할 수 없거나 확인을 끈 경우 null
+- **`GET /admin/policies`**: 쿼리 `partCode`, `active`. 최신 생성순, 페이지 없음. 없는 `partCode`는 `400 INVALID_PART_CODE`. 정책 형식에 `basedOnPolicyId`(조정 시 직전 정책 ID) 추가
+- **`POST /admin/policies`** → `201` 정책 1건. 요청 `{ modelVersion, calibratorVersion, policyVersion, passThreshold, validatedMin, validatedMax, metrics }`
+  - `passThreshold`·`validatedMin`·`validatedMax` 필수, 0~1, 소수 6자리로 반올림 저장. `validatedMin > validatedMax`나 범위 밖 값은 `400 INVALID_PARAMETER`, `passThreshold`가 검증 범위 밖이면 `400 POLICY_THRESHOLD_OUT_OF_RANGE`
+  - `policyVersion` 최대 90자 (조정 접미어 공간). `metrics`는 선택, 객체만 허용
+  - `404 MODEL_NOT_FOUND`, 같은 `policyVersion`은 `409 POLICY_VERSION_DUPLICATE`
+  - **ready 판정 (TBD-03 임시)**: 요청 `calibratorVersion`이 있고 모델의 보정기 버전과 일치 + `metrics.sampleCount ≥ app.policy.min-sample-count`(기본 0). 표본 수가 없거나 숫자가 아니면 ready 아님. 보정기가 없는 모델(실제 DOOR 모델)에는 ready 정책이 만들어지지 않음
+- **threshold** → `201` 새 정책. 모델·보정기·검증 범위·metrics·ready는 승계, `basedOnPolicyId`는 직전 정책. 이름은 **원본 정책 이름 + `-t번호`** (`example-door-p1` → `-t1`, `-t1`을 다시 조정해도 `-t2`). 동시 조정으로 이름이 겹치면 `409 POLICY_VERSION_DUPLICATE`
+- **activate** → `200` 정책 1건. ready, 모델 active, 정책·모델 보정기 일치를 모두 만족해야 함. 이미 적용 중이면 그대로 200(`activatedAt` 유지). 같은 모델의 다른 정책은 자동 중지 (V5: 모델당 active 1개, 보정기 무관). 동시 요청은 순서대로 처리되어 active는 1개만 남음
+- **deactivate** → `200` 정책 1건. 이미 중지 상태여도 200, `activatedAt`은 마지막 적용 시각으로 남음
 
 ---
 
@@ -523,6 +574,14 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 
 - 개발 중에는 이 규격대로 Mock AI 서버를 띄워 연동. Mock 모델 버전은 `mock-` 접두어 [승계]
 
+### 7.4 로드 가능 모델 `GET {AI}/internal/v1/models` [미확정, AI 확인 필요]
+
+현재 Mock AI 기준 형식. 실제 AI 서버의 엔드포인트 유무와 형식은 김도현 확인 필요. 백엔드 해석 코드는 `AiModelListParser` 한 곳에 있어 형식이 정해지면 그곳만 고침. 판단 규칙은 6.2
+
+```json
+{ "data": [ { "modelVersion": "...", "partCode": "DOOR", "calibratorVersion": null, "loadable": true } ] }
+```
+
 ---
 
 ## 8. 알림 계약 (홍승인 확인 필요)
@@ -564,6 +623,16 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - 알림 탭하면 `inspectionId`로 상세 화면 이동
 - 기기 토큰 등록: 로그인 직후 `POST /notifications/devices` `{ "token": "ExponentPushToken[...]", "platform": "ANDROID" | "IOS" }`
 - 알림 기록 테이블은 두지 않음. 확인 필요 목록은 검사 기록에서 조회 [제안, DB 주간보고의 조건부 Notification 테이블은 미생성]
+
+### 8.4 구현 세부 [구현 11/02]
+
+- **등록** `POST /notifications/devices` → `204`. 토큰은 `ExponentPushToken[...]` 또는 `ExpoPushToken[...]`, 아니면 `400 INVALID_DEVICE_TOKEN`. 같은 토큰이 있으면 사용자·플랫폼·최근 확인 시각을 갱신 (행 1개)
+- **해제** `DELETE /notifications/devices/{token}` → `204`. 본인 토큰만 지워지고, 없거나 다른 사람 토큰이면 아무 일도 하지 않고 204
+  - **토큰의 `[ ]`는 경로에서 인코딩 필수**. 그대로 보내면 Tomcat이 400으로 거절함 (확인 11/02). 앱은 `encodeURIComponent(token)` 사용
+- **로그아웃** `POST /auth/logout`에 선택 필드 `deviceToken`을 보내면 같은 규칙으로 해제
+- **발송**: 결과 저장 커밋 후 전용 스레드에서 Expo Push API로 100개씩 발송. 실패는 로그만 남기고 분석 결과에 영향 없음, 재시도 없음. 제목 `확인 필요`·`분석 실패`, 본문 `DOOR INS-000006 작업자 확인이 필요합니다.` 형식
+- **설정**: `app.push.enabled` 기본 false면 로그만 남김
+- **만료 토큰**: 발송 응답 티켓의 `DeviceNotRegistered`만 삭제. **receipt 조회는 미구현**이므로 Apple·Google이 나중에 알려 주는 만료는 삭제되지 않음. 실제 기기 수신은 미확인
 
 ---
 
@@ -629,6 +698,8 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 |---|---|---|---|
 | 추가 | 400 | `POLICY_THRESHOLD_OUT_OF_RANGE` | 검증 범위 밖 passThreshold |
 | 추가 | 404 | `POLICY_NOT_FOUND` | 정책 없음 |
+| 추가 | 404 | `MODEL_NOT_FOUND` | 정책 등록 시 모델 버전 없음 [구현 11/02] |
+| 추가 | 409 | `POLICY_VERSION_DUPLICATE` | 같은 policyVersion이 이미 있음 [구현 11/02] |
 | 추가 | 404 | `IMAGE_NOT_AVAILABLE` | Grad-CAM 없음·이미지 유실 |
 | 추가 | 409 | `NOT_RETRYABLE` | FAILED가 아닌 건 재검사 |
 | 추가 | 409 | `ALREADY_RETRIED` | 이미 재검사한 FAILED 건 |
@@ -655,7 +726,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 |---|---|---|---|---|
 | TBD-01 | 배포 환경·이미지 저장소·타임아웃 | 유지 | 개발은 로컬 저장소·Mock AI. 계약은 "만료되는 접근 정보"로만 기술 | 이승규·김도현·김남균 |
 | TBD-02 | 목표 미검출률 지정 방식 | **폐지** | 합의본에서 passThreshold 조정 방식으로 대체 | — |
-| TBD-03 | ready 판정 기준 값·최소 표본 수 | 일부 확정 | 설정 주체는 확정(검증 자료 등록 시 기준 충족 여부로 결정). 기준 값은 AI 평가 후 제공 | 김도현 |
+| TBD-03 | ready 판정 기준 값·최소 표본 수 | 일부 확정 | 설정 주체는 확정(검증 자료 등록 시 기준 충족 여부로 결정). 기준 값은 AI 평가 후 제공. 임시 구현: 보정기 일치 + `app.policy.min-sample-count`(기본 0) (6.9) | 김도현 |
 | TBD-04 | 검사항목 코드 이름 | 일부 확정 | 테이블 유지, API 비노출. 이름만 결정 (예: APPEARANCE) | 김남균·김도현 |
 | TBD-05 | AI 응답 세부·오류 본문·Grad-CAM 전달 | **해소** | base64 PNG·JPEG [합의 10/28], DEFECT 예측만 생성, 오류는 공통 형식 (7장) | — |
 | TBD-06 | predictedQuality와 정책 판정의 충돌 처리 | **해소** | DEFECT 예측은 항상 REVIEW, GOOD 예측만 AUTO_PASS 후보 (4장) | — |
