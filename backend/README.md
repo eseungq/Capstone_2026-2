@@ -81,22 +81,44 @@ curl -s localhost:8080/api/v1/inspections/<inspectionId> -H "Authorization: Bear
 
 계약 v4 7장 규격의 실제 AI 서버로 바꾸는 방법. 모델 버전은 `door-swin-tiny-e20-8d042c7bfab2` (보정기 미준비, 정책 없음 → 분석 성공 건은 모두 REVIEW가 정상: GOOD은 `NO_ACTIVE_POLICY`, DEFECT는 `DEFECT_PREDICTED`).
 
-1. 활성 모델 전환 (검사항목당 active 모델은 1개, V5 제약). 순서대로 실행
+1. 활성 모델 전환. 검사항목당 active 모델은 1개(V5 제약)이므로 **끄는 문장을 먼저** 실행. Mock 모델의 예시 정책도 함께 중지 (그대로 두면 무결성 점검 I12에 걸림)
    ```sql
+   UPDATE automation_policy SET active = FALSE WHERE policy_version = 'example-door-p1';
    UPDATE ai_model SET active = FALSE WHERE model_version = 'mock-door-swin-t-v1';
    UPDATE ai_model SET active = TRUE  WHERE model_version = 'door-swin-tiny-e20-8d042c7bfab2';
    ```
-   Mock 모델에 걸린 예시 정책 `example-door-p1`은 그대로 두면 "비활성 모델의 active 정책"으로 무결성 점검(I12)에 걸린다. 함께 중지하고, Mock으로 돌아올 때 다시 켠다
+   Mock으로 되돌리기
    ```sql
-   UPDATE automation_policy SET active = FALSE WHERE policy_version = 'example-door-p1';
+   UPDATE ai_model SET active = FALSE WHERE model_version = 'door-swin-tiny-e20-8d042c7bfab2';
+   UPDATE ai_model SET active = TRUE  WHERE model_version = 'mock-door-swin-t-v1';
+   UPDATE automation_policy SET active = TRUE WHERE policy_version = 'example-door-p1';
    ```
-   Mock으로 되돌리기: 위 두 모델의 TRUE·FALSE를 바꿔(실제 모델 FALSE를 먼저) 실행하고 `example-door-p1`을 `active = TRUE`로
-2. 백엔드를 AI 서버 주소와 함께 실행. AI 서버가 원본 사진을 내려받을 수 있도록 `PUBLIC_BASE_URL`은 **AI 서버에서 접근 가능한 이 PC의 주소**로
+2. 백엔드를 AI 서버 주소와 함께 실행. AI 서버가 원본 사진을 내려받으므로 `PUBLIC_BASE_URL`은 **AI 서버에서 접근 가능한 이 PC의 주소**. Tailscale이면 양쪽의 100.x 주소를 사용 (`tailscale ip -4`)
    ```bash
-   APP_AI_BASEURL=http://<AI서버주소>:<포트> PUBLIC_BASE_URL=http://<이 PC 내부 IP>:8080 ./gradlew bootRun
+   APP_AI_BASEURL=http://<DGX 100.x>:<포트> PUBLIC_BASE_URL=http://<Mac 100.x>:8080 ./gradlew bootRun
    ```
-   실제 추론이 오래 걸리면 `APP_AI_READTIMEOUTMS`(기본 10000)도 함께 조정
-3. 확인: `GET {AI}/internal/v1/models`에 위 모델 버전이 있는지, 접수 후 상세의 `ai.modelVersion`
+   - 실제 추론이 오래 걸리면 `APP_AI_READTIMEOUTMS`(기본 10000)도 함께 조정
+   - 실제 AI에 `/internal/v1/models`가 없거나 형식이 다르면 `APP_AI_MODELCHECKENABLED=false` 추가 (아래 표)
+3. 점검 스크립트로 확인
+   ```bash
+   scripts/check-ai-connection.sh http://<DGX 100.x>:<포트> http://<Mac 100.x>:8080 [이미지 파일]
+   ```
+   백엔드 응답 → AI `/internal/v1/models` → 사진 1장 접수 → 결과(reviewReason·gradcamStatus·inferenceTimeMs) 순서로 OK/실패와 원인 추정을 출력한다. AI에서 백엔드로 접근되는지는 Mac에서 확인할 수 없어 DGX에서 실행할 curl 명령을 함께 출력한다. 이미지를 주지 않으면 64x64 테스트 이미지를 쓰므로 실제 모델 확인에는 실제 부품 사진을 넣는다
+
+모델 로드 확인 (`GET {AI}/internal/v1/models`, 응답 형식은 AI 확인 필요. 해석 코드는 `ai/AiModelListParser` 한 곳)
+
+| 결과 | 조건 | 접수·재검사 | `modelAvailable` |
+|---|---|---|---|
+| AVAILABLE | 목록에 있고 loadable=true | 정상 | true |
+| NOT_LOADABLE | 목록에 없거나 loadable=false | 기록 없이 422 `MODEL_NOT_AVAILABLE` | false |
+| UNKNOWN | 연결 실패·타임아웃·형식 오류·404 | 정상 접수, AI 오류면 분석 단계에서 FAILED | false |
+
+| 설정 | 기본값 | 설명 |
+|---|---|---|
+| `app.ai.model-check-enabled` | true | false면 활성 모델이 있는 것만으로 AVAILABLE |
+| `app.ai.model-check-ttl-seconds` | 30 | 조회 성공 결과 캐시 |
+| `app.ai.model-check-failure-ttl-seconds` | 5 | 조회 실패 결과 캐시 |
+| `app.ai.model-check-connect-timeout-ms`, `read-timeout-ms` | 500, 1000 | 확인 전용 타임아웃 (분석용과 별개) |
 
 - 실제 DEFECT 응답은 Grad-CAM base64가 약 1,546만 자(15.5MB)로 크다. AI 응답 파싱 문자열 한도는 `app.ai.max-response-string-chars`(기본 5,000만 자, Jackson 기본 2,000만 자)
 - 실제 응답 원문 3종 회귀 테스트: `src/test/resources/ai-samples/` (15MB `02_DEFECT.json`은 저장소에 올리지 않음. 파일이 없으면 해당 테스트는 건너뜀)
