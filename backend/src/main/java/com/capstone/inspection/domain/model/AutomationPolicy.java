@@ -13,6 +13,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 // 자동 통과 정책 1개 버전. 관리자가 기준치를 조정하면 행을 고치지 않고 새 버전을 만듦 (계약 v4 6.9)
 @Entity
@@ -62,6 +63,34 @@ public class AutomationPolicy {
     private LocalDateTime createdAt;
 
     private LocalDateTime activatedAt;
+
+    // 등록·기준치 조정으로 만드는 새 버전. 항상 active=false로 시작 (계약 v4 6.9)
+    public AutomationPolicy(AiModel model, String calibratorVersion, String policyVersion, Double passThreshold,
+                            Double validatedMin, Double validatedMax, String metricsJson, boolean ready,
+                            String basedOnPolicyId) {
+        this.id = UUID.randomUUID().toString();
+        this.model = model;
+        this.item = model.getItem();
+        this.calibratorVersion = calibratorVersion;
+        this.policyVersion = policyVersion;
+        this.passThreshold = passThreshold;
+        this.validatedMin = validatedMin;
+        this.validatedMax = validatedMax;
+        this.metricsJson = metricsJson;
+        this.ready = ready;
+        this.active = false;
+        this.basedOnPolicyId = basedOnPolicyId;
+        this.createdAt = LocalDateTime.now();
+    }
+
+    public void activate(LocalDateTime at) {
+        this.active = true;
+        this.activatedAt = at;
+    }
+
+    public void deactivate() {
+        this.active = false;
+    }
 
     // 응답의 보정기 버전과 호환되는지 (정책에 보정기 버전이 없으면 보정 확률을 쓸 수 없으므로 비호환)
     public boolean isCompatibleWith(String responseCalibratorVersion) {

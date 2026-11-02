@@ -18,6 +18,7 @@ public final class TestProps {
                 new AppProperties.Storage("local", "./build/test-storage", 600, "http://localhost:8080"),
                 new AppProperties.Auth("test-secret-key-for-unit-tests-32-bytes-or-more", 1800, 1209600, 5),
                 new AppProperties.Inspection(2, 500),
-                new AppProperties.Monitoring(10));
+                new AppProperties.Monitoring(10),
+                new AppProperties.Policy(0));
     }
 }

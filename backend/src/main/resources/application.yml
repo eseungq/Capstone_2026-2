@@ -57,6 +57,8 @@ app:
     analysis-queue-capacity: 500      # 분석 대기열 크기
   monitoring:
     recent-size: 10                   # 부품별 최근 검사 표시 건수 (계약 6.3)
+  policy:
+    min-sample-count: 0               # ready 판정의 최소 표본 수 (TBD-03 임시, AI 평가 후 조정)
   auth:
     jwt-secret: ${JWT_SECRET:change-this-dev-secret-key-to-32-bytes-or-more}
     access-token-ttl-seconds: 1800

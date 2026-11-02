@@ -139,7 +139,7 @@ class AiSampleRegressionTest {
                         ai.readTimeoutMs(), ai.retryCount(), ai.imageSizeCheckEnabled(), ai.maxResponseStringChars(),
                         ai.modelCheckEnabled(), ai.modelCheckTtlSeconds(), ai.modelCheckFailureTtlSeconds(),
                         ai.modelCheckConnectTimeoutMs(), ai.modelCheckReadTimeoutMs()),
-                base.storage(), base.auth(), base.inspection(), base.monitoring());
+                base.storage(), base.auth(), base.inspection(), base.monitoring(), base.policy());
         return new AiClient(props, aiJson);
     }
 }
