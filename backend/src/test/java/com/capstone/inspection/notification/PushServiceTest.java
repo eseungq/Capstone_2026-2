@@ -37,6 +37,7 @@ class PushServiceTest {
 
     private HttpServer server;
     private final List<JsonNode> requests = new ArrayList<>();
+    private final List<String> contentLengths = new ArrayList<>();
     private final DeviceTokenRepository repository = Mockito.mock(DeviceTokenRepository.class);
 
     @AfterEach
@@ -52,6 +53,7 @@ class PushServiceTest {
         server.createContext("/", exchange -> {
             JsonNode request = MAPPER.readTree(exchange.getRequestBody().readAllBytes());
             requests.add(request);
+            contentLengths.add(exchange.getRequestHeaders().getFirst("Content-Length"));
             List<String> tickets = new ArrayList<>();
             for (JsonNode message : request) {
                 tickets.add(message.path("to").asText().equals(errorToken)
@@ -83,6 +85,7 @@ class PushServiceTest {
         registered(List.of("ExponentPushToken[a]"));
         service(200, null).send(NOTICE);
 
+        assertThat(contentLengths.get(0)).isNotNull();
         JsonNode message = requests.get(0).get(0);
         assertThat(message.path("to").asText()).isEqualTo("ExponentPushToken[a]");
         assertThat(message.path("title").asText()).isEqualTo("확인 필요");

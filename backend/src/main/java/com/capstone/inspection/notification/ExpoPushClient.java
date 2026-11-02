@@ -44,10 +44,16 @@ public class ExpoPushClient {
 
     // 요청 전체가 거절되거나 응답 형식이 다르면 예외
     public List<Ticket> send(List<Message> messages) {
+        byte[] request;
+        try {
+            request = objectMapper.writeValueAsBytes(messages); // 바이트로 보내 Content-Length를 명시
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("푸시 메시지 변환 실패", e);
+        }
         String body = restClient.post()
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
-                .body(messages)
+                .body(request)
                 .retrieve()
                 .body(String.class);
         return parseTickets(messages, body);
