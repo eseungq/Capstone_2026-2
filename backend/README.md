@@ -77,6 +77,22 @@ curl -s localhost:8080/api/v1/inspections/<inspectionId> -H "Authorization: Bear
 
 응답 헤더 `X-Trace-Id`와 서버 로그의 `[traceId]`가 같으면 추적 ID 연결이 정상이다. 분석 로그도 접수 요청과 같은 traceId로 남는다.
 
+## 앱 연결
+
+서버는 `server.address`를 지정하지 않아 모든 네트워크 주소(0.0.0.0)에서 듣는다. 앱에는 Mac 주소로 만든 기본 주소를 넣는다.
+
+| | Tailscale (권장) | 같은 와이파이 |
+|---|---|---|
+| 조건 | Mac·iPhone이 같은 tailnet에 로그인 | Mac·iPhone이 같은 와이파이 (기기 간 통신을 막는 학교·공용 망은 불가) |
+| Mac 주소 확인 | `tailscale ip -4` (100.x.x.x) | `ipconfig getifaddr en0` |
+| 앱 기본 주소 | `http://<Mac 100.x>:8080/api/v1` | `http://<Mac 내부 IP>:8080/api/v1` |
+| 백엔드 실행 | `PUBLIC_BASE_URL=http://<Mac 100.x>:8080 ./gradlew bootRun` | `PUBLIC_BASE_URL=http://<Mac 내부 IP>:8080 ./gradlew bootRun` |
+
+- `PUBLIC_BASE_URL`은 이미지 주소의 앞부분이다. `localhost`로 두면 iPhone에서 이미지가 열리지 않는다. 앱과 AI 서버가 같은 값을 쓰므로 둘 다 연결할 때는 양쪽에서 접근되는 Tailscale 주소를 사용한다
+- macOS 방화벽을 켠 경우: 시스템 설정 → 네트워크 → 방화벽 → 옵션에서 Java의 들어오는 연결을 허용
+- iPhone 브라우저에서 `http://<주소>:8080/swagger-ui.html`이 열리면 네트워크는 정상이다
+- Wi-Fi가 바뀌면 내부 IP도 바뀌므로 앱 주소와 `PUBLIC_BASE_URL`을 다시 맞춘다. Mac이 잠자기에 들어가면 연결이 끊긴다
+
 ## 실제 AI 연결
 
 계약 v4 7장 규격의 실제 AI 서버로 바꾸는 방법. 모델 버전은 `door-swin-tiny-e20-8d042c7bfab2` (보정기 미준비, 정책 없음 → 분석 성공 건은 모두 REVIEW가 정상: GOOD은 `NO_ACTIVE_POLICY`, DEFECT는 `DEFECT_PREDICTED`).
