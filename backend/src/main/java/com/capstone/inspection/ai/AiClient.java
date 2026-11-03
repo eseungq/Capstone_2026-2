@@ -65,6 +65,12 @@ public class AiClient {
     }
 
     private Result callOnce(AiPredictRequest request) {
+        byte[] payload;
+        try {
+            payload = objectMapper.writeValueAsBytes(request); // 바이트로 보내 Content-Length를 명시 (chunked 요청은 실제 AI가 400)
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("AI 요청 변환 실패", e);
+        }
         String body;
         HttpStatusCode status;
         try {
@@ -72,7 +78,7 @@ public class AiClient {
                     .uri("/internal/v1/predict")
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
-                    .body(request)
+                    .body(payload)
                     .exchange((req, res) -> new Exchange(res.getStatusCode(),
                             StreamUtils.copyToString(res.getBody(), StandardCharsets.UTF_8)));
             status = ex.status();
