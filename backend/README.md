@@ -52,7 +52,7 @@ uvicorn main:app --port 8090
 | device-door | Device1234! | DEVICE (사진 입력 프로그램) |
 
 시드에는 Mock 모델 `mock-door-swin-t-v1`(보정기 `mock-cal-v1`, active)과 예시 정책 `example-door-p1`(passThreshold 0.05, 검증 범위 0.02~0.08, ready·active)도 들어 있다. 실제 검증 값이 아니다.
-실제 DOOR 모델 `door-swin-tiny-e20-8d042c7bfab2`(보정기 없음, 정책 없음)도 **비활성**으로 등록되어 있다 (아래 "실제 AI 연결").
+실제 DOOR 모델 `door-swin-tiny-e20-8d042c7bfab2`(10/28)와 재학습 2회차 `door-swin-tiny-e02-28a2dd1cb40b-dev`(11/03, V5_2)도 보정기·정책 없이 **비활성**으로 등록되어 있다 (아래 "실제 AI 연결").
 **운영 배포 시 `spring.flyway.locations`에서 `classpath:db/seed-dev`를 빼야 한다.**
 
 ## 동작 확인 (curl)
@@ -137,17 +137,17 @@ curl -s -X DELETE 'localhost:8080/api/v1/notifications/devices/ExponentPushToken
 
 ## 실제 AI 연결
 
-계약 v4 7장 규격의 실제 AI 서버로 바꾸는 방법. 모델 버전은 `door-swin-tiny-e20-8d042c7bfab2` (보정기 미준비, 정책 없음 → 분석 성공 건은 모두 REVIEW가 정상: GOOD은 `NO_ACTIVE_POLICY`, DEFECT는 `DEFECT_PREDICTED`).
+계약 v4 7장 규격의 실제 AI 서버로 바꾸는 방법. 모델 버전은 재학습 2회차 `door-swin-tiny-e02-28a2dd1cb40b-dev` (11/03, 이전 버전 e20은 비활성 유지. 보정기 미준비, 정책 없음 → 분석 성공 건은 모두 REVIEW가 정상: GOOD은 `NO_ACTIVE_POLICY`, DEFECT는 `DEFECT_PREDICTED`).
 
 1. 활성 모델 전환. 검사항목당 active 모델은 1개(V5 제약)이므로 **끄는 문장을 먼저** 실행. Mock 모델의 예시 정책도 함께 중지 (그대로 두면 무결성 점검 I12에 걸림)
    ```sql
    UPDATE automation_policy SET active = FALSE WHERE policy_version = 'example-door-p1';
    UPDATE ai_model SET active = FALSE WHERE model_version = 'mock-door-swin-t-v1';
-   UPDATE ai_model SET active = TRUE  WHERE model_version = 'door-swin-tiny-e20-8d042c7bfab2';
+   UPDATE ai_model SET active = TRUE  WHERE model_version = 'door-swin-tiny-e02-28a2dd1cb40b-dev';
    ```
    Mock으로 되돌리기
    ```sql
-   UPDATE ai_model SET active = FALSE WHERE model_version = 'door-swin-tiny-e20-8d042c7bfab2';
+   UPDATE ai_model SET active = FALSE WHERE model_version = 'door-swin-tiny-e02-28a2dd1cb40b-dev';
    UPDATE ai_model SET active = TRUE  WHERE model_version = 'mock-door-swin-t-v1';
    UPDATE automation_policy SET active = TRUE WHERE policy_version = 'example-door-p1';
    ```

@@ -495,7 +495,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 
 ### 7.2 정상 응답
 
-실제 DOOR 모델 버전 [합의 10/28]: `door-swin-tiny-e20-8d042c7bfab2` (보정기 미준비 → `calibratedDefectProbability`·`calibratorVersion` null, 정책 없음 → 분석 성공 건은 REVIEW). 개발 중 기본 활성 모델은 Mock `mock-door-swin-t-v1`
+실제 DOOR 모델 버전 [11/03 갱신]: 재학습 2회차 `door-swin-tiny-e02-28a2dd1cb40b-dev` (이전 10/28 `door-swin-tiny-e20-8d042c7bfab2`. 보정기 미준비 → `calibratedDefectProbability`·`calibratorVersion` null, 정책 없음 → 분석 성공 건은 REVIEW). 개발 중 기본 활성 모델은 Mock `mock-door-swin-t-v1`
 
 ```json
 {
@@ -660,6 +660,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - V5 내용: 복합 FK 2(검사 부품–검사항목, 정책 모델–검사항목), 검사항목당 active 모델 1개·모델당 active 정책 1개(생성 컬럼 UNIQUE), 허용값·확률 범위 CHECK, 상태별 값 규칙(RECEIVED·ANALYZING·COMPLETED·FAILED), AUTO_PASS 조건 강화(GOOD 예측·정책·보정 확률 ≤ 기준치), REVIEW 사유와 값 일관성, Grad-CAM 상태(GOOD → NOT_REQUIRED, DEFECT → GENERATED·FAILED·NO_ACTIVATION), 보정 확률·보정기 버전 짝, 정책 ready 시 기준치·검증 범위·보정기 필수
 - CHECK로 막을 수 없는 테이블 간 규칙 12개는 점검 SQL(`V5_integrity_checks.sql`)로 확인
 - 개발 시드 V5_1: 실제 DOOR 모델 `door-swin-tiny-e20-8d042c7bfab2`를 비활성으로 등록 (Mock 모델과 동시 active 불가)
+- 개발 시드 V5_2 [11/03]: 재학습 2회차 `door-swin-tiny-e02-28a2dd1cb40b-dev`를 비활성으로 등록. checksum은 해시 앞 12자리(전체 sha256 받으면 교체)
 - 이미 적용된 마이그레이션은 수정하지 않고 다음 버전으로 추가
 
 제약·인덱스

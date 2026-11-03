@@ -99,7 +99,7 @@ class ModelCheckIntegrationTest extends IntegrationTestBase {
     void adminModels() throws Exception {
         aiModels = () -> Map.of(MOCK_MODEL, true, REAL_MODEL, false);
         JsonNode models = json(call(get("/api/v1/admin/models"), admin())).path("data");
-        assertThat(models).hasSize(2);
+        assertThat(models).hasSize(3); // Mock·e20·e02 (seed-dev V4_1·V5_1·V5_2)
         for (JsonNode model : models) {
             boolean mock = model.path("modelVersion").asText().equals(MOCK_MODEL);
             assertThat(model.path("loadable").asBoolean()).isEqualTo(mock);

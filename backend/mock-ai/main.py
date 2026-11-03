@@ -27,6 +27,7 @@ MODELS = {
     # modelVersion: (partCode, calibratorVersion). 보정기가 없는 모델은 보정 확률·보정기 버전을 항상 null로 반환
     "mock-door-swin-t-v1": ("DOOR", "mock-cal-v1"),
     "door-swin-tiny-e20-8d042c7bfab2": ("DOOR", None),  # 실제 DOOR 모델 버전 (AI 10/28). 백엔드 연동 시험용
+    "door-swin-tiny-e02-28a2dd1cb40b-dev": ("DOOR", None),  # 재학습 2회차 (AI 11/03). 실제 연동 시험 대상
 }
 
 # 시나리오별 반환 값. raw ≥ 0.5 이면 DEFECT (계약 7.2)

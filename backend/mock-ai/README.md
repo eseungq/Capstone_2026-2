@@ -50,6 +50,6 @@ curl localhost:8090/mock/scenario
 - Grad-CAM은 EXIF 방향 보정한 원본과 같은 크기의 PNG
 - `GET /internal/v1/models`: 로드 가능한 모델 목록
 - `PUT /mock/models`: 목록 응답 바꾸기 `{"modelVersion":"mock-door-swin-t-v1","state":"NOT_LOADABLE"}` (`LOADABLE`·`NOT_LOADABLE`·`HIDDEN`). 백엔드 캐시 때문에 최대 30초 뒤 반영
-- 모델 버전 2개: `mock-door-swin-t-v1`(보정기 `mock-cal-v1`), `door-swin-tiny-e20-8d042c7bfab2`(실제 DOOR 모델 버전, 보정기 없음).
+- 모델 버전 3개: `mock-door-swin-t-v1`(보정기 `mock-cal-v1`), 실제 DOOR 모델 버전 `door-swin-tiny-e20-8d042c7bfab2`(10/28)·`door-swin-tiny-e02-28a2dd1cb40b-dev`(재학습 2회차, 11/03), 실제 버전은 보정기 없음.
   보정기가 없는 모델은 어떤 시나리오든 보정 확률·보정기 버전을 null로 반환한다 (정책도 없으므로 GOOD은 REVIEW `NO_ACTIVE_POLICY`)
 - 새 시나리오 2종은 AUTO 선택 대상에 넣지 않았다 (기존 사진별 결과 유지). 직접 지정해서 사용
