@@ -73,6 +73,7 @@ public class AiClient {
         }
         String body;
         HttpStatusCode status;
+        long startNanos = System.nanoTime();
         try {
             Exchange ex = restClient.post()
                     .uri("/internal/v1/predict")
@@ -83,6 +84,9 @@ public class AiClient {
                             StreamUtils.copyToString(res.getBody(), StandardCharsets.UTF_8)));
             status = ex.status();
             body = ex.body();
+            // 요청 전송부터 응답 본문 수신 완료까지 (TBD-01 타임아웃 근거, AI inferenceTimeMs와 비교)
+            log.info("AI 응답 {} HTTP {} {}ms {}자", request.inspectionId(), status.value(),
+                    (System.nanoTime() - startNanos) / 1_000_000, body.length());
         } catch (ResourceAccessException e) {
             if (hasCause(e, SocketTimeoutException.class) && !isConnectTimeout(e)) {
                 throw new AiCallException(ErrorCode.AI_SERVER_TIMEOUT, "AI 응답 시간 초과: " + e.getMessage(), false);
