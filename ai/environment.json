@@ -1,0 +1,13 @@
+{
+  "container": "nvcr.io/nvidia/pytorch:25.11-py3",
+  "python": "3.12 series; use the container Python",
+  "torch": "2.10.0a0+b558c986e8.nv25.11",
+  "torchvision": "0.25.0a0+7a13ad0f",
+  "timm": "1.0.30",
+  "Pillow": "12.0.0",
+  "numpy": "2.1.0",
+  "cudaBuild": "13.0",
+  "precision": "FP32",
+  "gpu": "NVIDIA GB10",
+  "amp": false
+}

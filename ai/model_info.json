@@ -1,0 +1,26 @@
+{
+  "modelVersion": "door-swin-tiny-e02-28a2dd1cb40b-dev",
+  "partCode": "DOOR",
+  "checkpointSHA256": "28a2dd1cb40b4bbecf3fc4e34dfc5354179dcb31c0c37297f1d3ee3bfe3d985e",
+  "epoch": 2,
+  "modelName": "swin_tiny_patch4_window7_224.ms_in1k",
+  "inputSize": [
+    3,
+    224,
+    224
+  ],
+  "classMapping": {
+    "GOOD": 0,
+    "DEFECT": 1
+  },
+  "selection": "best model-selection F1 among the frozen ten-epoch run",
+  "calibratorVersion": null,
+  "calibratedDefectProbability": null,
+  "validatedPassThreshold": null,
+  "policyReady": false,
+  "gradcamLayer": "layers.3.blocks.1.norm1",
+  "gradcamFormat": "jpeg",
+  "jpegQuality": 90,
+  "gradcamMeaning": "Decision-support explanation; exact defect location is not guaranteed",
+  "trainingDataIndependenceEstablished": false
+}

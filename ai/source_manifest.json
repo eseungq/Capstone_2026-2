@@ -1,0 +1,120 @@
+{
+  "schema": "published-runtime-source-provenance-v1",
+  "files": [
+    {
+      "path": "ai_api/__init__.py",
+      "sourceSHA256": "4bd2f8030790a5cb7289f19aad0fae7ba9afabf09188210769532b11dceaafea",
+      "publishedSHA256": "4bd2f8030790a5cb7289f19aad0fae7ba9afabf09188210769532b11dceaafea",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "ai_api/backend_contract.py",
+      "sourceSHA256": "a6370eed077adaa908cfebd505507e354402ef3e3fd8f1b9b6e244355292447d",
+      "publishedSHA256": "a6370eed077adaa908cfebd505507e354402ef3e3fd8f1b9b6e244355292447d",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "ai_api/cam_encoding.py",
+      "sourceSHA256": "dfb9b660a4c8eb5a676306262a83b72e25ca1f5c3afab7588b9468503e86c849",
+      "publishedSHA256": "dfb9b660a4c8eb5a676306262a83b72e25ca1f5c3afab7588b9468503e86c849",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "ai_api/contract.py",
+      "sourceSHA256": "39ef30aeb9db7cc1403381d08a25ee3c732ba889d909194ffd381837f938e2f3",
+      "publishedSHA256": "39ef30aeb9db7cc1403381d08a25ee3c732ba889d909194ffd381837f938e2f3",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "ai_api/e02_engine.py",
+      "sourceSHA256": "ebe52abc9dd9972abfa585bcd8de06238ceb84cfde703a249b94bafefa71ff8a",
+      "publishedSHA256": "0931b7dc54bad273928d48fb57fd6ddab895a23771b6f8bb9e998456491e8312",
+      "change": "environment/path bindings only"
+    },
+    {
+      "path": "ai_api/e02_service.py",
+      "sourceSHA256": "1d35e7d59b5d24e88bf83998b92e2d00a62e9305ddf201733275d2f8ac32cf9a",
+      "publishedSHA256": "1d35e7d59b5d24e88bf83998b92e2d00a62e9305ddf201733275d2f8ac32cf9a",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "ai_api/server.py",
+      "sourceSHA256": "55f83e407f97bbf091be0b1a65aa4c9dd7ef3ba0d1c9abe2ed11eb4810a09a3a",
+      "publishedSHA256": "55f83e407f97bbf091be0b1a65aa4c9dd7ef3ba0d1c9abe2ed11eb4810a09a3a",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "ai_api/e02_integration/__init__.py",
+      "sourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "ai_api/e02_integration/handler.py",
+      "sourceSHA256": "589dfd4648b01a5cae223d8de0d1c0de6051d52f508d8f8f0b7bd4e7b8297527",
+      "publishedSHA256": "589dfd4648b01a5cae223d8de0d1c0de6051d52f508d8f8f0b7bd4e7b8297527",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "ai_api/e02_integration/serve.py",
+      "sourceSHA256": "a2f271ae4e439b2590e9b1a4dd2611afb5452ce54dc886bdcbb944e316b0e5ca",
+      "publishedSHA256": "a2f271ae4e439b2590e9b1a4dd2611afb5452ce54dc886bdcbb944e316b0e5ca",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "ai_api/e02_integration/wire.py",
+      "sourceSHA256": "b638b43710751f6341f4848f7d434b5521712d415f5fccee121dfd9cda893771",
+      "publishedSHA256": "b638b43710751f6341f4848f7d434b5521712d415f5fccee121dfd9cda893771",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "ai_api/e02_integration/test_503_server.py",
+      "sourceSHA256": "9e1b12e272850b94e1808984bef2ecf66706f056bc921eee7d9e4489ff9eae2c",
+      "publishedSHA256": "588e82fbb8394b25b4190c0e64da23b02de90705168934d3149c72e1119e4abc",
+      "change": "environment/path bindings only"
+    },
+    {
+      "path": "ai_api/e02_integration/verify_stub_http.py",
+      "sourceSHA256": "b3792ff6d167387f565a390c13e551c61095307b7b893683aed884558fc52238",
+      "publishedSHA256": "b3792ff6d167387f565a390c13e551c61095307b7b893683aed884558fc52238",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "prototype/app.py",
+      "sourceSHA256": "ea9343dc6833acc8c44ce41dee9a7ead1e7e6119e31fc59cf33a94445210b2a2",
+      "publishedSHA256": "ea9343dc6833acc8c44ce41dee9a7ead1e7e6119e31fc59cf33a94445210b2a2",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "prototype/engine.py",
+      "sourceSHA256": "cee667843e12084f32fce293ad050c8df074ce02a0f3072fe54a8313e204aa03",
+      "publishedSHA256": "6f74e93018ee09b36afcd807816a4fb60aacaa0badced5ff3b05d2e02f5084fa",
+      "change": "environment/path bindings only"
+    },
+    {
+      "path": "door_experiment/__init__.py",
+      "sourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "door_experiment/preflight.py",
+      "sourceSHA256": "8a1c696e8889e20b0e3cc5266995eaccd64b991ecbedb05ddafbcff56f41f0e0",
+      "publishedSHA256": "8a1c696e8889e20b0e3cc5266995eaccd64b991ecbedb05ddafbcff56f41f0e0",
+      "change": "unchanged deployed source"
+    },
+    {
+      "path": "door_experiment/train_10.py",
+      "sourceSHA256": "9844216c1a9d798a48934c36f26b25ac2c0f37d08ff562eb15f8a3bd79cda334",
+      "publishedSHA256": "9844216c1a9d798a48934c36f26b25ac2c0f37d08ff562eb15f8a3bd79cda334",
+      "change": "unchanged deployed source"
+    }
+  ],
+  "algorithmsUnchanged": [
+    "Engine.tensor",
+    "Engine.predict",
+    "Engine.explain"
+  ],
+  "liveProjectModified": false,
+  "note": "Private frozen-artifact audit remains enforced. Publication changes only path/origin configuration."
+}

@@ -1,0 +1,4 @@
+# Install inside the recorded NVIDIA PyTorch container. Do not replace its torch/torchvision.
+timm==1.0.30
+Pillow==12.0.0
+numpy==2.1.0

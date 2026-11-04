@@ -1,0 +1,18 @@
+{
+  "inspectionId": "22222222-2222-4222-8222-222222222222",
+  "modelVersion": "door-swin-tiny-e02-28a2dd1cb40b-dev",
+  "predictedQuality": "DEFECT",
+  "rawDefectProbability": 0.9999741315841675,
+  "calibratedDefectProbability": null,
+  "calibratorVersion": null,
+  "imageWidth": 4224,
+  "imageHeight": 2376,
+  "gradcam": {
+    "targetClass": "DEFECT",
+    "status": "NO_ACTIVATION",
+    "mapType": "ZERO_MAP",
+    "format": null,
+    "imageBase64": null
+  },
+  "inferenceTimeMs": 3274
+}
