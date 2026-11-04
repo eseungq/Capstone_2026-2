@@ -1,0 +1,10 @@
+{
+  "data": [
+    {
+      "modelVersion": "door-swin-tiny-e02-28a2dd1cb40b-dev",
+      "partCode": "DOOR",
+      "calibratorVersion": null,
+      "loadable": true
+    }
+  ]
+}

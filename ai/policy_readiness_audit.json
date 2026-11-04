@@ -1,0 +1,182 @@
+{
+  "schema": "e02-policy-readiness-audit-v1",
+  "createdAt": "2026-11-04T11:05:11.976994+00:00",
+  "modelVersion": "door-swin-tiny-e02-28a2dd1cb40b-dev",
+  "metadataChecksPassed": true,
+  "errors": [],
+  "roles": {
+    "train": {
+      "rows": 9262,
+      "classCounts": {
+        "0": 4106,
+        "1": 5156
+      },
+      "manifestSHA256": "ca73a8271581a929d9fedadf0c8d37a762f4fecc769f8f8409ee7cdc4179cd45",
+      "hashMatches": true
+    },
+    "model_selection": {
+      "rows": 1959,
+      "classCounts": {
+        "0": 878,
+        "1": 1081
+      },
+      "manifestSHA256": "8456c7e4bf8c7957d8290448a68ab868ed93fc438689227998d213286c54ab4d",
+      "hashMatches": true
+    },
+    "calibration_fit": {
+      "rows": 990,
+      "classCounts": {
+        "0": 439,
+        "1": 551
+      },
+      "manifestSHA256": "7efbb50e702da33a3ae056f982d5d7f6a9ae0022af7573a78b7fee48a0ff21b6",
+      "hashMatches": true
+    },
+    "policy_development": {
+      "rows": 990,
+      "classCounts": {
+        "0": 439,
+        "1": 551
+      },
+      "manifestSHA256": "15de03f75ea26ffff5acc7d9b1f4f26adb685d44692b9df6a0b26f5b3a1f77c0",
+      "hashMatches": true
+    }
+  },
+  "overlaps": [
+    {
+      "roles": [
+        "train",
+        "model_selection"
+      ],
+      "sharedGroupIds": 0,
+      "sharedImagePaths": 0
+    },
+    {
+      "roles": [
+        "train",
+        "calibration_fit"
+      ],
+      "sharedGroupIds": 0,
+      "sharedImagePaths": 0
+    },
+    {
+      "roles": [
+        "train",
+        "policy_development"
+      ],
+      "sharedGroupIds": 0,
+      "sharedImagePaths": 0
+    },
+    {
+      "roles": [
+        "model_selection",
+        "calibration_fit"
+      ],
+      "sharedGroupIds": 0,
+      "sharedImagePaths": 0
+    },
+    {
+      "roles": [
+        "model_selection",
+        "policy_development"
+      ],
+      "sharedGroupIds": 0,
+      "sharedImagePaths": 0
+    },
+    {
+      "roles": [
+        "calibration_fit",
+        "policy_development"
+      ],
+      "sharedGroupIds": 0,
+      "sharedImagePaths": 0
+    }
+  ],
+  "metadataHashChecks": [
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/all_images_ledger.csv",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/groups.json",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/calibration_fit.csv",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/policy_development.csv",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/train.csv",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/confirmed_same_photo_links.json",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/role_constraints.json",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/candidate_roles.csv",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/model_selection.csv",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/unconfirmed_risk_relations.json",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/human_suspected_constraints.json",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T161326_786692Z/label_policy.json",
+      "hashMatches": true
+    },
+    {
+      "relativePath": "outputs/door_experiment_freeze/20261029T162530_864636Z/training_hyperparameters.json",
+      "hashMatches": true
+    }
+  ],
+  "knownConstraintsChecked": 16,
+  "knownConstraintViolations": 0,
+  "independenceEstablished": false,
+  "remainingHeuristicCandidateCounts": {
+    "model_selection/train": 10326,
+    "calibration_fit/train": 6571,
+    "policy_development/train": 7791,
+    "model_selection/policy_development": 1416,
+    "calibration_fit/model_selection": 1177,
+    "calibration_fit/policy_development": 844
+  },
+  "zeroMissOneSided95UpperIllustration": 0.005422147482793904,
+  "boundAssumptions": "Fixed policy and independent representative defect observations; assumptions NOT certified here.",
+  "zeroMissRequiredDefectsIllustration": {
+    "0.005": 598,
+    "0.01": 299,
+    "0.05": 59
+  },
+  "releaseReady": false,
+  "calibratorVersion": null,
+  "passThreshold": null,
+  "validatedMin": null,
+  "validatedMax": null,
+  "releaseBlockers": [
+    "Unreviewed similarity/physical-part independence remains unresolved; metadata non-overlap is not proof of independence.",
+    "policy_development is a development role; threshold selection on this set is not an independent final policy test.",
+    "Accepted risk target, confidence rule and release/adjustment criteria must be supplied before ready policy registration."
+  ],
+  "imagesRead": false,
+  "finalTestRead": false,
+  "calibrationFitted": false,
+  "productionModified": false,
+  "notAnAdminPolicyRegistrationPayload": true
+}
