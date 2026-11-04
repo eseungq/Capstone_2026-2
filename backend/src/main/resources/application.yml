@@ -53,7 +53,7 @@ app:
     access-url-ttl-seconds: 600
     public-base-url: ${PUBLIC_BASE_URL:http://localhost:8080}   # 이미지 접근 주소의 앞부분 (AI 서버·앱이 접근할 주소)
   inspection:
-    analysis-pool-size: 2             # AI 동시 호출 수 (계약 5장, 실측 후 조정)
+    analysis-pool-size: 1             # AI 동시 호출 수 (계약 5장). 실제 AI는 한 건씩 처리해 2개면 AI 안에서 대기가 생김 (11/04 실측, TBD-01)
     analysis-queue-capacity: 500      # 분석 대기열 크기
   monitoring:
     recent-size: 10                   # 부품별 최근 검사 표시 건수 (계약 6.3)

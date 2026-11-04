@@ -4,7 +4,7 @@
 
 현재 구현 범위 (9주차)
 - 인증: 로그인·토큰 재발급·로그아웃, 역할(WORKER·ADMIN·DEVICE)별 접근 제어, 로그인 5회 실패 잠금
-- 사진 접수(비동기): `POST /api/v1/inspections` → 202, 스레드 풀(2개)에서 AI 호출·응답 검증·정책 적용
+- 사진 접수(비동기): `POST /api/v1/inspections` → 202, 스레드 풀(1개, 11/04 실측으로 2→1)에서 AI 호출·응답 검증·정책 적용
 - 검사 상세: `GET /api/v1/inspections/{id}` (AI·정책·판정·이미지 블록, 만료되는 이미지 주소)
 - 검사 이력: `GET /api/v1/inspections` (부품·displayState·기간 필터, 페이지)
 - 모니터링: `GET /api/v1/monitoring/parts` (부품별 요약), `GET /api/v1/monitoring/queue` (확인 필요 목록, 커서)
@@ -217,7 +217,7 @@ scripts/             연결 점검·전체 흐름·측정·시연 데이터
 | `app.auth.login-lock-threshold` | TBD-10 |
 | `app.policy.min-sample-count` | TBD-03 |
 | `app.push.enabled`, `expo-url` | TBD-14 |
-| `app.inspection.analysis-pool-size` | 실측 후 조정 |
+| `app.inspection.analysis-pool-size` | 11/04 실측으로 1 (실제 AI가 한 건씩 처리). 처리량이 더 필요하면 재측정 |
 | 검사항목 코드 `SCRATCH` (V2 시드) | TBD-04 |
 
 ## 문제 해결
