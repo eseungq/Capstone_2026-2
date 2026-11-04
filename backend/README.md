@@ -17,7 +17,9 @@
 - Mock AI 서버 (`mock-ai/`, Python)
 - 점검 스크립트 (`scripts/`, 아래 표)
 
-아직 없음: 통계 API, AI 무응답 시 수동 판정, 실제 AI·앱 연결 시험 결과 ([통합 점검표](../docs/통합_점검표.md)에 기록)
+아직 없음: 통계 API, AI 무응답 시 수동 판정, 앱 연결 시험 결과
+
+실제 AI 연결 시험: 11/04 DGX(e02)와 16개 항목 통과(B6만 보류), 동시 접수 측정 포함 ([통합 점검표](../docs/통합_점검표.md))
 
 ## 실행 방법
 
@@ -157,13 +159,15 @@ curl -s -X DELETE 'localhost:8080/api/v1/notifications/devices/ExponentPushToken
    ```
    - 실제 추론이 오래 걸리면 `APP_AI_READTIMEOUTMS`(기본 10000)도 함께 조정
    - 실제 AI에 `/internal/v1/models`가 없거나 형식이 다르면 `APP_AI_MODELCHECKENABLED=false` 추가 (아래 표)
+   - 현재 값 (11/04): AI `http://100.81.8.101:8771`(DGX, 503 시험용은 8772), Mac `http://100.117.82.89:8080`, DB 포트 3307. IntelliJ에서는 실행 구성 환경변수에 `DB_PORT=3307;APP_AI_BASEURL=...;PUBLIC_BASE_URL=...`
+   - AI는 허용된 출처의 이미지 주소만 받는다. `PUBLIC_BASE_URL`을 다른 포트·주소로 바꾸면 `422 IMAGE_ORIGIN_NOT_ALLOWED` → `AI_REQUEST_REJECTED`
 3. 점검 스크립트로 확인
    ```bash
    scripts/check-ai-connection.sh http://<DGX 100.x>:<포트> http://<Mac 100.x>:8080 [이미지 파일]
    ```
    백엔드 응답 → AI `/internal/v1/models` → 사진 1장 접수 → 결과(reviewReason·gradcamStatus·inferenceTimeMs) 순서로 OK/실패와 원인 추정을 출력한다. AI에서 백엔드로 접근되는지는 Mac에서 확인할 수 없어 DGX에서 실행할 curl 명령을 함께 출력한다. 이미지를 주지 않으면 64x64 테스트 이미지를 쓰므로 실제 모델 확인에는 실제 부품 사진을 넣는다
 
-모델 로드 확인 (`GET {AI}/internal/v1/models`, 응답 형식은 AI 확인 필요. 해석 코드는 `ai/AiModelListParser` 한 곳)
+모델 로드 확인 (`GET {AI}/internal/v1/models`, 실제 AI도 Mock과 같은 형식 확인 11/04. 해석 코드는 `ai/AiModelListParser` 한 곳)
 
 | 결과 | 조건 | 접수·재검사 | `modelAvailable` |
 |---|---|---|---|

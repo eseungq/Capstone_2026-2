@@ -1,6 +1,6 @@
 # 백엔드 API 계약 v4 (초안)
 
-3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장) · 11/02 갱신 (구현 세부 반영: 6.1~6.4, 6.6~6.9, 7.4, 8장, 10장, 12장)
+3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장) · 11/02 갱신 (구현 세부 반영: 6.1~6.4, 6.6~6.9, 7.4, 8장, 10장, 12장) · 11/04 갱신 (실제 AI 연결 확인: 7.3, 7.4, 12장 TBD-01)
 
 - 기준 1: 「자동차부품_공정모니터링_개발계획서_최종합의반영」(10/14 합의본)
 - 기준 2: 「요구사항명세서_패치검사_개정본3」(9/30)의 규칙 중 합의본과 충돌하지 않는 것은 그대로 승계
@@ -573,10 +573,12 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 | 필수 필드 누락·범위 밖 값·`modelVersion` 불일치 | `AI_RESPONSE_INVALID` → FAILED |
 
 - 개발 중에는 이 규격대로 Mock AI 서버를 띄워 연동. Mock 모델 버전은 `mock-` 접두어 [승계]
+- 실제 AI 확인 [11/04, 김도현·이승규]: 503 `INFERENCE_FAILED` → 재시도 1회 후 `AI_SERVER_ERROR`, 422 `IMAGE_ORIGIN_NOT_ALLOWED` → `AI_REQUEST_REJECTED`(재시도 없음), 타임아웃 → `AI_SERVER_TIMEOUT` 후 상태 불변, AI 중지 → `AI_SERVER_ERROR`·modelAvailable=false, 복구 후 재검사 COMPLETED. 409 `MODEL_VERSION_MISMATCH`는 AI 단독으로 확인 (통합 점검표 B7~B10, E2)
+- AI는 허용된 출처의 이미지 주소만 내려받음. 백엔드 `PUBLIC_BASE_URL`은 AI 쪽에 등록된 주소(현재 Mac Tailscale 주소의 8080)와 같아야 하며, 다르면 422 `IMAGE_ORIGIN_NOT_ALLOWED`
 
-### 7.4 로드 가능 모델 `GET {AI}/internal/v1/models` [미확정, AI 확인 필요]
+### 7.4 로드 가능 모델 `GET {AI}/internal/v1/models` [확인 11/04]
 
-현재 Mock AI 기준 형식. 실제 AI 서버의 엔드포인트 유무와 형식은 김도현 확인 필요. 백엔드 해석 코드는 `AiModelListParser` 한 곳에 있어 형식이 정해지면 그곳만 고침. 판단 규칙은 6.2
+실제 AI 서버도 Mock과 같은 형식으로 응답함을 확인 (11/04, e02 `loadable=true`, `calibratorVersion=null`). 해석 코드 `AiModelListParser`는 수정 없음. 판단 규칙은 6.2
 
 ```json
 { "data": [ { "modelVersion": "...", "partCode": "DOOR", "calibratorVersion": null, "loadable": true } ] }
@@ -725,7 +727,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 
 | ID | 내용 | v4 상태 | 백엔드 제안 / 임시 기준 | 확인 대상 |
 |---|---|---|---|---|
-| TBD-01 | 배포 환경·이미지 저장소·타임아웃 | 유지 | 개발은 로컬 저장소·Mock AI. 계약은 "만료되는 접근 정보"로만 기술 | 이승규·김도현·김남균 |
+| TBD-01 | 배포 환경·이미지 저장소·타임아웃 | 유지 | 개발은 로컬 저장소·Mock AI. 계약은 "만료되는 접근 정보"로만 기술. 11/04 실측: 단건 DEFECT 약 3초·GOOD 0.3~1.2초. AI가 한 건씩 처리해 동시 2건이면 inferenceTimeMs 최대 8.9초 → 10초에 여유 약 1초. 동시 호출 1개 또는 타임아웃 20초 중 결정 필요 (통합 점검표 B11) | 이승규·김도현·김남균 |
 | TBD-02 | 목표 미검출률 지정 방식 | **폐지** | 합의본에서 passThreshold 조정 방식으로 대체 | — |
 | TBD-03 | ready 판정 기준 값·최소 표본 수 | 일부 확정 | 설정 주체는 확정(검증 자료 등록 시 기준 충족 여부로 결정). 기준 값은 AI 평가 후 제공. 임시 구현: 보정기 일치 + `app.policy.min-sample-count`(기본 0) (6.9) | 김도현 |
 | TBD-04 | 검사항목 코드 이름 | 일부 확정 | 테이블 유지, API 비노출. 이름만 결정 (예: APPEARANCE) | 김남균·김도현 |
