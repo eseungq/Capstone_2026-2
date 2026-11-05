@@ -1,4 +1,6 @@
 
+import { authV4 } from '../api/backendV4/authRuntime';
+
 import { useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import {
@@ -20,35 +22,54 @@ export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  // Mock 로그인: 실제 서버 인증은 아직 연결하지 않음
-  const handleLogin = () => {
-    if (!username.trim() || !password) {
+// 실제 백엔드 로그인: 인증 성공 후 모니터링 화면으로 이동
+const handleLogin = async () => {
+  if (!username.trim() || !password) {
+    Alert.alert('입력 확인', '아이디와 비밀번호를 입력하세요.');
+    return;
+  }
+
+  try {
+    // 실제 백엔드 인증 요청
+    const session = await authV4.login(username, password);
+
+    // 실제 서버가 전달한 권한만 사용
+    if (session.role !== 'WORKER' && session.role !== 'ADMIN') {
       Alert.alert(
-        '입력 확인',
-        '아이디와 비밀번호를 입력하세요.'
+        '서버 권한 확인 필요',
+        '로그인 요청은 성공했지만 사용자 권한을 확인할 수 없습니다. 백엔드 응답 형식을 확인해 주세요.',
       );
       return;
     }
 
-    // admin 계정은 관리자 화면,
-    // 나머지 계정은 작업자 화면으로 이동
-    const role =
-      username.trim().toLowerCase() === 'admin'
-        ? 'ADMIN'
-        : 'WORKER';
-
+    // 인증 성공 후 모니터링 화면으로 이동
     router.replace({
-      pathname: '/monitoring',
-      params: { role },
-    });
-  };
+  pathname: '/monitoring',
+  params: {
+    role: session.role,
+    mode: 'live',
+  },
+});
+  } catch (error) {
+    Alert.alert(
+      '로그인 실패',
+      error instanceof Error
+        ? error.message
+        : '서버와 연결할 수 없습니다.',
+    );
+  }
+};
+
 
   // 관리자 화면 시연용 이동
   const handleAdminPreview = () => {
     router.replace({
-      pathname: '/monitoring',
-      params: { role: 'ADMIN' },
-    });
+  pathname: '/monitoring',
+  params: {
+    role: 'ADMIN',
+    mode: 'mock',
+  },
+});
   };
 
   return (
