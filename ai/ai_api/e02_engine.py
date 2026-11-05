@@ -3,6 +3,7 @@ import ast,hashlib,importlib.metadata,json,random,os
 from pathlib import Path
 from prototype.engine import Engine as LegacyEngine,sha
 from door_experiment.preflight import audit_manifests
+from ai_api.e02_integration.timing import measure
 
 ROOT=Path(os.environ.get('AI_PROJECT_ROOT',Path(__file__).resolve().parents[1])).expanduser().resolve()
 MANIFEST=Path(os.environ.get('AI_CANDIDATE_MANIFEST',ROOT/'ai_api/door_e02_candidate.json'))
@@ -45,4 +46,8 @@ class CandidateEngine(LegacyEngine):
   source=ROOT/manifest['trainingSource'];tree=ast.parse(source.read_text());main=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='main');node=next(n for n in main.body if isinstance(n,ast.ClassDef) and n.name=='DoorDataset');ns=dict(Dataset=Dataset,Image=Image,ImageOps=ImageOps,TF=TF,CONFIG=cfg['config'],mean=mean,std=std,fill=self.fill);exec(compile(ast.Module(body=[node],type_ignores=[]),str(source),'exec'),ns);self.dataset=ns['DoorDataset']
   self.metadata=dict(model_name=cfg['config']['model_name'],model_sha256=self.expected_checkpoint_sha256,checkpoint_epoch=manifest['expectedEpoch'],model_version=manifest['modelVersion'],versions=versions,gpu=torch.cuda.get_device_name(0),pretrained=False,strict=True,precision='FP32',batch_size=1,cutoff=.5,classes=cfg['class_mapping'],normalization=cfg['normalization'],preprocessing='unchanged training DoorDataset: EXIF -> RGB -> BICUBIC pad224 fill(124,116,104) -> original normalization',gradcam_layer=manifest['gradcamLayer'],automatic_pass=False,backend_model_registered=False)
   print('[E02 GPU READY]',json.dumps(self.metadata,ensure_ascii=False),flush=True)
- # tensor/predict/explain are inherited unchanged. No old Engine initialization or weights are used.
+ def tensor(self,path):
+  return measure('preprocessingMs',super().tensor,path)
+
+ def explain(self,path,dest,cls):
+  return measure('camGenerationMs',super().explain,path,dest,cls)
