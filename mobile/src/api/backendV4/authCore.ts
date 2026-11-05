@@ -25,12 +25,15 @@ export interface AuthPublicState {
   loginId: string | null;
 }
 
+
 type TokenReply = {
   accessToken?: unknown;
   refreshToken?: unknown;
   role?: unknown;
   loginId?: unknown;
+  user?: unknown;
 };
+
 
 export class AuthContractPendingError extends Error {
   constructor(message: string) { super(message); this.name = 'AuthContractPendingError'; }
@@ -63,12 +66,24 @@ export function parseTokenReply(
   if (!refreshToken) {
     throw new AuthContractPendingError('data.refreshToken 위치를 백엔드와 확인해야 합니다. 임의 토큰으로 로그인하지 않습니다.');
   }
+  
+  const user = isObject(data.user) ? data.user : null;
+
   return {
     accessToken: data.accessToken,
     refreshToken,
-    role: asRole(data.role) ?? previous?.role ?? null,
-    loginId: typeof data.loginId === 'string' ? data.loginId : previous?.loginId ?? submittedLoginId,
+    role: (user ? asRole(user.role) : null)
+      ?? asRole(data.role)
+      ?? previous?.role
+      ?? null,
+    loginId:
+      user && typeof user.loginId === 'string'
+        ? user.loginId
+        : typeof data.loginId === 'string'
+          ? data.loginId
+          : previous?.loginId ?? submittedLoginId,
   };
+
 }
 
 export interface AuthV4Config {

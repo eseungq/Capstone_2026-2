@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MonitoringDashboardV4 from '../components/MonitoringDashboardV4';
-
+import MonitoringLiveDashboardV4 from '../components/MonitoringLiveDashboardV4';
 type Tab = 'monitoring' | 'history' | 'settings';
 
 // Figma에서 내려받은 이미지
@@ -60,8 +60,13 @@ const mockAlerts = [
 
 export default function MonitoringScreen() {
   const router = useRouter();
-  const { role } = useLocalSearchParams<{ role?: string }>();
-  const isAdmin = role === 'ADMIN';
+  const { role, mode } = useLocalSearchParams<{
+  role?: string;
+  mode?: string;
+}>();
+
+const isAdmin = role === 'ADMIN';
+const isLive = mode === 'live';
 
   const [activeTab, setActiveTab] = useState<Tab>('monitoring');
 
@@ -113,8 +118,13 @@ const showInspection = (inspectionNo: string) => {
         {activeTab === 'monitoring' ? (
           <>
             {/* 73단계: 공정 요약 · 최근 접수 · 대기열 · 새 알림은 하나의 폴링 데이터 출처 공유 */}
-            <MonitoringDashboardV4 />
-
+            {isLive ? (
+  <MonitoringLiveDashboardV4 />
+) : (
+  <MonitoringDashboardV4 />
+)}
+{!isLive && (
+  <>
             {/* 아래 자료는 예전 로컬 INS Mock 상세 화면을 확인하기 위한 별도 샘플 */}
             <View style={styles.inputCard}>
               <Text style={styles.cardTitle}>기존 로컬 Mock 검사 · 상세 이동</Text>
@@ -187,7 +197,9 @@ const showInspection = (inspectionNo: string) => {
                   <Text style={styles.alertDescription}>{item.description}</Text>
                 </Pressable>
               );
-            })}
+                        })}
+          </>
+        )}
           </>
         ) : activeTab === 'history' ? (
           /* 이력 탭: 다음 단계에서 상세 구현 */
