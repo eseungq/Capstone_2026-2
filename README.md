@@ -49,25 +49,27 @@ flowchart LR
 
 ## 통합 실행 순서
 
-같은 와이파이에서 개발 PC 한 대로 띄우는 기준입니다.
+개발용은 PC 한 대에서 Mock AI로, 실제 연결은 Tailscale로 Mac(백엔드)·DGX(AI)·iPhone(앱)을 묶어 실행합니다.
 
 | 순서 | 무엇 | 방법 |
 |---|---|---|
-| 1 | MySQL | `backend/`에서 `docker compose up -d` |
-| 2 | AI 서버 | 실제 서버는 [`ai/`](ai/) 안내, 없으면 [`backend/mock-ai`](backend/mock-ai/) (포트 8090) |
-| 3 | 백엔드 | `backend/`에서 `./gradlew bootRun` (포트 8080, Swagger: `/swagger-ui.html`) |
-| 4 | 앱 | [`mobile/`](mobile/) 안내. 백엔드 주소는 `localhost`가 아니라 PC의 내부 IP |
+| 1 | MySQL | `backend/`에서 `docker compose up -d` (기존 `inspection-mysql` 컨테이너가 있으면 `docker start inspection-mysql`) |
+| 2 | AI 서버 | 실제 서버는 [`ai/`](ai/) 안내 (DGX, 포트 8771), 없으면 [`backend/mock-ai`](backend/mock-ai/) (포트 8090) |
+| 3 | 백엔드 | `backend/`에서 `./gradlew bootRun` (포트 8080, Swagger: `/swagger-ui.html`). 실제 AI는 `APP_AI_BASEURL`·`PUBLIC_BASE_URL` 지정 |
+| 4 | 앱 | [`mobile/`](mobile/) 안내. 백엔드 주소는 `localhost`가 아니라 PC의 Tailscale 또는 내부 IP |
 
 명령과 테스트 계정은 [backend/README.md](backend/README.md)에 있습니다.
 
 ## 진행 현황
 
-| 파트 | 현재 상태 |
+| 파트 | 현재 상태 (11/05) |
 |---|---|
-| 백엔드 | 인증, 사진 접수(비동기), AI 연동·판정, 검사 상세·이력, 모니터링, 작업자 확인, 재검사 구현. DB V5 무결성 제약 적용, 실제 AI 응답 형식(Grad-CAM NO_ACTIVATION·JPEG) 반영. 관리자 정책 API·푸시 알림 진행 예정 |
-| AI | |
-| 모바일 앱 | |
-| DB | |
+| 백엔드 | 인증, 사진 접수(비동기), AI 연동·판정, 검사 상세·이력, 모니터링, 작업자 확인, 재검사, 관리자 모델·정책 API, 기기 토큰·Expo 푸시 발송 구현. DB V5 무결성 제약 적용. 테스트 86건, GitHub Actions CI. 실제 AI 연결 시험 완료(11/04) |
+| AI | e02 모델(`door-swin-tiny-e02-28a2dd1cb40b-dev`) 추론 서버 공개본 업로드(PR #1). DGX에서 실행 중이며 백엔드와 실제 연결 시험 완료(11/04). 보정기·AUTO_PASS 기준은 데이터 독립성 확인 전이라 미제공 → 분석 결과는 모두 작업자 확인(REVIEW). 자세한 내용은 [ai/README.md](ai/README.md), [ai/VALIDATION.md](ai/VALIDATION.md) |
+| 모바일 앱 | Expo 앱 업로드(PR #2). 로그인·모니터링·이력·상세·통계·정책 화면은 Mock 데이터로 동작. 계약 v4 API 연동 코드(`src/api/backendV4/`)는 계약 예시로만 점검했고 화면과 실제 서버 연결은 진행 중. 푸시 토큰 등록은 미구현 |
+| DB | 저장 구조는 백엔드 Flyway 마이그레이션(V1~V5)으로 적용. 설계 SQL·ERD·무결성 점검 SQL 업로드 예정 |
+
+연결 시험 결과는 [docs/통합_점검표.md](docs/통합_점검표.md)에 기록합니다.
 
 각 파트 담당자가 직접 갱신합니다.
 
