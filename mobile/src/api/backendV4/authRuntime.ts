@@ -9,7 +9,11 @@ export const API_BASE_URL =
     .replace(/\/+$/, '');
 
 // 실제 서버 인증 + iPhone 보안 저장소 연결
+
 export const authV4 = createAuthV4({
   baseUrl: API_BASE_URL,
   vault: makeSecureAuthVault(),
+  refreshBody: (refreshToken) => ({ refreshToken }),
+  logoutBody: (refreshToken) => ({ refreshToken }),
 });
+
