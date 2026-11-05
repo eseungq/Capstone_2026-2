@@ -66,8 +66,8 @@ flowchart LR
 |---|---|
 | 백엔드 | 인증, 사진 접수(비동기), AI 연동·판정, 검사 상세·이력, 모니터링, 작업자 확인, 재검사, 관리자 모델·정책 API, 기기 토큰·Expo 푸시 발송 구현. DB V5 무결성 제약 적용. 테스트 86건, GitHub Actions CI. 실제 AI 연결 시험 완료(11/04) |
 | AI | e02 모델(`door-swin-tiny-e02-28a2dd1cb40b-dev`) 추론 서버 공개본 업로드(PR #1). DGX에서 실행 중이며 백엔드와 실제 연결 시험 완료(11/04). 보정기·AUTO_PASS 기준은 데이터 독립성 확인 전이라 미제공 → 분석 결과는 모두 작업자 확인(REVIEW). 자세한 내용은 [ai/README.md](ai/README.md), [ai/VALIDATION.md](ai/VALIDATION.md) |
-| 모바일 앱 | Expo 앱 업로드(PR #2). 로그인·모니터링·이력·상세·통계·정책 화면은 Mock 데이터로 동작. 계약 v4 API 연동 코드(`src/api/backendV4/`)는 계약 예시로만 점검했고 화면과 실제 서버 연결은 진행 중. 푸시 토큰 등록은 미구현 |
-| DB | 저장 구조는 백엔드 Flyway 마이그레이션(V1~V5)으로 적용. 설계 SQL·ERD·무결성 점검 SQL 업로드 예정 |
+| 모바일 앱 | Expo 앱 (PR #2, #4). **로그인·토큰 재발급과 모니터링은 실제 서버 연결**(서버 주소는 `.env.local`의 `EXPO_PUBLIC_API_URL`). 이력·상세·판정·통계·정책 화면은 아직 Mock 데이터이고 계약 v4 연동 코드(`src/api/backendV4/`)를 화면에 붙이는 중. 푸시 토큰 등록은 미구현 |
+| DB | 설계 자료 업로드(PR #3): V1~V5 통합 스키마(비교용), 저장 흐름 예시, 제약 위반 테스트 28건, 무결성 점검 12개, ERD, 명세서 4.3 개정 문안(FR-DB-05 NO_ACTIVATION 반영). 실제 서버 스키마는 백엔드 Flyway 마이그레이션 기준. 자세한 내용은 [db/README.md](db/README.md) |
 
 연결 시험 결과는 [docs/통합_점검표.md](docs/통합_점검표.md)에 기록합니다.
 
