@@ -78,7 +78,9 @@ export function advanceMonitoringObservationV4(
 
   const at = snapshot.lastSuccessAtMs;
   const baseline = previous.lastSuccessfulPolls === 0;
-  const map = new Map(previous.observations.map((item) => [item.inspectionId, item]));
+  const map = new Map<string, InspectionObservationV4>(
+    previous.observations.map((item) => [item.inspectionId, item] as const),
+  );
   // 최근 검사(분석 중/확정 완료 포함)와 대기열(오래된 REVIEW/FAILED 포함)을 함께 관측합니다.
   const current = new Map<string, {
     inspectionId: string;
