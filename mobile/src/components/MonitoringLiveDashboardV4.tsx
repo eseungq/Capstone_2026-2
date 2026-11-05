@@ -1,6 +1,6 @@
-
+import { router } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { liveMonitoringReaderV4 } from '../api/backendV4/monitoringLiveReaderV4';
 import { useMonitoringPollV4 } from '../api/backendV4/useMonitoringPollV4';
@@ -68,19 +68,41 @@ export default function MonitoringLiveDashboardV4() {
               : '서버 조회 대기'}
           </Text>
         ) : (
-          vm.queue.slice(0, 20).map((item) => (
-            <View key={item.inspectionId} style={styles.row}>
-              <Text style={styles.itemTitle}>
-                {item.inspectionNo ?? '검사번호 미제공'}
-              </Text>
-              <Text>
-                {item.displayState === 'FAILED'
-                  ? 'AI 분석 실패'
-                  : '작업자 확인 필요'}
-              </Text>
-              <Text>AI 예측: {item.predictedQuality ?? '미제공'}</Text>
-            </View>
-          ))
+          
+vm.queue.slice(0, 20).map((item) => (
+  <Pressable
+    key={item.inspectionId}
+    style={styles.row}
+    accessibilityRole="button"
+    onPress={() =>
+      router.push({
+        pathname: '/inspection-live',
+        params: {
+          inspectionId: item.inspectionId,
+        },
+      })
+    }
+  >
+    <Text style={styles.itemTitle}>
+      {item.inspectionNo ?? '검사번호 미제공'}
+    </Text>
+
+    <Text>
+      {item.displayState === 'FAILED'
+        ? 'AI 분석 실패'
+        : '작업자 확인 필요'}
+    </Text>
+
+    <Text>
+      AI 예측: {item.predictedQuality ?? '미제공'}
+    </Text>
+
+    <Text style={styles.detailLink}>
+      상세 보기 ›
+    </Text>
+  </Pressable>
+))
+
         )}
       </View>
     </View>
@@ -88,7 +110,13 @@ export default function MonitoringLiveDashboardV4() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  detailLink: {
+  color: '#2054D8',
+  fontSize: 13,
+  fontWeight: '600',
+  marginTop: 4,
+},
+    container: {
     gap: 12,
     paddingBottom: 16,
   },
