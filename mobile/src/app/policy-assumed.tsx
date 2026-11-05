@@ -1,0 +1,140 @@
+import React, { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { validateThresholdEditV4 } from '../api/backendV4/policyThresholdV4';
+
+/**
+ * 화면 상태만 바꾸는 완전 독립 Mock 시연. 실측 값/운영 정책이 아닙니다.
+ * 서버, API, AsyncStorage, 기존 검사 기록/통계에는 접근하지 않습니다.
+ */
+const MOCK = {
+  part:'DOOR', model:'mock-door-model', policy:'example-policy-v1',
+  min:0.02, max:0.10, current:0.08,
+} as const;
+
+type Phase = 'EDITING' | 'SAVED' | 'ACTIVE';
+type Role = 'ADMIN' | 'WORKER';
+const C={
+  bg:'#F5F7FB',white:'#FFF',text:'#111827',muted:'#64748B',border:'#E4E7EC',
+  blue:'#2054D8',bluePale:'#EBF1FF',red:'#B42318',redPale:'#FFF0ED',
+  green:'#067647',greenPale:'#EAFBF2',gray:'#E2E8F0'
+};
+function Card({title,children}:{title:string;children:React.ReactNode}){
+  return <View style={s.card}><Text style={s.cardTitle}>{title}</Text>{children}</View>;
+}
+function Row({name,value}:{name:string;value:string}){
+  return <View style={s.row}><Text style={s.muted}>{name}</Text><Text style={s.val}>{value}</Text></View>;
+}
+function Nav({role}:{role:Role}){
+  const items:Array<{label:string;symbol:string;route:'/monitoring'|'/history'|'/settings'}>=[
+    {label:'모니터링',symbol:'▣',route:'/monitoring'},
+    {label:'이력',symbol:'▤',route:'/history'},
+    {label:'설정',symbol:'⚙',route:'/settings'},
+  ];
+  return <View style={s.nav}>{items.map((item)=><Pressable key={item.label} accessibilityRole="button" style={s.navItem}
+    onPress={()=>router.replace({pathname:item.route,params:{role}})}>
+    <Text style={[s.navSymbol,item.label==='설정'&&s.selected]}>{item.symbol}</Text>
+    <Text style={[s.navLabel,item.label==='설정'&&s.selected]}>{item.label}</Text>
+  </Pressable>)}</View>;
+}
+export default function AssumedPolicyScreen(){
+  const params=useLocalSearchParams<{role?:string}>();
+  const role:Role=params.role==='ADMIN'?'ADMIN':'WORKER';
+  const [phase,setPhase]=useState<Phase>('EDITING');
+  const [value,setValue]=useState(String(MOCK.current));
+  const [savedValue,setSavedValue]=useState<number|null>(null);
+  // 이 경계값은 현실의 AI 검증 결과가 아니라 가상 시연 전용입니다.
+  const result=validateThresholdEditV4(value,{validatedMin:MOCK.min,validatedMax:MOCK.max,evidenceVerified:true});
+  const save=()=>{
+    if(!result.ok || phase!=='EDITING') return;
+    const candidate=result.value;
+    Alert.alert('가상 새 버전 저장',
+      `기준치 ${candidate}을(를) example-policy-v2에 저장한 화면만 시연합니다. 실제 정책 저장은 발생하지 않습니다.`,[
+        {text:'취소',style:'cancel'},
+        {text:'Mock 저장',onPress:()=>{setSavedValue(candidate);setPhase('SAVED');}},
+      ]);
+  };
+  const activate=()=>{
+    if(phase!=='SAVED'||savedValue===null)return;
+    Alert.alert('가상 정책 적용',
+      'example-policy-v2를 적용 중으로 표시합니다. 실제 정책·자동 통과·검사 결과는 변경되지 않습니다.',[
+        {text:'취소',style:'cancel'},
+        {text:'Mock 적용',onPress:()=>setPhase('ACTIVE')},
+      ]);
+  };
+  return <SafeAreaView style={s.screen} edges={['top','bottom']}>
+    <Stack.Screen options={{headerShown:false}} />
+    <View style={s.header}>
+      <Text style={s.title}>기준치 조정 · Mock 시연</Text>
+      <Text style={s.subtitle}>합의 v4 절차 시연 · AI 실측 검증/서버 연동 아님</Text>
+    </View>
+    {role!=='ADMIN'?<View style={s.body}><Card title="관리자 전용"><Text style={s.note}>WORKER 시연 역할에서는 접근할 수 없습니다.</Text></Card></View>:
+      <ScrollView style={s.scroller} contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
+        <View style={s.warningBox}><Text style={s.warning}>
+          아래 모든 값·검증 범위·정책 버전은 가상 예시입니다. 실제 운영 저장/적용은 불가하며, 이 화면에서 상태는 앱 메모리 안에서만 바뀝니다.
+        </Text></View>
+        <Card title="시연 조건 · 예시 데이터">
+          <Row name="부품/모델" value={`${MOCK.part} / ${MOCK.model}`} />
+          <Row name="기존 정책" value={`${MOCK.policy} · Mock`} />
+          <Row name="가상 검증 허용 범위" value={`${MOCK.min.toFixed(2)} ~ ${MOCK.max.toFixed(2)}`} />
+          <Row name="기존 기준치" value={`${MOCK.current.toFixed(2)} · Mock`} />
+        </Card>
+        <Card title="1. 검증 범위 내 기준치 조정">
+          <Text style={s.note}>목표 미검출률이 아니라, 가상의 허용 범위에 속하는 passThreshold 값을 직접 지정합니다. 실제 허용 범위는 아직 제공되지 않았습니다.</Text>
+          <View style={s.inputRow}>
+            <Text style={s.inputLabel}>passThreshold (0~1)</Text>
+            <TextInput accessibilityLabel="Mock 기준치" keyboardType="decimal-pad" style={[s.input,phase!=='EDITING'&&s.inputDisabled]}
+              value={value} maxLength={12} editable={phase==='EDITING'} onChangeText={setValue}/>
+          </View>
+          {phase==='EDITING' && !result.ok?<Text style={s.warning}>{result.reason==='OUT_OF_RANGE'?'가상 검증 범위 내 값을 입력해 주세요.':'0~1 사이의 올바른 소수를 입력해 주세요.'}</Text>:null}
+          <Pressable accessibilityRole="button" disabled={phase!=='EDITING'||!result.ok}
+            accessibilityState={{disabled:phase!=='EDITING'||!result.ok}} onPress={save}
+            style={[s.action,(phase!=='EDITING'||!result.ok)&&s.disabled]}>
+            <Text style={[s.actionText,(phase!=='EDITING'||!result.ok)&&s.disabledText]}>
+              {phase==='EDITING'?'새 정책 버전 저장 · Mock':'새 정책 버전 저장됨 · Mock'}
+            </Text>
+          </Pressable>
+        </Card>
+        <Card title="2. 저장 후 별도 적용">
+          <Row name="새 버전" value={savedValue===null?'없음':'example-policy-v2 · Mock'} />
+          <Row name="저장된 기준치" value={savedValue===null?'없음':`${savedValue} · Mock`} />
+          <Row name="ready" value={savedValue===null?'미준비':'준비됨 가정 · Mock'} />
+          <Row name="active" value={phase==='ACTIVE'?'적용됨 가정 · Mock':'미적용'} />
+          <Text style={s.note}>기준치를 저장해도 자동 적용되지 않습니다. 실제 환경에서는 서버가 ready·활성 모델·보정기 호환성을 검증합니다.</Text>
+          <Pressable accessibilityRole="button" disabled={phase!=='SAVED'} accessibilityState={{disabled:phase!=='SAVED'}}
+            onPress={activate} style={[s.action,phase!=='SAVED'&&s.disabled]}>
+            <Text style={[s.actionText,phase!=='SAVED'&&s.disabledText]}>{phase==='ACTIVE'?'적용 시연 완료':'저장된 새 정책 적용 · Mock'}</Text>
+          </Pressable>
+        </Card>
+        <Card title="시연 결과">
+          <Row name="현재 시연 단계" value={phase==='EDITING'?'조정 전':phase==='SAVED'?'저장 완료·미적용':'적용 중 가정'} />
+          <Row name="서버 API 요청" value="없음" />
+          <Row name="운영 정책/검사 기록 변경" value="없음" />
+          {phase!=='EDITING'?<Pressable accessibilityRole="button" onPress={()=>{setPhase('EDITING');setValue(String(savedValue??MOCK.current));setSavedValue(null);}} style={s.secondary}>
+            <Text style={s.secondaryText}>기준치 재조정 시연 다시 시작</Text>
+          </Pressable>:null}
+        </Card>
+        <Pressable accessibilityRole="button" onPress={()=>router.replace({pathname:'/policy-adjust',params:{role:'ADMIN'}})} style={s.secondary}>
+          <Text style={s.secondaryText}>실제 준비 상태 화면으로 돌아가기</Text>
+        </Pressable>
+      </ScrollView>}
+    <Nav role={role}/>
+  </SafeAreaView>;
+}
+const s=StyleSheet.create({
+  screen:{flex:1,backgroundColor:C.bg},header:{paddingHorizontal:20,paddingTop:10,paddingBottom:23},
+  title:{fontSize:24,fontWeight:'700',color:C.text,lineHeight:34},subtitle:{color:C.muted,fontSize:12,lineHeight:20},
+  scroller:{flex:1},body:{paddingHorizontal:20,paddingBottom:28,gap:12},
+  card:{backgroundColor:C.white,borderWidth:1,borderColor:C.border,borderRadius:16,padding:16,gap:13},
+  cardTitle:{fontSize:17,fontWeight:'700',color:C.text},row:{flexDirection:'row',gap:10},
+  muted:{flex:0.5,color:C.muted,fontSize:13,lineHeight:20},val:{flex:0.5,textAlign:'right',color:C.text,fontSize:13,fontWeight:'600',lineHeight:20},
+  note:{color:C.muted,fontSize:12,lineHeight:20},warningBox:{backgroundColor:C.redPale,padding:14,borderRadius:12},
+  warning:{fontSize:12,color:C.red,lineHeight:20},inputRow:{flexDirection:'row',alignItems:'center',gap:10},
+  inputLabel:{color:C.muted,flex:1,fontSize:13},input:{width:108,borderRadius:10,borderColor:'#CAD5E8',borderWidth:1,backgroundColor:C.white,color:C.text,textAlign:'right',paddingHorizontal:13,paddingVertical:10,fontSize:16},
+  inputDisabled:{backgroundColor:'#F0F4FA',color:C.muted},action:{minHeight:46,borderRadius:12,backgroundColor:C.blue,alignItems:'center',justifyContent:'center',padding:12},
+  actionText:{color:C.white,fontSize:13,fontWeight:'700',textAlign:'center'},disabled:{backgroundColor:C.gray},disabledText:{color:C.muted},
+  secondary:{minHeight:46,borderRadius:12,backgroundColor:C.bluePale,alignItems:'center',justifyContent:'center',padding:12},secondaryText:{color:C.blue,fontSize:13,fontWeight:'700',textAlign:'center'},
+  nav:{height:58,marginHorizontal:20,marginBottom:7,borderWidth:1,borderColor:C.border,borderRadius:15,backgroundColor:C.white,flexDirection:'row',alignItems:'center'},
+  navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:2,minHeight:46},navSymbol:{fontSize:17,color:C.muted},navLabel:{fontSize:11,color:C.muted,fontWeight:'600'},selected:{color:C.blue,fontWeight:'700'}
+});
