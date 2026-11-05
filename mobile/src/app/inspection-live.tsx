@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
+  AppState,
   Image,
   Pressable,
   ScrollView,
@@ -80,9 +81,28 @@ export default function InspectionLiveScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imageNotice, setImageNotice] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const [isForeground, setIsForeground] = useState(
+    AppState.currentState === 'active' || AppState.currentState == null,
+  );
   const requestSerial = useRef(0);
   const failedImageUrls = useRef(new Set<string>());
   const lastAutoRefreshedExpiry = useRef<string | null>(null);
+  const pendingImageRefreshOnResume = useRef(false);
+
+  // 화면 이탈이나 앱 백그라운드 진입 시 자동 이미지 갱신을 정지합니다.
+  useFocusEffect(useCallback(() => {
+    setIsFocused(true);
+    return () => setIsFocused(false);
+  }, []));
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setIsForeground(state === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
 
   const load = useCallback(async (initial = false) => {
     const serial = ++requestSerial.current;
@@ -91,6 +111,8 @@ export default function InspectionLiveScreen() {
       setDetail(null);
       failedImageUrls.current.clear();
       lastAutoRefreshedExpiry.current = null;
+      pendingImageRefreshOnResume.current = false;
+      setImageNotice(null);
     } else {
       setRefreshing(true);
     }
@@ -99,7 +121,16 @@ export default function InspectionLiveScreen() {
       if (!id) throw new Error('검사 UUID가 전달되지 않았습니다.');
       const response = await inspectionReader.detail(id);
       if (serial !== requestSerial.current) return;
-      setDetail(response.value);
+      const next = response.value;
+      setDetail(next);
+      // 서버가 실패했던 이미지 URL을 그대로 재발급해도 성공으로 표시하지 않습니다.
+      const urls = [next.originalImageUrl, next.gradcamImageUrl].filter(
+        (url): url is string => typeof url === 'string',
+      );
+      const stillBroken = urls.some((url) => failedImageUrls.current.has(url));
+      setImageNotice(stillBroken
+        ? '서버에서 같은 이미지 주소를 받았습니다. 계속 실패하면 서명 URL과 저장소 연결을 확인해 주세요.'
+        : null);
     } catch (cause) {
       if (serial !== requestSerial.current) return;
       setError(errorMessage(cause));
@@ -116,9 +147,10 @@ export default function InspectionLiveScreen() {
     return () => { requestSerial.current += 1; };
   }, [load]);
 
-  // 접근 URL이 만료되기 30초 전에 GET 상세를 재조회합니다.
-  // 서버가 같은 만료 시각을 반환해도 무한 재조회하지 않습니다.
+  // 화면이 활성 상태인 동안에만 만료 30초 전 상세를 다시 조회합니다.
+  // 복귀 시 이미 만료됐으면 즉시 조회하되, 같은 만료 시각은 자동 재시도하지 않습니다.
   useEffect(() => {
+    if (!isFocused || !isForeground || loading || refreshing) return;
     const expiry = detail?.imageUrlExpiresAt;
     if (!expiry || lastAutoRefreshedExpiry.current === expiry) return;
     const expiryMs = Date.parse(expiry);
@@ -129,19 +161,36 @@ export default function InspectionLiveScreen() {
       void load(false);
     }, delay);
     return () => clearTimeout(timer);
-  }, [detail?.imageUrlExpiresAt, load]);
+  }, [detail?.imageUrlExpiresAt, isFocused, isForeground, loading, refreshing, load]);
+
+  // 비활성 상태에서 발생한 이미지 실패는 복귀 후 재조회합니다.
+  useEffect(() => {
+    if (!isFocused || !isForeground || loading || refreshing || !pendingImageRefreshOnResume.current) return;
+    pendingImageRefreshOnResume.current = false;
+    void load(false);
+  }, [isFocused, isForeground, loading, refreshing, load]);
 
   const handleImageError = (url: string) => {
+    // 과거 검사 또는 만료된 이전 이미지의 늦은 콜백은 무시합니다.
+    if (url !== detail?.originalImageUrl && url !== detail?.gradcamImageUrl) return;
     if (failedImageUrls.current.has(url)) return;
     failedImageUrls.current.add(url);
+    setImageNotice('이미지 접근에 실패하여 새 주소를 조회합니다. 같은 주소가 실패하면 저장소 접근을 확인해 주세요.');
+    if (!isFocused || !isForeground) {
+      pendingImageRefreshOnResume.current = true;
+      return;
+    }
     void load(false);
   };
 
-  const gradcamMissing = detail?.gradcamStatus === 'NO_ACTIVATION'
+  // 새 검사로 이동하는 첫 렌더에서도 이전 검사의 데이터를 숨깁니다.
+  const visibleDetail = detail?.inspectionId === id ? detail : null;
+
+  const gradcamMissing = visibleDetail?.gradcamStatus === 'NO_ACTIVATION'
     ? 'AI 예측은 완료됐지만, 위치별 강조 반응이 없어 판단 근거 이미지를 제공하기 어렵습니다.'
-    : detail?.gradcamStatus === 'NOT_REQUIRED'
+    : visibleDetail?.gradcamStatus === 'NOT_REQUIRED'
       ? 'AI가 GOOD으로 예측하여 Grad-CAM을 생성하지 않았습니다.'
-      : detail?.gradcamStatus === 'FAILED'
+      : visibleDetail?.gradcamStatus === 'FAILED'
         ? 'Grad-CAM 생성에 실패했습니다. 원본 사진과 AI 예측을 참고하세요.'
         : 'Grad-CAM 이미지가 제공되지 않았습니다.';
 
@@ -157,6 +206,9 @@ export default function InspectionLiveScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
+        {refreshing && !loading && (
+          <Text style={styles.muted}>서버에서 최신 상세 정보를 확인하는 중…</Text>
+        )}
         {loading && (
           <View style={styles.card}>
             <ActivityIndicator />
@@ -170,65 +222,83 @@ export default function InspectionLiveScreen() {
           </View>
         )}
 
-        {!loading && !detail && (
+        {error && visibleDetail && (
+          <View style={styles.staleCard}>
+            <Text style={styles.staleText}>
+              서버 조회에 실패했습니다. 아래 내용은 마지막으로 조회한 정보이며 최신 상태가 아닐 수 있습니다.
+            </Text>
+          </View>
+        )}
+
+        {!loading && !visibleDetail && (
           <Pressable style={styles.button} onPress={() => void load(true)}>
             <Text style={styles.buttonText}>다시 조회</Text>
           </Pressable>
         )}
 
-        {detail && (
+        {visibleDetail && (
           <>
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>{detail.inspectionNo}</Text>
-              <Field label="부품" value={detail.partCode} />
-              <Field label="상태" value={`${detail.displayStateLabel} (${detail.displayState})`} />
-              <Field label="접수 시각" value={formatTime(detail.receivedAt)} />
-              <Field label="검사 UUID" value={detail.inspectionId} />
+              <Text style={styles.cardTitle}>{visibleDetail.inspectionNo}</Text>
+              <Field label="부품" value={visibleDetail.partCode} />
+              <Field label="상태" value={`${visibleDetail.displayStateLabel} (${visibleDetail.displayState})`} />
+              <Field label="접수 시각" value={formatTime(visibleDetail.receivedAt)} />
+              <Field label="검사 UUID" value={visibleDetail.inspectionId} />
             </View>
+
+            {imageNotice && (
+              <View style={styles.staleCard}>
+                <Text style={styles.staleText}>{imageNotice}</Text>
+              </View>
+            )}
 
             <ImagePanel
               title="원본 사진"
-              url={detail.originalImageUrl}
+              url={visibleDetail.originalImageUrl}
               missingText="원본 이미지 주소가 제공되지 않았습니다."
               onLoadError={handleImageError}
             />
 
             <ImagePanel
               title="AI 판단 근거 · Grad-CAM"
-              url={detail.gradcamImageUrl}
+              url={visibleDetail.gradcamImageUrl}
               missingText={gradcamMissing}
               onLoadError={handleImageError}
             />
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>AI 분석 · 정책 · 최종 판정</Text>
-              <Field label="AI 예측" value={detail.prediction ?? '미제공'} />
+              <Field label="AI 예측" value={visibleDetail.prediction ?? '미제공'} />
               <Field
                 label="보정 불량 확률"
-                value={detail.calibratedDefectProbability === null
+                value={visibleDetail.calibratedDefectProbability === null
                   ? '미준비 / 미제공'
-                  : `${(detail.calibratedDefectProbability * 100).toFixed(2)}%`}
+                  : `${(visibleDetail.calibratedDefectProbability * 100).toFixed(2)}%`}
               />
-              <Field label="AI 모델" value={detail.modelVersion ?? '미제공'} />
-              <Field label="REVIEW 사유" value={detail.reviewReasonText ?? '해당 없음'} />
-              <Field label="최종 작업자 판정" value={detail.finalJudgement ?? '미확정'} />
-              <Field label="판정 주체" value={detail.judgedBy ?? '미제공'} />
-              <Field label="판정 시각" value={formatTime(detail.confirmedAt)} />
-              {detail.errorCode && <Field label="오류 코드" value={detail.errorCode} />}
-              {detail.errorMessage && <Text style={styles.errorText}>{detail.errorMessage}</Text>}
+              <Field label="AI 모델" value={visibleDetail.modelVersion ?? '미제공'} />
+              <Field label="REVIEW 사유" value={visibleDetail.reviewReasonText ?? '해당 없음'} />
+              <Field label="최종 작업자 판정" value={visibleDetail.finalJudgement ?? '미확정'} />
+              <Field label="판정 주체" value={visibleDetail.judgedBy ?? '미제공'} />
+              <Field label="판정 시각" value={formatTime(visibleDetail.confirmedAt)} />
+              {visibleDetail.errorCode && <Field label="오류 코드" value={visibleDetail.errorCode} />}
+              {visibleDetail.errorMessage && <Text style={styles.errorText}>{visibleDetail.errorMessage}</Text>}
             </View>
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>이미지 접근 주소</Text>
-              <Field label="서명 URL 만료 시각" value={formatTime(detail.imageUrlExpiresAt)} />
+              <Field label="서명 URL 만료 시각" value={formatTime(visibleDetail.imageUrlExpiresAt)} />
               <Text style={styles.muted}>
-                만료되기 30초 전 자동으로 새 주소를 조회합니다.
-                이미지 로드 실패 시에도 다시 조회합니다.
+                화면이 활성 상태일 때 만료 30초 전 새 주소를 조회합니다.
+                백그라운드에서는 자동 조회를 중단하며, 복귀하면 만료 여부를 다시 확인합니다.
+                이미지 로딩 실패 시에도 새 주소를 다시 조회합니다.
               </Text>
               <Pressable
                 style={[styles.button, refreshing && styles.disabledButton]}
                 disabled={refreshing}
-                onPress={() => void load(false)}
+                onPress={() => {
+                  lastAutoRefreshedExpiry.current = visibleDetail.imageUrlExpiresAt;
+                  void load(false);
+                }}
               >
                 <Text style={styles.buttonText}>
                   {refreshing ? '조회 중…' : '상세 · 이미지 URL 다시 조회'}
@@ -263,5 +333,7 @@ const styles = StyleSheet.create({
   buttonText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
   disabledButton: { opacity: 0.5 },
   errorCard: { backgroundColor: '#FFF0ED' },
+  staleCard: { backgroundColor: '#FFF3E5', borderRadius: 12, padding: 12 },
+  staleText: { color: '#92400E', fontSize: 12, lineHeight: 18 },
   errorText: { color: '#B42318', fontSize: 13 },
 });
