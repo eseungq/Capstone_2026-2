@@ -29,6 +29,7 @@ export default function MonitoringLiveDashboardV4() {
   const { snapshot } = useMonitoringPollV4(liveMonitoringReaderV4);
   const vm = buildMonitoringViewModelV4(snapshot);
   const [observation, setObservation] = useState(createMonitoringObservationStateV4);
+  const [visibleQueueCount, setVisibleQueueCount] = useState(20);
 
   useEffect(() => {
     setObservation((previous) => advanceMonitoringObservationV4(previous, snapshot));
@@ -160,10 +161,16 @@ export default function MonitoringLiveDashboardV4() {
 
       <View style={styles.card}>
         <Text style={styles.title}>확인 필요 · 분석 실패</Text>
+        {vm.hasSuccessfulRead && (
+          <Text style={styles.note}>
+            표시 {Math.min(visibleQueueCount, vm.queue.length)} / {vm.queue.length}건
+            {' · '}서버 nextCursor 페이지 수집 후 20건씩 표시
+          </Text>
+        )}
         {vm.queue.length === 0 ? (
           <Text>{vm.hasSuccessfulRead ? '현재 대기 항목 없음' : '서버 조회 대기'}</Text>
         ) : (
-          vm.queue.slice(0, 20).map((item) => (
+          vm.queue.slice(0, visibleQueueCount).map((item) => (
             <Pressable
               key={item.inspectionId}
               style={styles.row}
@@ -179,6 +186,26 @@ export default function MonitoringLiveDashboardV4() {
               <Text style={styles.detailLink}>상세 보기 ›</Text>
             </Pressable>
           ))
+        )}
+        {vm.queue.length > visibleQueueCount && (
+          <Pressable
+            style={styles.moreButton}
+            accessibilityRole="button"
+            onPress={() => setVisibleQueueCount((count) => count + 20)}
+          >
+            <Text style={styles.moreButtonText}>
+              목록 더 보기 · 다음 {Math.min(20, vm.queue.length - visibleQueueCount)}건
+            </Text>
+          </Pressable>
+        )}
+        {visibleQueueCount > 20 && (
+          <Pressable
+            style={styles.collapseButton}
+            accessibilityRole="button"
+            onPress={() => setVisibleQueueCount(20)}
+          >
+            <Text style={styles.collapseText}>처음 20건만 보기</Text>
+          </Pressable>
         )}
       </View>
     </View>
@@ -200,4 +227,8 @@ const styles = StyleSheet.create({
   row: { borderTopWidth: 1, borderTopColor: '#E4E7EC', paddingTop: 10, gap: 5 },
   itemTitle: { fontSize: 13, fontWeight: '700', color: '#111827' },
   detailLink: { color: '#2054D8', fontSize: 13, fontWeight: '600', marginTop: 4 },
+  moreButton: { padding: 13, backgroundColor: '#2054D8', borderRadius: 10, alignItems: 'center' },
+  moreButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  collapseButton: { padding: 10, alignItems: 'center' },
+  collapseText: { color: '#2054D8', fontWeight: '600', fontSize: 12 },
 });
