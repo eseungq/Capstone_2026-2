@@ -180,7 +180,7 @@ curl -s -X DELETE 'localhost:8080/api/v1/notifications/devices/ExponentPushToken
 | `app.ai.model-check-enabled` | true | false면 활성 모델이 있는 것만으로 AVAILABLE |
 | `app.ai.model-check-ttl-seconds` | 30 | 조회 성공 결과 캐시 |
 | `app.ai.model-check-failure-ttl-seconds` | 5 | 조회 실패 결과 캐시 |
-| `app.ai.model-check-connect-timeout-ms`, `read-timeout-ms` | 500, 1000 | 확인 전용 타임아웃 (분석용과 별개) |
+| `app.ai.model-check-connect-timeout-ms`, `read-timeout-ms` | 2000, 2000 | 확인 전용 타임아웃 (분석용과 별개). Tailscale 지연이 최대 약 1초라 11/05에 500, 1000에서 올림. AI가 꺼져 있으면 접수가 최대 약 4초 늦어지고 실패 결과는 5초 캐시 |
 
 - 실제 DEFECT 응답은 Grad-CAM base64가 약 1,546만 자(15.5MB)로 크다. AI 응답 파싱 문자열 한도는 `app.ai.max-response-string-chars`(기본 5,000만 자, Jackson 기본 2,000만 자)
 - 실제 응답 원문 3종 회귀 테스트: `src/test/resources/ai-samples/` (15MB `02_DEFECT.json`은 저장소에 올리지 않음. 파일이 없으면 해당 테스트는 건너뜀)

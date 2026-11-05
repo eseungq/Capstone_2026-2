@@ -45,8 +45,8 @@ app:
     model-check-enabled: true         # /internal/v1/models로 로드 확인. false면 활성 모델 있음만으로 판단
     model-check-ttl-seconds: 30       # 조회 성공 결과 캐시
     model-check-failure-ttl-seconds: 5  # 조회 실패 결과 캐시 (AI 장애 때 요청마다 확인하지 않게)
-    model-check-connect-timeout-ms: 500
-    model-check-read-timeout-ms: 1000
+    model-check-connect-timeout-ms: 2000   # Tailscale 지연이 최대 약 1초까지 튀어 0.5초에서 올림 (11/04 실측)
+    model-check-read-timeout-ms: 2000
   storage:
     type: local                       # 개발용 로컬 저장, 운영 방식은 TBD-01
     local-root: ./storage
