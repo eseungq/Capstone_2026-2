@@ -50,6 +50,11 @@ predict 요청은 JSON Content-Length가 필요합니다. 현재 chunked 요청�
 - AI는 raw softmax 불량 점수 0.5를 기준으로 GOOD/DEFECT를 반환합니다. 이 값은 passThreshold와 별개입니다.
 - AUTO_PASS/REVIEW는 백엔드가 결정합니다. DEFECT는 항상 REVIEW, GOOD도 호환 정책 ready·active 및 유효한 보정 확률/기준치 조건을 모두 만족해야 AUTO_PASS입니다. 자동 FAIL은 없습니다.
 - `inferenceTimeMs`: handler 진입부터 응답 JSON 직렬화 직전까지. 이미지 다운로드·모델 잠금 대기·추론·CAM·JPEG 인코딩을 포함합니다. 직렬화·응답 전송·백엔드 후처리는 제외합니다.
+- e02의 `requests.jsonl`에는 `requestId`로 연결되는 서비스 로그와 `wire_response` 로그가 남습니다. 서비스 로그의 구간별 시간은 모두 밀리초입니다.
+  - `imageDownloadMs`는 이미지 출처 검사와 이미지 본문 다운로드에 걸린 시간입니다.
+  - `preprocessingMs`는 분류에 사용하는 첫 입력 텐서의 디코딩·EXIF 보정·리사이즈·정규화 시간입니다. 별도로 수행되는 업로드 이미지 검증과 크기 확인은 제외합니다.
+  - `camGenerationMs`는 CAM 함수 전체 시간입니다. CAM용 재전처리, CAM 계산, 오버레이 작성이 포함됩니다. 기존 `camEncodingMs`는 그 뒤 JPEG/PNG 응답 인코딩 시간입니다.
+  - 실행하지 않은 구간은 `null`입니다. 실행 도중 실패한 구간은 실패 시점까지 걸린 시간을 기록합니다. HTTP 응답 필드는 기존과 같습니다.
 - 요청은 여러 개 받을 수 있지만 모델 추론과 CAM은 공유 잠금으로 직렬 처리됩니다. 백엔드 동시 호출 수/timeout은 별도 설정입니다.
 - 최종 HTTP 형식은 `ai_api/e02_integration/wire.py`와 handler입니다. contract.py/backend_contract.py 일부는 과거 내부 호환 코드이며 그 내부 프로필 이름을 앱 계약으로 사용하지 않습니다.
 

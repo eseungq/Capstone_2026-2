@@ -28,8 +28,8 @@
     {
       "path": "ai_api/e02_engine.py",
       "sourceSHA256": "ebe52abc9dd9972abfa585bcd8de06238ceb84cfde703a249b94bafefa71ff8a",
-      "publishedSHA256": "0931b7dc54bad273928d48fb57fd6ddab895a23771b6f8bb9e998456491e8312",
-      "change": "environment/path bindings only"
+      "publishedSHA256": "fc5139acc8f5de843e95deb72ef14430a19a06a15e5864175bec295c2c51e06e",
+      "change": "environment/path bindings and request timing around inherited operations"
     },
     {
       "path": "ai_api/e02_service.py",
@@ -58,8 +58,8 @@
     {
       "path": "ai_api/e02_integration/serve.py",
       "sourceSHA256": "a2f271ae4e439b2590e9b1a4dd2611afb5452ce54dc886bdcbb944e316b0e5ca",
-      "publishedSHA256": "a2f271ae4e439b2590e9b1a4dd2611afb5452ce54dc886bdcbb944e316b0e5ca",
-      "change": "unchanged deployed source"
+      "publishedSHA256": "79c8ad7358eb56090a72ae728edf7366d177084f88aa5aaffb762f3f63e5c407",
+      "change": "request-local stage timings in the audit log"
     },
     {
       "path": "ai_api/e02_integration/wire.py",
@@ -108,6 +108,12 @@
       "sourceSHA256": "9844216c1a9d798a48934c36f26b25ac2c0f37d08ff562eb15f8a3bd79cda334",
       "publishedSHA256": "9844216c1a9d798a48934c36f26b25ac2c0f37d08ff562eb15f8a3bd79cda334",
       "change": "unchanged deployed source"
+    },
+    {
+      "path": "ai_api/e02_integration/timing.py",
+      "sourceSHA256": null,
+      "publishedSHA256": "1f6ad768eeba175e9f76bf0d7f1f12e380392819fa6af75f9552f46572002d06",
+      "change": "new request timing utility"
     }
   ],
   "algorithmsUnchanged": [
@@ -116,5 +122,5 @@
     "Engine.explain"
   ],
   "liveProjectModified": false,
-  "note": "Private frozen-artifact audit remains enforced. Publication changes only path/origin configuration."
+  "note": "Private frozen-artifact audit remains enforced. The published source adds request timing to path/origin configuration."
 }

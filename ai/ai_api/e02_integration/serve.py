@@ -1,5 +1,6 @@
 """Development e02 server; does not start training or activate backend models."""
-import argparse,json,logging,os,signal,fcntl
+import argparse,json,logging,os,signal
+from functools import partial
 from pathlib import Path
 from ai_api import backend_contract
 from ai_api.e02_engine import CandidateEngine,MANIFEST
@@ -7,11 +8,26 @@ from ai_api.e02_service import CandidateService
 from ai_api.server import Server,Downloader
 from ai_api.e02_integration import wire
 from ai_api.e02_integration.handler import Handler
+from ai_api.e02_integration.timing import REQUEST_TIMINGS, STAGES, measure
 class IntegrationService(CandidateService):
-    def __init__(self,*args,**kwargs):
+    def __init__(self,engine,version,downloader,*args,**kwargs):
         kwargs['response_profile']=backend_contract.PROFILE
-        super().__init__(*args,**kwargs)
+        super().__init__(engine,version,partial(measure,'imageDownloadMs',downloader),*args,**kwargs)
         self.response_profile=wire.PROFILE
+
+    def predict(self,body,*,request_id=None):
+        token=REQUEST_TIMINGS.set(dict.fromkeys(STAGES))
+        try:
+            return super().predict(body,request_id=request_id)
+        finally:
+            REQUEST_TIMINGS.reset(token)
+
+    def audit(self,record):
+        timings=REQUEST_TIMINGS.get()
+        if timings is not None:
+            record={**record,**timings}
+        super().audit(record)
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--manifest',type=Path,default=MANIFEST)
@@ -24,6 +40,7 @@ def main():
     a=p.parse_args();logging.basicConfig(level=logging.INFO)
     gpu_lock=None
     if a.gpu_lock:
+        import fcntl
         a.gpu_lock.parent.mkdir(parents=True,exist_ok=True)
         gpu_lock=a.gpu_lock.open('a')
         fcntl.flock(gpu_lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
