@@ -178,5 +178,51 @@
   "finalTestRead": false,
   "calibrationFitted": false,
   "productionModified": false,
-  "notAnAdminPolicyRegistrationPayload": true
+  "notAnAdminPolicyRegistrationPayload": true,
+  "capstoneDemoDecision": {
+    "decisionDate": "2026-11-07",
+    "partCode": "DOOR",
+    "scope": "capstone_demo_only",
+    "status": "selected",
+    "modelVersion": "door-swin-tiny-e02-28a2dd1cb40b-dev",
+    "checkpointSHA256": "28a2dd1cb40b4bbecf3fc4e34dfc5354179dcb31c0c37297f1d3ee3bfe3d985e",
+    "input": "original_photo",
+    "gate": {
+      "predictedQuality": "GOOD",
+      "maximumExperimentalCalibratedDefectProbability": 0.3,
+      "inclusive": true,
+      "otherwise": "REVIEW"
+    },
+    "offlineCalibration": {
+      "method": "temperature_scaling",
+      "temperature": 0.6025595860743578,
+      "fitSource": "CARS-AD development split",
+      "fitPhotos": 100
+    },
+    "evaluation": {
+      "source": "CARS-AD",
+      "unit": "photo_group",
+      "photos": 148,
+      "normalGroups": 62,
+      "defectGroups": 86,
+      "frozenThreshold": {
+        "passThreshold": 0.4471282637053319,
+        "normalAutoPass": 53,
+        "defectAutoPass": 1
+      },
+      "postHocDemoThreshold": {
+        "passThreshold": 0.3,
+        "normalAutoPass": 53,
+        "defectAutoPass": 0,
+        "reusedFrozenEvaluationPhotos": true,
+        "independentlyValidated": false
+      },
+      "physicalPartIndependenceEstablished": false
+    },
+    "evidenceSHA256": {
+      "frozenPolicy": "fea7d1256bce7d5ee6ffc400f19f17bb591cadb831477883e7b202d4fc4150e0",
+      "offlineReport": "3bbec4ae98396a530cf12c3117aed2d1f527d55613b0f7eecda8448ba6dd682a",
+      "thresholdSensitivity": "c53f4feadb5946b34228f0e7887519ef7ce00cde7ea82f1e94803ba31b88193d"
+    }
+  }
 }
