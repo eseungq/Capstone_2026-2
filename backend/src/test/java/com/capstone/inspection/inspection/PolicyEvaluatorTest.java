@@ -124,6 +124,17 @@ class PolicyEvaluatorTest {
     }
 
     @Test
+    @DisplayName("관리자 조정 시연: 보정 0.32는 30%에서 REVIEW, 35%로 조정한 정책에서는 AUTO_PASS")
+    void demoAdjustTo35() {
+        var before = PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.32, "cal-v1", DEMO_30);
+        assertThat(before.reviewReason()).isEqualTo(ReviewReason.ABOVE_THRESHOLD);
+
+        var after = PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.32, "cal-v1", List.of(policy("cal-v1", 0.35)));
+        assertThat(after.action()).isEqualTo(RecommendedAction.AUTO_PASS);
+        assertThat(after.passThreshold()).isEqualTo(0.35);
+    }
+
+    @Test
     @DisplayName("시연 30%여도 실서버처럼 보정 확률·보정기가 null이면 REVIEW(CALIBRATION_UNAVAILABLE)")
     void demoUncalibratedReview() {
         var d = PolicyEvaluator.evaluate(PredictedQuality.GOOD, null, null, DEMO_30);
