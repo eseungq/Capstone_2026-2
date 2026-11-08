@@ -35,6 +35,9 @@ SCENARIOS = {
     "GOOD_CALIBRATED": dict(quality="GOOD", raw=0.123456, cal=0.021000, calibrated=True),   # 예시 정책(0.05) 기준 AUTO_PASS
     "GOOD_ABOVE_THRESHOLD": dict(quality="GOOD", raw=0.312345, cal=0.200000, calibrated=True),  # REVIEW(ABOVE_THRESHOLD)
     "GOOD_UNCALIBRATED": dict(quality="GOOD", raw=0.231044, cal=None, calibrated=False),  # REVIEW(CALIBRATION_UNAVAILABLE)
+    # 도어 시연 기준 30% 시험용 (ai/VALIDATION.md). 0.30은 경계라 AUTO_PASS, 0.35는 REVIEW(ABOVE_THRESHOLD)
+    "GOOD_DEMO_BOUNDARY": dict(quality="GOOD", raw=0.284210, cal=0.300000, calibrated=True),
+    "GOOD_DEMO_ABOVE": dict(quality="GOOD", raw=0.341872, cal=0.350000, calibrated=True),
     "DEFECT_GRADCAM": dict(quality="DEFECT", raw=0.912345, cal=0.880000, calibrated=True, gradcam=True),
     "DEFECT_GRADCAM_FAIL": dict(quality="DEFECT", raw=0.871234, cal=0.830000, calibrated=True, gradcam=False),
     # 0맵: 계산 성공·위치별 강조 반응 없음 → 백엔드 gradcamStatus NO_ACTIVATION, 이미지 없음 (합의 10/28)
