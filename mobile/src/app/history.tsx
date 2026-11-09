@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { getMockInspectionHistory, useMockStoreState, type Inspection } from '../data/mockInspections';
+import HistoryLiveScreenV4 from '../components/HistoryLiveScreenV4';
 
 // Figma: 99:506 (WORKER), 99:561 (ADMIN) 검사 이력 목록.
 // 본 화면은 동일 Mock store를 읽으며 실제 조회 API와 연결되어 있지 않습니다.
@@ -20,7 +21,7 @@ function state(it: Inspection): string {
   if (it.status === 'ANALYZING') return 'AI 분석 중 · 접수 완료';
   return 'RECEIVED · 분석 대기';
 }
-export default function HistoryScreen() {
+function HistoryMockScreen() {
   const p = useLocalSearchParams<{ role?: string }>();
   const role: Role = p.role === 'ADMIN' ? 'ADMIN' : 'WORKER';
   const { ready, revision, warning } = useMockStoreState();
@@ -70,6 +71,12 @@ export default function HistoryScreen() {
     </View>
   </SafeAreaView>;
 }
+/** 실제 로그인 화면은 SERVER 이력을, Mock 시연은 기존 로컬 이력을 사용합니다. */
+export default function HistoryScreen() {
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  return mode === 'live' ? <HistoryLiveScreenV4 /> : <HistoryMockScreen />;
+}
+
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
   heading: { paddingHorizontal: 20, paddingTop: 9, paddingBottom: 22 },

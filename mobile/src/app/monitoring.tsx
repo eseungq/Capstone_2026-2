@@ -288,6 +288,7 @@ onPress={() =>
     pathname: '/history',
     params: {
       role: isAdmin ? 'ADMIN' : 'WORKER',
+      mode: isLive ? 'live' : 'mock',
     },
   })
 }
@@ -319,6 +320,7 @@ onPress={() =>
     pathname: '/settings',
     params: {
       role: isAdmin ? 'ADMIN' : 'WORKER',
+      mode: isLive ? 'live' : 'mock',
     },
   })
 }

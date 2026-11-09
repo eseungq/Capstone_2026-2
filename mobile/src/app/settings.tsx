@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // 99:772 (07 · 작업자 설정), 99:809 (07-M · 관리자 설정)
 // 실제 인증 서비스에 연결되지 않은 Mock 역할 선택 화면입니다.
 type Role = 'WORKER' | 'ADMIN';
+type Mode = 'live' | 'mock';
 
 const color = {
   background: '#F5F7FB',
@@ -43,13 +44,13 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-function NavBar({ role }: { role: Role }) {
+function NavBar({ role, mode }: { role: Role; mode: Mode }) {
   return (
     <View style={styles.nav}>
       <Pressable
         style={styles.navItem}
         accessibilityRole="button"
-        onPress={() => router.replace({ pathname: '/monitoring', params: { role } })}
+        onPress={() => router.replace({ pathname: '/monitoring', params: { role, mode } })}
       >
         <Text style={styles.navIcon}>▣</Text>
         <Text style={styles.navText}>모니터링</Text>
@@ -57,7 +58,7 @@ function NavBar({ role }: { role: Role }) {
       <Pressable
         style={styles.navItem}
         accessibilityRole="button"
-        onPress={() => router.replace({ pathname: '/history', params: { role } })}
+        onPress={() => router.replace({ pathname: '/history', params: { role, mode } })}
       >
         <Text style={styles.navIcon}>▤</Text>
         <Text style={styles.navText}>이력</Text>
@@ -71,9 +72,11 @@ function NavBar({ role }: { role: Role }) {
 }
 
 export default function SettingsScreen() {
-  const { role: rawRole } = useLocalSearchParams<{ role?: string }>();
+  const { role: rawRole, mode: rawMode } = useLocalSearchParams<{ role?: string; mode?: string }>();
   // 현재는 화면 이동 파라미터에 따른 Mock 역할 표시입니다. 서버 권한 검증과 무관합니다.
   const role: Role = rawRole === 'ADMIN' ? 'ADMIN' : 'WORKER';
+  // 서버 조회 여부는 모니터링/이력 라우트에서 결정합니다. 이 화면은 여전히 Mock 설정 UI입니다.
+  const mode: Mode = rawMode === 'live' ? 'live' : 'mock';
   const isAdmin = role === 'ADMIN';
 
   const logout = () => {
@@ -246,7 +249,7 @@ onPress={() =>
         </View>
       </ScrollView>
 
-      <NavBar role={role} />
+      <NavBar role={role} mode={mode} />
     </SafeAreaView>
   );
 }
