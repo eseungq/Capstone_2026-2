@@ -120,7 +120,7 @@ else
     ng "FAILED $ERROR_CODE"
     case "$ERROR_CODE" in
         AI_SERVER_ERROR) hint "AI 서버 연결 실패 또는 5xx. AI 주소(APP_AI_BASEURL)와 AI 서버 로그를 확인" ;;
-        AI_SERVER_TIMEOUT) hint "응답 시간 초과. APP_AI_READTIMEOUTMS(기본 10000)를 실측값에 맞춰 조정" ;;
+        AI_SERVER_TIMEOUT) hint "응답 시간 초과. APP_AI_READTIMEOUTMS(기본 20000)를 실측값에 맞춰 조정. 이미지 다운로드가 느린 네트워크인지 먼저 확인" ;;
         AI_REQUEST_REJECTED) hint "AI가 4xx로 거절. 이미지 다운로드 실패라면 PUBLIC_BASE_URL이 DGX에서 접근 가능한 주소인지 확인" ;;
         AI_RESPONSE_INVALID) hint "응답 형식이 계약 7.2와 다름. 백엔드 로그에서 traceId로 원인을 확인" ;;
     esac

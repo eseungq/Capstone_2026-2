@@ -89,4 +89,56 @@ class PolicyEvaluatorTest {
         assertThat(d.reviewReason()).isEqualTo(ReviewReason.ABOVE_THRESHOLD);
         assertThat(d.passThreshold()).isEqualTo(0.05);
     }
+
+    // 도어 e02 캡스톤 시연 기준 30% (ai/VALIDATION.md, 11/07 선정). GOOD + 보정 확률 ≤ 0.30만 AUTO_PASS
+    private static final List<AutomationPolicy> DEMO_30 = List.of(policy("cal-v1", 0.30));
+
+    @Test
+    @DisplayName("시연 30%: GOOD + 0.21 → AUTO_PASS")
+    void demoAutoPass() {
+        var d = PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.21, "cal-v1", DEMO_30);
+        assertThat(d.action()).isEqualTo(RecommendedAction.AUTO_PASS);
+        assertThat(d.passThreshold()).isEqualTo(0.30);
+    }
+
+    @Test
+    @DisplayName("시연 30%: GOOD + 0.30 경계 → AUTO_PASS (≤)")
+    void demoAutoPassAtBoundary() {
+        var d = PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.30, "cal-v1", DEMO_30);
+        assertThat(d.action()).isEqualTo(RecommendedAction.AUTO_PASS);
+    }
+
+    @Test
+    @DisplayName("시연 30%: GOOD + 0.35 → REVIEW(ABOVE_THRESHOLD)")
+    void demoAboveThreshold() {
+        var d = PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.35, "cal-v1", DEMO_30);
+        assertThat(d.reviewReason()).isEqualTo(ReviewReason.ABOVE_THRESHOLD);
+        assertThat(d.passThreshold()).isEqualTo(0.30);
+    }
+
+    @Test
+    @DisplayName("시연 30%: DEFECT는 보정 확률이 낮아도 REVIEW(DEFECT_PREDICTED)")
+    void demoDefectReview() {
+        var d = PolicyEvaluator.evaluate(PredictedQuality.DEFECT, 0.10, "cal-v1", DEMO_30);
+        assertThat(d.reviewReason()).isEqualTo(ReviewReason.DEFECT_PREDICTED);
+    }
+
+    @Test
+    @DisplayName("관리자 조정 시연: 보정 0.32는 30%에서 REVIEW, 35%로 조정한 정책에서는 AUTO_PASS")
+    void demoAdjustTo35() {
+        var before = PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.32, "cal-v1", DEMO_30);
+        assertThat(before.reviewReason()).isEqualTo(ReviewReason.ABOVE_THRESHOLD);
+
+        var after = PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.32, "cal-v1", List.of(policy("cal-v1", 0.35)));
+        assertThat(after.action()).isEqualTo(RecommendedAction.AUTO_PASS);
+        assertThat(after.passThreshold()).isEqualTo(0.35);
+    }
+
+    @Test
+    @DisplayName("시연 30%여도 실서버처럼 보정 확률·보정기가 null이면 REVIEW(CALIBRATION_UNAVAILABLE)")
+    void demoUncalibratedReview() {
+        var d = PolicyEvaluator.evaluate(PredictedQuality.GOOD, null, null, DEMO_30);
+        assertThat(d.action()).isEqualTo(RecommendedAction.REVIEW);
+        assertThat(d.reviewReason()).isEqualTo(ReviewReason.CALIBRATION_UNAVAILABLE);
+    }
 }

@@ -35,6 +35,11 @@ SCENARIOS = {
     "GOOD_CALIBRATED": dict(quality="GOOD", raw=0.123456, cal=0.021000, calibrated=True),   # 예시 정책(0.05) 기준 AUTO_PASS
     "GOOD_ABOVE_THRESHOLD": dict(quality="GOOD", raw=0.312345, cal=0.200000, calibrated=True),  # REVIEW(ABOVE_THRESHOLD)
     "GOOD_UNCALIBRATED": dict(quality="GOOD", raw=0.231044, cal=None, calibrated=False),  # REVIEW(CALIBRATION_UNAVAILABLE)
+    # 도어 시연 기준 30% 시험용 (ai/VALIDATION.md). 0.30은 경계라 AUTO_PASS, 0.35는 REVIEW(ABOVE_THRESHOLD)
+    "GOOD_DEMO_BOUNDARY": dict(quality="GOOD", raw=0.284210, cal=0.300000, calibrated=True),
+    "GOOD_DEMO_ABOVE": dict(quality="GOOD", raw=0.341872, cal=0.350000, calibrated=True),
+    # 관리자 기준치 조정 시연용: 0.30에서 REVIEW, 0.35로 조정·적용 후 AUTO_PASS (AI 11/09)
+    "GOOD_DEMO_ADJUST": dict(quality="GOOD", raw=0.326514, cal=0.320000, calibrated=True),
     "DEFECT_GRADCAM": dict(quality="DEFECT", raw=0.912345, cal=0.880000, calibrated=True, gradcam=True),
     "DEFECT_GRADCAM_FAIL": dict(quality="DEFECT", raw=0.871234, cal=0.830000, calibrated=True, gradcam=False),
     # 0맵: 계산 성공·위치별 강조 반응 없음 → 백엔드 gradcamStatus NO_ACTIVATION, 이미지 없음 (합의 10/28)
@@ -44,7 +49,7 @@ SCENARIOS = {
                                 gradcam_format="jpeg"),
     "ERROR_4XX": dict(error=422),        # 백엔드: AI_REQUEST_REJECTED → FAILED (재시도 없음)
     "ERROR_5XX": dict(error=500),        # 백엔드: 1회 재시도 후 AI_SERVER_ERROR → FAILED
-    # 백엔드 read-timeout(10초)보다 오래 대기 후 정상 응답 → 백엔드는 이미 AI_SERVER_TIMEOUT으로 FAILED (늦은 결과 무시)
+    # 백엔드 read-timeout(20초)보다 오래 대기 후 정상 응답 → 백엔드는 이미 AI_SERVER_TIMEOUT으로 FAILED (늦은 결과 무시)
     "TIMEOUT": dict(quality="GOOD", raw=0.123456, cal=0.021000, calibrated=True, timeout=True),
     # modelVersion 불일치 → AI_RESPONSE_INVALID
     "INVALID_RESPONSE": dict(quality="GOOD", raw=0.123456, cal=0.021000, calibrated=True, invalid=True),
@@ -52,7 +57,7 @@ SCENARIOS = {
 # AUTO: 사진 내용(해시)으로 정상 시나리오 중 하나를 고름. 같은 사진은 항상 같은 결과
 AUTO_POOL = ["GOOD_CALIBRATED", "GOOD_ABOVE_THRESHOLD", "GOOD_UNCALIBRATED", "DEFECT_GRADCAM", "DEFECT_GRADCAM_FAIL"]
 
-TIMEOUT_SECONDS = float(os.getenv("MOCK_TIMEOUT_SECONDS", "15"))
+TIMEOUT_SECONDS = float(os.getenv("MOCK_TIMEOUT_SECONDS", "25"))  # 백엔드 read-timeout 20초보다 길게
 DELAY_MS = int(os.getenv("MOCK_DELAY_MS", "300"))  # 추론 시간 흉내
 
 state = {"scenario": os.getenv("MOCK_SCENARIO", "AUTO"), "once": None}
