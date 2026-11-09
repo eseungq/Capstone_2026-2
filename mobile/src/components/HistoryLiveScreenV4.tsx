@@ -322,7 +322,7 @@ export default function HistoryLiveScreenV4() {
         </View>
         <Pressable
           style={styles.navItem}
-          onPress={() => router.push({ pathname: '/settings', params: { role } })}
+          onPress={() => router.push({ pathname: '/settings', params: { role, mode: 'live' } })}
           accessibilityRole="button"
         >
           <Text style={styles.navIcon}>⚙</Text>
