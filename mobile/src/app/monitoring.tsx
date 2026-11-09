@@ -320,6 +320,7 @@ onPress={() =>
     pathname: '/settings',
     params: {
       role: isAdmin ? 'ADMIN' : 'WORKER',
+      mode: isLive ? 'live' : 'mock',
     },
   })
 }
