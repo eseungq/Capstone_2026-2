@@ -49,7 +49,7 @@ SCENARIOS = {
                                 gradcam_format="jpeg"),
     "ERROR_4XX": dict(error=422),        # 백엔드: AI_REQUEST_REJECTED → FAILED (재시도 없음)
     "ERROR_5XX": dict(error=500),        # 백엔드: 1회 재시도 후 AI_SERVER_ERROR → FAILED
-    # 백엔드 read-timeout(10초)보다 오래 대기 후 정상 응답 → 백엔드는 이미 AI_SERVER_TIMEOUT으로 FAILED (늦은 결과 무시)
+    # 백엔드 read-timeout(20초)보다 오래 대기 후 정상 응답 → 백엔드는 이미 AI_SERVER_TIMEOUT으로 FAILED (늦은 결과 무시)
     "TIMEOUT": dict(quality="GOOD", raw=0.123456, cal=0.021000, calibrated=True, timeout=True),
     # modelVersion 불일치 → AI_RESPONSE_INVALID
     "INVALID_RESPONSE": dict(quality="GOOD", raw=0.123456, cal=0.021000, calibrated=True, invalid=True),
@@ -57,7 +57,7 @@ SCENARIOS = {
 # AUTO: 사진 내용(해시)으로 정상 시나리오 중 하나를 고름. 같은 사진은 항상 같은 결과
 AUTO_POOL = ["GOOD_CALIBRATED", "GOOD_ABOVE_THRESHOLD", "GOOD_UNCALIBRATED", "DEFECT_GRADCAM", "DEFECT_GRADCAM_FAIL"]
 
-TIMEOUT_SECONDS = float(os.getenv("MOCK_TIMEOUT_SECONDS", "15"))
+TIMEOUT_SECONDS = float(os.getenv("MOCK_TIMEOUT_SECONDS", "25"))  # 백엔드 read-timeout 20초보다 길게
 DELAY_MS = int(os.getenv("MOCK_DELAY_MS", "300"))  # 추론 시간 흉내
 
 state = {"scenario": os.getenv("MOCK_SCENARIO", "AUTO"), "once": None}

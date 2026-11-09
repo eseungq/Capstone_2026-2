@@ -31,7 +31,7 @@ uvicorn main:app --port 8090
 | DEFECT_GRADCAM_JPEG | DEFECT, Grad-CAM JPEG (`format: jpeg`) | COMPLETED · REVIEW (DEFECT_PREDICTED), gradcamStatus GENERATED, `image/jpeg`로 저장 |
 | ERROR_4XX | 422 오류 본문 | FAILED · AI_REQUEST_REJECTED (재시도 없음) |
 | ERROR_5XX | 500 오류 본문 | 1회 재시도 후 FAILED · AI_SERVER_ERROR |
-| TIMEOUT | 15초 대기 | FAILED · AI_SERVER_TIMEOUT (백엔드 read-timeout 10초) |
+| TIMEOUT | 25초 대기 | FAILED · AI_SERVER_TIMEOUT (백엔드 read-timeout 20초) |
 | INVALID_RESPONSE | modelVersion 불일치 | FAILED · AI_RESPONSE_INVALID |
 
 ```bash
@@ -45,7 +45,7 @@ curl localhost:8090/mock/scenario
 
 - `once`로 `ERROR_5XX`를 걸면 백엔드의 1회 재시도는 AUTO 결과를 받아 성공한다 (재시도 동작 확인용). FAILED까지 보려면 `once` 없이 설정
 
-환경 변수: `MOCK_SCENARIO`(시작 시나리오), `MOCK_TIMEOUT_SECONDS`(기본 15), `MOCK_DELAY_MS`(기본 300)
+환경 변수: `MOCK_SCENARIO`(시작 시나리오), `MOCK_TIMEOUT_SECONDS`(기본 25, 백엔드 read-timeout보다 길어야 함), `MOCK_DELAY_MS`(기본 300)
 
 ## 그 밖의 동작
 

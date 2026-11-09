@@ -158,7 +158,7 @@ curl -s -X DELETE 'localhost:8080/api/v1/notifications/devices/ExponentPushToken
    ```bash
    APP_AI_BASEURL=http://<DGX 100.x>:<포트> PUBLIC_BASE_URL=http://<Mac 100.x>:8080 ./gradlew bootRun
    ```
-   - 실제 추론이 오래 걸리면 `APP_AI_READTIMEOUTMS`(기본 10000)도 함께 조정
+   - 실행 타임아웃 `APP_AI_READTIMEOUTMS` 기본 20000 (11/09 시연용으로 10000에서 상향. 네트워크가 느리면 AI의 이미지 다운로드만 6~9.5초)
    - 실제 AI에 `/internal/v1/models`가 없거나 형식이 다르면 `APP_AI_MODELCHECKENABLED=false` 추가 (아래 표)
    - 현재 값 (11/04): AI `http://100.81.8.101:8771`(DGX, 503 시험용은 8772), Mac `http://100.117.82.89:8080`, DB 포트 3307. IntelliJ에서는 실행 구성 환경변수에 `DB_PORT=3307;APP_AI_BASEURL=...;PUBLIC_BASE_URL=...`
    - AI는 허용된 출처의 이미지 주소만 받는다. `PUBLIC_BASE_URL`을 다른 포트·주소로 바꾸면 `422 IMAGE_ORIGIN_NOT_ALLOWED` → `AI_REQUEST_REJECTED`
