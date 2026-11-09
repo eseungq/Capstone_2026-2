@@ -157,7 +157,11 @@ export default function AssumedPolicyScreen(){
           <Text style={s.note}>기존 REVIEW 검사는 정책이 바뀌어도 그대로 남습니다. 실제 REVIEW의 작업자 PASS/FAIL은 서버에서 반환한 검사 UUID의 상세 화면에서만 수행합니다.</Text>
         </Card>
         <Card title="시연 상태">
-          <Row name="진행 단계" value={phase==='EDITING'?'30% 기본 정책':phase==='SAVED'?'35% 저장·미적용':'35% 새 정책 적용'} />
+          <Row name="진행 단계" value={phase==='EDITING'
+            ? '30% 기본 정책'
+            : phase==='SAVED'
+              ? `${((savedValue??MOCK.adjustedThreshold)*100).toFixed(2)}% 저장·미적용`
+              : `${(appliedThreshold*100).toFixed(2)}% 새 정책 적용`} />
           <Row name="서버 API 요청" value="없음" />
           <Row name="운영 정책/검사 기록 변경" value="없음" />
           {phase!=='EDITING'||demoReceipts.length>0?<Pressable accessibilityRole="button" onPress={()=>{
