@@ -90,7 +90,7 @@ export default function AssumedPolicyScreen(){
   return <SafeAreaView style={s.screen} edges={['top','bottom']}>
     <Stack.Screen options={{headerShown:false}} />
     <View style={s.header}>
-      <Text style={s.title}>도어 AUTO_PASS · Mock 시연</Text>
+      <Text style={s.title}>자동 통과 시연</Text>
       <Text style={s.subtitle}>11/09 팀 합의 30% → 35% · 실서버/운영 정책 미연동</Text>
     </View>
     {role!=='ADMIN'?<View style={s.body}><Card title="관리자 전용"><Text style={s.note}>WORKER 시연 역할에서는 접근할 수 없습니다.</Text></Card></View>:
