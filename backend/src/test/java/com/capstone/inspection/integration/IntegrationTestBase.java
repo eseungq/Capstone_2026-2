@@ -194,6 +194,11 @@ abstract class IntegrationTestBase {
         return json(result).at("/error/code").asText();
     }
 
+    // 접수 가능한 작은 PNG (테스트마다 같은 사진)
+    protected static byte[] imageBytes() {
+        return IMAGE.clone();
+    }
+
     protected MvcResult submit() throws Exception {
         return call(multipart("/api/v1/inspections")
                 .file(new MockMultipartFile("image", "t.png", "image/png", IMAGE)).param("partCode", "DOOR"), device());
