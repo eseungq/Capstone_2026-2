@@ -2,7 +2,7 @@
 
 담당: 이승규 · 기준 문서: [백엔드 API 계약 v4](../docs/백엔드_API계약_v4.md)
 
-현재 구현 범위 (9주차)
+현재 구현 범위 (11/10)
 - 인증: 로그인·토큰 재발급·로그아웃, 역할(WORKER·ADMIN·DEVICE)별 접근 제어, 로그인 5회 실패 잠금
 - 사진 접수(비동기): `POST /api/v1/inspections` → 202, 스레드 풀(1개, 11/04 실측으로 2→1)에서 AI 호출·응답 검증·정책 적용
 - 검사 상세: `GET /api/v1/inspections/{id}` (AI·정책·판정·이미지 블록, 만료되는 이미지 주소)
@@ -12,12 +12,12 @@
 - 재검사: `POST /api/v1/inspections/{id}/retry` (FAILED만, 새 검사 생성)
 - 부품 목록: `GET /api/v1/parts` (모델 사용 가능·정책 적용 여부)
 - 모델 로드 확인: 접수·재검사·부품 목록·모니터링 공통 (아래 "실제 AI 연결")
-- 관리자: `GET /api/v1/admin/models`, 정책 조회·등록·기준치 조정(새 버전)·적용·중지
+- 관리자: `GET /api/v1/admin/models`, 정책 조회·등록·기준치 조정(새 버전)·적용·중지, 계정 잠금 해제 `POST /api/v1/admin/users/{loginId}/unlock`
 - 알림: 기기 토큰 등록·해제, Expo 푸시 발송 (`app.push.enabled` 기본 false면 로그만). 티켓까지만 확인하고 receipt 조회는 없음
 - Mock AI 서버 (`mock-ai/`, Python)
 - 점검 스크립트 (`scripts/`, 아래 표)
 
-아직 없음: 통계 API, AI 무응답 시 수동 판정, 앱 연결 시험 결과
+아직 없음: AI 무응답 시 수동 판정 (방식 결정 중, [결정안](../docs/수동판정_결정안.md)). 통계 API는 합의본상 범위 제외 (앱 통계 화면은 시연용 Mock)
 
 실제 AI 연결 시험: 11/04 DGX(e02)와 16개 항목 통과(B6만 보류), 동시 접수 측정 포함 ([통합 점검표](../docs/통합_점검표.md))
 
@@ -244,3 +244,5 @@ scripts/             연결 점검·전체 흐름·측정·시연 데이터
 - Flyway 체크섬 오류: 이미 적용된 마이그레이션 파일을 수정한 경우. 개발 중이면 `docker compose down -v`로 DB 볼륨을 지우고 다시 실행
 - 분석이 계속 ANALYZING: Mock AI 서버가 켜져 있는지, `app.ai.base-url` 확인. 서버를 재시작하면 ANALYZING 건은 FAILED로 정리됨
 - Mock AI가 이미지를 못 읽음(422 → FAILED `AI_REQUEST_REJECTED`): `app.storage.public-base-url`이 Mock AI에서 접근 가능한 주소인지 확인
+- 로그인 423 `AUTH_ACCOUNT_LOCKED` (비밀번호 5회 실패): ADMIN 토큰으로 `POST /api/v1/admin/users/{loginId}/unlock` (Swagger 관리자 탭). 관리자 계정이 잠겼으면 DB에서 `UPDATE users SET locked = FALSE, failed_login_count = 0 WHERE login_id = 'admin01';`
+- 분석이 10초 넘게 걸리거나 FAILED `AI_SERVER_TIMEOUT`: AI가 이 PC에서 사진을 내려받는 시간이 대부분. 이 PC의 **업로드** 속도와 Tailscale 연결을 먼저 확인 (11/09 실효 1.4Mbps에서 DEFECT 타임아웃). 실행 타임아웃은 20초
