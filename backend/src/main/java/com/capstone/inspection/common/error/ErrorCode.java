@@ -27,6 +27,7 @@ public enum ErrorCode {
     INSPECTION_NOT_FOUND(HttpStatus.NOT_FOUND, "검사를 찾을 수 없습니다.", false),
     POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, "정책을 찾을 수 없습니다.", false),
     MODEL_NOT_FOUND(HttpStatus.NOT_FOUND, "모델을 찾을 수 없습니다.", false),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.", false),
     IMAGE_NOT_AVAILABLE(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없거나 접근 기간이 지났습니다.", false),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 경로가 없습니다.", false),                      // 5.7 표에 추가 필요
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다.", false), // 5.7 표에 추가 필요
