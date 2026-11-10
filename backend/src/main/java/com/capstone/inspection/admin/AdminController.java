@@ -4,6 +4,7 @@ import com.capstone.inspection.admin.dto.ModelResponse;
 import com.capstone.inspection.admin.dto.PolicyCreateRequest;
 import com.capstone.inspection.admin.dto.PolicyResponse;
 import com.capstone.inspection.admin.dto.ThresholdRequest;
+import com.capstone.inspection.admin.dto.UserLockResponse;
 import com.capstone.inspection.common.api.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,13 +23,14 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 // ADMIN만 호출 가능 (SecurityConfig)
-@Tag(name = "관리자", description = "모델 조회, 자동 통과 정책 등록·조정·적용·중지")
+@Tag(name = "관리자", description = "모델 조회, 자동 통과 정책 등록·조정·적용·중지, 계정 잠금 해제")
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
 public class AdminController {
 
     private final AdminPolicyService policyService;
+    private final AdminUserService userService;
 
     @Operation(summary = "모델 목록", description = "모델 버전·부품·보정기·활성 여부와 AI 서버 로드 가능 여부(확인 불가·확인 끔이면 null). 조회만 제공")
     @GetMapping("/models")
@@ -67,5 +69,11 @@ public class AdminController {
     @PostMapping("/policies/{id}/deactivate")
     public ApiResponse<PolicyResponse> deactivate(@PathVariable String id) {
         return ApiResponse.of(policyService.deactivate(id));
+    }
+
+    @Operation(summary = "계정 잠금 해제", description = "로그인 실패 누적으로 잠긴 계정을 풀고 실패 횟수 초기화. 잠기지 않은 계정도 200")
+    @PostMapping("/users/{loginId}/unlock")
+    public ApiResponse<UserLockResponse> unlock(@PathVariable String loginId) {
+        return ApiResponse.of(userService.unlock(loginId));
     }
 }

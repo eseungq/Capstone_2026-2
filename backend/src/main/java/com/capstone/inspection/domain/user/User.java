@@ -64,4 +64,10 @@ public class User {
     public void resetLoginFailures() {
         this.failedLoginCount = 0;
     }
+
+    // 관리자 잠금 해제 (TBD-10 "관리자 해제"). 실패 횟수도 초기화
+    public void unlock() {
+        this.locked = false;
+        this.failedLoginCount = 0;
+    }
 }
