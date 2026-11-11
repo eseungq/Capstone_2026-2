@@ -71,6 +71,7 @@ export function elapsedFromReceiptV4(receivedAt: string, observedAtMs: number): 
 export function advanceMonitoringObservationV4(
   previous: MonitoringObservationStateV4,
   snapshot: MonitorSnapshotV4,
+  partCode = 'DOOR',
 ): MonitoringObservationStateV4 {
   if (snapshot.status !== 'ready' ||
       snapshot.lastSuccessAtMs === null ||
@@ -90,6 +91,7 @@ export function advanceMonitoringObservationV4(
     displayState: DisplayStateV4;
   }>();
   for (const part of snapshot.parts) {
+    if (part.partCode !== partCode) continue;
     for (const item of part.recent) {
       current.set(item.inspectionId, {
         inspectionId: item.inspectionId,
@@ -103,6 +105,7 @@ export function advanceMonitoringObservationV4(
   // 같은 폴링의 /queue 응답이 /parts와 순간적으로 다를 수 있습니다.
   // 대기 상태에 대해서는 현재 화면 건수의 출처인 /queue 항목을 우선합니다.
   for (const item of snapshot.queue) {
+    if (item.partCode !== partCode) continue;
     current.set(item.inspectionId, {
       inspectionId: item.inspectionId,
       inspectionNo: item.inspectionNo ?? current.get(item.inspectionId)?.inspectionNo ?? null,
@@ -137,7 +140,7 @@ export function advanceMonitoringObservationV4(
             Date.parse(item.receivedAt) > Date.parse(latestDetection.receivedAt)) {
           latestDetection = event;
         }
-        if (item.displayState === 'REVIEW_PENDING' && item.partCode === 'DOOR') {
+        if (item.displayState === 'REVIEW_PENDING') {
           newPending.push(item);
         }
       }
@@ -155,7 +158,7 @@ export function advanceMonitoringObservationV4(
           previousState: existing.displayState,
         };
         latestStateChange = event;
-        if (item.displayState === 'REVIEW_PENDING' && item.partCode === 'DOOR') {
+        if (item.displayState === 'REVIEW_PENDING') {
           newPending.push(item);
         }
       }
@@ -169,7 +172,7 @@ export function advanceMonitoringObservationV4(
   }
 
   const reviewCount = snapshot.queue.filter(
-    (item) => item.partCode === 'DOOR' && item.displayState === 'REVIEW_PENDING',
+    (item) => item.partCode === partCode && item.displayState === 'REVIEW_PENDING',
   ).length;
   let latestReviewCountChange = previous.latestReviewCountChange;
   if (!baseline && previous.reviewCount !== null && previous.reviewCount !== reviewCount) {
