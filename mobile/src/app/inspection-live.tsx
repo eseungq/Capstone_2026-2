@@ -367,6 +367,47 @@ export default function InspectionLiveScreen() {
     );
   };
 
+  const requestManual = () => {
+    if (!visibleDetail || submitting || !visibleDetail.canOfferManual || role !== 'WORKER') return;
+    Alert.alert(
+      '실제 서버 수동 판정 전환',
+      `${visibleDetail.inspectionNo}의 FAILED 기록은 유지하고, AI 분석 없이 작업자 판정용 새 검사를 만들까요? 재검사와 수동 전환은 원본당 한 번만 가능합니다.`,
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '수동 판정으로 전환', onPress: () => { void submitAction('manual'); } },
+      ],
+    );
+  };
+
+  const canShowRetry = !roleLoading && (role === 'WORKER' || role === 'ADMIN') &&
+    visibleDetail?.canOfferRetry === true;
+  const canShowManual = !roleLoading && role === 'WORKER' &&
+    visibleDetail?.canOfferManual === true;
+  const followUpSubmitted = submitting !== null || retryResult !== null || manualResult !== null;
+  const retryButton = canShowRetry ? (
+    <Pressable
+      style={[styles.button, followUpSubmitted && styles.disabledButton]}
+      disabled={followUpSubmitted}
+      onPress={requestRetry}
+      accessibilityRole="button"
+    >
+      <Text style={styles.buttonText}>{retryResult ? '재검사 접수됨' : 'FAILED 재검사 요청'}</Text>
+    </Pressable>
+  ) : null;
+  const manualButton = canShowManual ? (
+    <Pressable
+      style={[modelAvailable === true ? styles.secondaryButton : styles.button,
+        followUpSubmitted && styles.disabledButton]}
+      disabled={followUpSubmitted}
+      onPress={requestManual}
+      accessibilityRole="button"
+    >
+      <Text style={modelAvailable === true ? styles.secondaryButtonText : styles.buttonText}>
+        {manualResult ? '수동 검사 생성됨' : '수동 판정으로 전환'}
+      </Text>
+    </Pressable>
+  ) : null;
+
   const gradcamMissing = visibleDetail?.gradcamStatus === 'NO_ACTIVATION'
     ? 'AI 예측은 완료됐지만, 위치별 강조 반응이 없어 판단 근거 이미지를 제공하기 어렵습니다.'
     : visibleDetail?.gradcamStatus === 'NOT_REQUIRED'
@@ -383,7 +424,7 @@ export default function InspectionLiveScreen() {
           <Text style={styles.back}>‹ 모니터링으로 돌아가기</Text>
         </Pressable>
         <Text style={styles.title}>실제 서버 검사 상세</Text>
-        <Text style={styles.muted}>SERVER · 검사 UUID로 조회 · 권한별 판정/재검사</Text>
+        <Text style={styles.muted}>SERVER · 검사 UUID로 조회 · 권한별 판정/재검사/수동 전환</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
@@ -422,10 +463,56 @@ export default function InspectionLiveScreen() {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>{visibleDetail.inspectionNo}</Text>
               <Field label="부품" value={visibleDetail.partCode} />
+              <Field label="검사 생성 경로" value={visibleDetail.source ?? '미제공'} />
               <Field label="상태" value={`${visibleDetail.displayStateLabel} (${visibleDetail.displayState})`} />
               <Field label="접수 시각" value={formatTime(visibleDetail.receivedAt)} />
               <Field label="검사 UUID" value={visibleDetail.inspectionId} />
             </View>
+
+            {isManualInspection && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>AI 분석 없이 작업자 판정</Text>
+                <Text style={styles.muted}>
+                  AI 결과가 없는 수동 검사입니다. 원본 사진을 확인하고 WORKER가 PASS/FAIL을 직접 판정합니다.
+                </Text>
+                {visibleDetail.manualOf && (
+                  <>
+                    <Field label="원래 FAILED 검사" value={visibleDetail.manualOf.inspectionNo} />
+                    <Field label="원본 AI 오류 코드" value={visibleDetail.manualOf.errorCode} />
+                    <Text style={styles.muted}>{visibleDetail.manualOf.errorMessage}</Text>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => router.push({
+                        pathname: '/inspection-live',
+                        params: { inspectionId: visibleDetail.manualOf!.inspectionId },
+                      })}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.secondaryButtonText}>원본 {visibleDetail.manualOf.inspectionNo} 상세 보기 ›</Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
+            )}
+            {visibleDetail.followUp && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>이미 생성된 후속 검사</Text>
+                <Text style={styles.muted}>
+                  원본 FAILED 기록은 유지됩니다. 이미 후속 검사가 있어 재검사·수동 판정 전환을 다시 요청할 수 없습니다.
+                </Text>
+                <Field label="후속 검사 유형" value={visibleDetail.followUp.source === 'MANUAL' ? '수동 판정' : '재검사'} />
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => router.push({
+                    pathname: '/inspection-live',
+                    params: { inspectionId: visibleDetail.followUp!.inspectionId },
+                  })}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.secondaryButtonText}>후속 검사 {visibleDetail.followUp.inspectionNo} 상세 보기 ›</Text>
+                </Pressable>
+              </View>
+            )}
 
             {imageNotice && (
               <View style={styles.staleCard}>
@@ -440,25 +527,33 @@ export default function InspectionLiveScreen() {
               onLoadError={handleImageError}
             />
 
-            <ImagePanel
-              title="AI 판단 근거"
-              url={visibleDetail.gradcamImageUrl}
-              missingText={gradcamMissing}
-              caption="AI가 반응한 영역입니다. 원본 사진과 함께 확인해 주세요."
-              onLoadError={handleImageError}
-            />
+            {!isManualInspection && (
+              <ImagePanel
+                title="AI 판단 근거"
+                url={visibleDetail.gradcamImageUrl}
+                missingText={gradcamMissing}
+                caption="AI가 반응한 영역입니다. 원본 사진과 함께 확인해 주세요."
+                onLoadError={handleImageError}
+              />
+            )}
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>AI 분석 · 정책 · 최종 판정</Text>
-              <Field label="AI 예측" value={visibleDetail.prediction ?? '미제공'} />
-              <Field
-                label="보정 불량 확률"
-                value={visibleDetail.calibratedDefectProbability === null
-                  ? '미준비 / 미제공'
-                  : `${(visibleDetail.calibratedDefectProbability * 100).toFixed(2)}%`}
-              />
-              <Field label="AI 모델" value={visibleDetail.modelVersion ?? '미제공'} />
-              <Field label="REVIEW 사유" value={visibleDetail.reviewReasonText ?? '해당 없음'} />
+              <Text style={styles.cardTitle}>{isManualInspection ? '수동 판정 · 최종 판정' : 'AI 분석 · 정책 · 최종 판정'}</Text>
+              {isManualInspection ? (
+                <Field label="판정 방식" value="AI 분석 없이 작업자 판정" />
+              ) : (
+                <>
+                  <Field label="AI 예측" value={visibleDetail.prediction ?? '미제공'} />
+                  <Field
+                    label="보정 불량 확률"
+                    value={visibleDetail.calibratedDefectProbability === null
+                      ? '미준비 / 미제공'
+                      : `${(visibleDetail.calibratedDefectProbability * 100).toFixed(2)}%`}
+                  />
+                  <Field label="AI 모델" value={visibleDetail.modelVersion ?? '미제공'} />
+                  <Field label="REVIEW 사유" value={visibleDetail.reviewReasonText ?? '해당 없음'} />
+                </>
+              )}
               <Field label="최종 작업자 판정" value={visibleDetail.finalJudgement ?? '미확정'} />
               <Field label="판정 주체" value={visibleDetail.judgedBy ?? '미제공'} />
               <Field label="판정 시각" value={formatTime(visibleDetail.confirmedAt)} />
@@ -467,7 +562,7 @@ export default function InspectionLiveScreen() {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>실제 서버 판정 · 재검사</Text>
+              <Text style={styles.cardTitle}>실제 서버 판정 · 재검사 · 수동 전환</Text>
               <Text style={styles.muted}>
                 서버가 최종 권한과 상태를 검증합니다. 제출 후 자동으로 재전송하지 않습니다.
               </Text>
