@@ -15,7 +15,8 @@ public record PartMonitoringResponse(String partCode,
                                      long failedCount,           // 재검사하지 않은 FAILED 건수 (배지용)
                                      List<Recent> recent) {      // 최근 N건, 접수 시각 최신순
 
-    public record Recent(String inspectionId, DisplayState displayState, OffsetDateTime receivedAt,
+    // inspectionNo: 화면 표시용 번호 (11/11 추가, 앱 관측 기록에서 UUID 대신 표시)
+    public record Recent(String inspectionId, String inspectionNo, DisplayState displayState, OffsetDateTime receivedAt,
                          String thumbnailUrl) {
     }
 }

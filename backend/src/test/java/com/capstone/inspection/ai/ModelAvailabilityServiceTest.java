@@ -33,7 +33,7 @@ class ModelAvailabilityServiceTest {
 
         @Override
         @SuppressWarnings("unchecked")
-        public Map<String, Boolean> fetch() {
+        public Map<String, Boolean> fetch(String baseUrl) {
             calls++;
             Object answer = answers.size() > 1 ? answers.poll() : answers.peek();
             if (answer instanceof RuntimeException e) {
@@ -48,7 +48,7 @@ class ModelAvailabilityServiceTest {
         AppProperties.Ai a = d.ai();
         return new AppProperties(d.upload(), new AppProperties.Ai(a.baseUrl(), a.connectTimeoutMs(), a.readTimeoutMs(),
                 a.retryCount(), a.imageSizeCheckEnabled(), a.maxResponseStringChars(), enabled, ttl, failureTtl,
-                a.modelCheckConnectTimeoutMs(), a.modelCheckReadTimeoutMs()),
+                a.modelCheckConnectTimeoutMs(), a.modelCheckReadTimeoutMs(), a.partBaseUrls()),
                 d.storage(), d.auth(), d.inspection(), d.monitoring(), d.policy(), d.push());
     }
 

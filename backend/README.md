@@ -162,6 +162,21 @@ curl -s -X DELETE 'localhost:8080/api/v1/notifications/devices/ExponentPushToken
    - 실제 AI에 `/internal/v1/models`가 없거나 형식이 다르면 `APP_AI_MODELCHECKENABLED=false` 추가 (아래 표)
    - 현재 값 (11/04): AI `http://100.81.8.101:8771`(DGX, 503 시험용은 8772), Mac `http://100.117.82.89:8080`, DB 포트 3307. IntelliJ에서는 실행 구성 환경변수에 `DB_PORT=3307;APP_AI_BASEURL=...;PUBLIC_BASE_URL=...`
    - AI는 허용된 출처의 이미지 주소만 받는다. `PUBLIC_BASE_URL`을 다른 포트·주소로 바꾸면 `422 IMAGE_ORIGIN_NOT_ALLOWED` → `AI_REQUEST_REJECTED`
+   - **부품마다 AI 서버가 다를 때** (11/11 프레임·카울커버): `APP_AI_PARTBASEURLS_<부품코드>=<주소>`를 추가. `COWL_COVER`처럼 `_`가 든 코드도 그대로 쓰면 됨 (Spring이 키를 `cowl.cover`로 바꿔도 구분 기호를 무시하고 비교). 지정한 부품은 그 서버로, 나머지는 `APP_AI_BASEURL`로 추론 요청을 보내고, 모델 확인은 모든 서버의 `/internal/v1/models`를 합쳐 판단 (한 서버가 꺼져도 다른 서버 모델은 정상 판단)
+     ```
+     DB_PORT=3307;APP_AI_BASEURL=http://100.81.8.101:8771;APP_AI_PARTBASEURLS_FRAME=http://100.81.8.101:8774;APP_AI_PARTBASEURLS_COWL_COVER=http://100.81.8.101:8778;PUBLIC_BASE_URL=http://100.117.82.89:8080;APP_PUSH_ENABLED=true
+     ```
+   - 분석 스레드(`analysis-pool-size: 1`)는 부품 공통이라 도어·프레임 접수가 겹치면 차례로 처리
+### 프레임 통합 모델 (11/11, V5_4)
+
+- 모델 `frame-swin-tiny-unified-e08-2425d7e46572-dev`, 보정기 `frame-e08-temperature-5d4299808c3e-demo`, AI 서버 8774, 검사항목 `UNIFIED`(통합 불량, 임시 코드). seed에서 **active로 등록**
+- 시연 정책 `frame-e08-demo-0367`: 기준치 3.67%, 검증 범위 3.00~3.67% (평가 사진 정상 846/1,439 자동 통과, 불량 0/1,802). ready·비활성으로 등록되며 관리자 API로 적용
+  ```bash
+  curl -X POST $BE/api/v1/admin/policies/<policyId>/activate -H "Authorization: Bearer $AD"   # policyId는 GET /admin/policies?partCode=FRAME
+  ```
+- 카울커버 통합 모델 (11/11, V5_5): `cowl-cover-unified-swin-tiny-e08-458a07d46453-dev`, 보정기 `cowl-unified-e08-temperature-2d80fc926685-demo`, AI 서버 8778, 검사항목 `UNIFIED`. 시연 정책 `cowl-e08-demo-0163`: 기준치 1.63%, 검증 범위 1.00~1.63% (사전 고정 기준을 평가 사진에 적용: 정상 109/1,250 자동 통과, 불량 0/1,281). 적용 방법은 프레임과 같음
+- 보정기가 있는 실제 모델(프레임·카울커버)이라 GOOD이고 보정 확률이 3.67% 이하면 **실제 AI로 AUTO_PASS**, 넘으면 `ABOVE_THRESHOLD`, DEFECT는 `DEFECT_PREDICTED`(LayerCAM 생성)
+
 3. 점검 스크립트로 확인
    ```bash
    scripts/check-ai-connection.sh http://<DGX 100.x>:<포트> http://<Mac 100.x>:8080 [이미지 파일]

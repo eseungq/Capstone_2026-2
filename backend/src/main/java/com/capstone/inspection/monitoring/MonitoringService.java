@@ -78,7 +78,7 @@ public class MonitoringService {
         Map<String, List<PartMonitoringResponse.Recent>> recentByPart = recent.stream()
                 .sorted(NEWEST_FIRST)
                 .collect(Collectors.groupingBy(i -> i.getPart().getId(), Collectors.mapping(
-                        i -> new PartMonitoringResponse.Recent(i.getId(), DisplayState.of(i),
+                        i -> new PartMonitoringResponse.Recent(i.getId(), i.getInspectionNo(), DisplayState.of(i),
                                 Times.toOffset(i.getReceivedAt()), urls.get(i.getId())),
                         Collectors.toList())));
 

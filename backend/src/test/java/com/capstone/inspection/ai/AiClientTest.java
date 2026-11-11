@@ -59,7 +59,7 @@ class AiClientTest {
                 "http://127.0.0.1:" + server.getAddress().getPort(), ai.connectTimeoutMs(), ai.readTimeoutMs(),
                 ai.retryCount(), ai.imageSizeCheckEnabled(), ai.maxResponseStringChars(), ai.modelCheckEnabled(),
                 ai.modelCheckTtlSeconds(), ai.modelCheckFailureTtlSeconds(), ai.modelCheckConnectTimeoutMs(),
-                ai.modelCheckReadTimeoutMs()),
+                ai.modelCheckReadTimeoutMs(), ai.partBaseUrls()),
                 d.storage(), d.auth(), d.inspection(), d.monitoring(), d.policy(), d.push());
         return new AiClient(props, new AiJson(MAPPER, props));
     }

@@ -138,7 +138,7 @@ class AiSampleRegressionTest {
                 new AppProperties.Ai("http://127.0.0.1:" + server.getAddress().getPort(), ai.connectTimeoutMs(),
                         ai.readTimeoutMs(), ai.retryCount(), ai.imageSizeCheckEnabled(), ai.maxResponseStringChars(),
                         ai.modelCheckEnabled(), ai.modelCheckTtlSeconds(), ai.modelCheckFailureTtlSeconds(),
-                        ai.modelCheckConnectTimeoutMs(), ai.modelCheckReadTimeoutMs()),
+                        ai.modelCheckConnectTimeoutMs(), ai.modelCheckReadTimeoutMs(), ai.partBaseUrls()),
                 base.storage(), base.auth(), base.inspection(), base.monitoring(), base.policy(), base.push());
         return new AiClient(props, aiJson);
     }

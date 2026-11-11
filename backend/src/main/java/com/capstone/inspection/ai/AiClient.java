@@ -18,6 +18,8 @@ import org.springframework.web.client.RestClient;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 // AI 추론 서버 호출 (계약 v4 7장). 실패는 AiCallException으로 변환
 //   연결 실패·5xx → AI_SERVER_ERROR (재시도 대상)
@@ -29,20 +31,26 @@ public class AiClient {
 
     private static final Logger log = LoggerFactory.getLogger(AiClient.class);
 
-    private final RestClient restClient;
+    private final AppProperties.Ai ai;
+    private final SimpleClientHttpRequestFactory factory;
+    private final Map<String, RestClient> clients = new ConcurrentHashMap<>(); // AI 주소별
     private final ObjectMapper objectMapper;
     private final int retryCount;
 
     public AiClient(AppProperties props, AiJson aiJson) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofMillis(props.ai().connectTimeoutMs()));
-        factory.setReadTimeout(Duration.ofMillis(props.ai().readTimeoutMs()));
-        this.restClient = RestClient.builder()
-                .baseUrl(props.ai().baseUrl())
-                .requestFactory(factory)
-                .build();
+        this.ai = props.ai();
+        this.factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofMillis(ai.connectTimeoutMs()));
+        factory.setReadTimeout(Duration.ofMillis(ai.readTimeoutMs()));
         this.objectMapper = aiJson.mapper();
-        this.retryCount = Math.max(0, props.ai().retryCount());
+        this.retryCount = Math.max(0, ai.retryCount());
+    }
+
+    // 부품별 AI 서버 (app.ai.part-base-urls, 없으면 base-url)
+    private RestClient clientFor(String partCode) {
+        String baseUrl = ai.baseUrlFor(partCode);
+        return clients.computeIfAbsent(baseUrl,
+                url -> RestClient.builder().baseUrl(url).requestFactory(factory).build());
     }
 
     public record Result(AiPredictResponse response, String rawBody) {
@@ -75,7 +83,7 @@ public class AiClient {
         HttpStatusCode status;
         long startNanos = System.nanoTime();
         try {
-            Exchange ex = restClient.post()
+            Exchange ex = clientFor(request.partCode()).post()
                     .uri("/internal/v1/predict")
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)

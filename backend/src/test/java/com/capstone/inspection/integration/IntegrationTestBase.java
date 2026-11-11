@@ -102,7 +102,7 @@ abstract class IntegrationTestBase {
         AiModelListClient fakeAiModelListClient(AppProperties props, AiJson aiJson) {
             return new AiModelListClient(props, aiJson) {
                 @Override
-                public Map<String, Boolean> fetch() {
+                public Map<String, Boolean> fetch(String baseUrl) {
                     return aiModels.get();
                 }
             };

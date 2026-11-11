@@ -14,7 +14,7 @@ public final class TestProps {
         return new AppProperties(
                 new AppProperties.Upload(List.of("image/jpeg", "image/png"), 20_971_520L, 0, 0),
                 new AppProperties.Ai("http://localhost:8090", 2000, 10000, 1, false, 50_000_000,
-                        true, 30, 5, 500, 1000),
+                        true, 30, 5, 500, 1000, java.util.Map.of()),
                 new AppProperties.Storage("local", "./build/test-storage", 600, "http://localhost:8080"),
                 new AppProperties.Auth("test-secret-key-for-unit-tests-32-bytes-or-more", 1800, 1209600, 5),
                 new AppProperties.Inspection(2, 500),

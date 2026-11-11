@@ -33,6 +33,22 @@ class ModelCheckIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("모니터링 최근 검사에 검사번호 포함")
+    void monitoringRecentHasInspectionNo() throws Exception {
+        String id = submitAndWait().path("inspectionId").asText();
+        String no = jdbc.queryForObject("select inspection_no from inspection where id = ?", String.class, id);
+        for (JsonNode part : json(call(get("/api/v1/monitoring/parts"), worker())).path("data")) {
+            for (JsonNode recent : part.path("recent")) {
+                if (recent.path("inspectionId").asText().equals(id)) {
+                    assertThat(recent.path("inspectionNo").asText()).isEqualTo(no).startsWith("INS-");
+                    return;
+                }
+            }
+        }
+        throw new AssertionError("최근 검사에 없음");
+    }
+
+    @Test
     @DisplayName("AVAILABLE: 접수 202, /parts·모니터링 모두 true")
     void available() throws Exception {
         assertThat(partsDoor().path("modelAvailable").asBoolean()).isTrue();
@@ -99,7 +115,7 @@ class ModelCheckIntegrationTest extends IntegrationTestBase {
     void adminModels() throws Exception {
         aiModels = () -> Map.of(MOCK_MODEL, true, REAL_MODEL, false);
         JsonNode models = json(call(get("/api/v1/admin/models"), admin())).path("data");
-        assertThat(models).hasSize(3); // Mock·e20·e02 (seed-dev V4_1·V5_1·V5_2)
+        assertThat(models).hasSize(5); // Mock·e20·e02·프레임 e08·카울커버 e08 (seed-dev V4_1·V5_1·V5_2·V5_4·V5_5)
         for (JsonNode model : models) {
             boolean mock = model.path("modelVersion").asText().equals(MOCK_MODEL);
             assertThat(model.path("loadable").asBoolean()).isEqualTo(mock);
