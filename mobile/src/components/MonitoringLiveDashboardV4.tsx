@@ -25,22 +25,36 @@ function secondsText(receivedAt: string, detectedAtMs: number): string {
     : `${(elapsed / 1000).toFixed(1)}초`;
 }
 
+const MONITORED_PARTS = ['DOOR', 'FRAME'] as const;
+type MonitoredPart = (typeof MONITORED_PARTS)[number];
+
 export default function MonitoringLiveDashboardV4() {
   const { snapshot } = useMonitoringPollV4(liveMonitoringReaderV4);
-  const vm = buildMonitoringViewModelV4(snapshot);
-  const [observation, setObservation] = useState(createMonitoringObservationStateV4);
+  const [partCode, setPartCode] = useState<MonitoredPart>('DOOR');
+  const vm = buildMonitoringViewModelV4(snapshot, partCode);
+  // 두 공정 모두 매 폴링에 관측해, 공정 선택 시 과거 데이터를 신규 접수로 오인하지 않습니다.
+  const [observationsByPart, setObservationsByPart] = useState(() => ({
+    DOOR: createMonitoringObservationStateV4(),
+    FRAME: createMonitoringObservationStateV4(),
+  }));
   const [visibleQueueCount, setVisibleQueueCount] = useState(20);
 
   useEffect(() => {
-    setObservation((previous) => advanceMonitoringObservationV4(previous, snapshot));
+    setObservationsByPart((previous) => {
+      const door = advanceMonitoringObservationV4(previous.DOOR, snapshot, 'DOOR');
+      const frame = advanceMonitoringObservationV4(previous.FRAME, snapshot, 'FRAME');
+      return door === previous.DOOR && frame === previous.FRAME
+        ? previous : { DOOR: door, FRAME: frame };
+    });
   }, [snapshot]);
 
+  const observation = observationsByPart[partCode];
   const lastSuccess = timeText(snapshot.lastSuccessAtMs);
   const countChange = observation.latestReviewCountChange;
   const latestDetection = observation.latestDetection;
   const latestTransition = observation.latestStateChange;
   const recentStates = [...observation.observations]
-    .filter((item) => item.partCode === 'DOOR')
+    .filter((item) => item.partCode === partCode)
     .sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt))
     .slice(0, 5);
 
@@ -59,12 +73,35 @@ export default function MonitoringLiveDashboardV4() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.title}>DOOR 공정 현황</Text>
-        {!vm.door ? (
-          <Text>공정 데이터 조회 대기</Text>
+        <Text style={styles.title}>공정 선택</Text>
+        <View style={styles.partSelector}>
+          {MONITORED_PARTS.map((code) => (
+            <Pressable
+              key={code}
+              accessibilityRole="button"
+              accessibilityState={{ selected: partCode === code }}
+              style={[styles.partButton, partCode === code && styles.partButtonActive]}
+              onPress={() => {
+                setPartCode(code);
+                setVisibleQueueCount(20);
+              }}
+            >
+              <Text style={[styles.partButtonText, partCode === code && styles.partButtonTextActive]}>
+                {code}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.note}>선택한 공정의 실서버 현황과 대기열을 표시합니다.</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.title}>{partCode} 공정 현황</Text>
+        {!vm.part ? (
+          <Text>{vm.hasSuccessfulRead ? '서버 응답에 해당 부품 정보가 없습니다.' : '공정 데이터 조회 대기'}</Text>
         ) : (
           <>
-            <Text>부품: {vm.door.partName}</Text>
+            <Text>부품: {vm.part.partName}</Text>
             <Text>작업자 확인 필요: {vm.reviewCount}건</Text>
             <Text>AI 분석 실패: {vm.failedCount}건</Text>
           </>
@@ -72,7 +109,7 @@ export default function MonitoringLiveDashboardV4() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.title}>검사 상태·앱 반영 시각</Text>
+        <Text style={styles.title}>검사 상태·앱 반영 시각 · {partCode}</Text>
         <Text style={styles.note}>
           서버 접수(receivedAt)와 iPhone이 정상 폴링 응답을 받은 시각을 기록합니다.
           접수→앱 관측 시간에는 AI 분석 시간도 포함되므로 순수 폴링 지연이 아닙니다.
@@ -131,7 +168,7 @@ export default function MonitoringLiveDashboardV4() {
               </View>
             )}
 
-            <Text style={styles.subtitle}>최근 DOOR 검사별 관측 기록</Text>
+            <Text style={styles.subtitle}>최근 {partCode} 검사별 관측 기록</Text>
             {recentStates.length === 0 ? (
               <Text style={styles.note}>최근 검사 없음</Text>
             ) : recentStates.map((item) => (
@@ -160,7 +197,7 @@ export default function MonitoringLiveDashboardV4() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.title}>확인 필요 · 분석 실패</Text>
+        <Text style={styles.title}>확인 필요 · 분석 실패 · {partCode}</Text>
         {vm.hasSuccessfulRead && (
           <Text style={styles.note}>
             표시 {Math.min(visibleQueueCount, vm.queue.length)} / {vm.queue.length}건
@@ -215,6 +252,11 @@ export default function MonitoringLiveDashboardV4() {
 const styles = StyleSheet.create({
   container: { gap: 12, paddingBottom: 16 },
   card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 14, padding: 16, gap: 10 },
+  partSelector: { flexDirection: 'row', gap: 10 },
+  partButton: { flex: 1, paddingVertical: 12, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, alignItems: 'center', backgroundColor: '#F8FAFC' },
+  partButtonActive: { borderColor: '#2054D8', backgroundColor: '#2054D8' },
+  partButtonText: { fontSize: 14, fontWeight: '700', color: '#475569' },
+  partButtonTextActive: { color: '#FFFFFF' },
   title: { fontSize: 17, fontWeight: '700', color: '#111827' },
   subtitle: { fontSize: 13, fontWeight: '700', color: '#111827' },
   note: { fontSize: 12, color: '#64748B', lineHeight: 18 },
