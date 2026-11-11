@@ -4,11 +4,12 @@
  * 목록의 정확한 페이지 JSON 형태는 서버 확인 전이므로 두 후보 형태만 엄격히 지원합니다.
  */
 import { ContractV4Error } from './adapter';
-import type { DisplayStateV4, FinalJudgementV4, PredictedQualityV4, ReviewReasonV4 } from './types';
+import type { DisplayStateV4, FinalJudgementV4, InspectionSourceV4, PredictedQualityV4, ReviewReasonV4 } from './types';
 
 export const INSPECTION_UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const displayStates: readonly DisplayStateV4[] = ['ANALYZING', 'AUTO_PASS', 'REVIEW_PENDING', 'REVIEW_DONE', 'FAILED'];
-const reviewReasons: readonly ReviewReasonV4[] = ['DEFECT_PREDICTED', 'NO_ACTIVE_POLICY', 'CALIBRATION_UNAVAILABLE', 'ABOVE_THRESHOLD'];
+const reviewReasons: readonly ReviewReasonV4[] = ['DEFECT_PREDICTED', 'NO_ACTIVE_POLICY', 'CALIBRATION_UNAVAILABLE', 'ABOVE_THRESHOLD', 'AI_UNAVAILABLE'];
+const inspectionSources: readonly InspectionSourceV4[] = ['DEVICE', 'ADMIN', 'RETRY', 'MANUAL'];
 
 type Dict = Record<string, unknown>;
 function record(x: unknown): x is Dict { return typeof x === 'object' && x !== null && !Array.isArray(x); }
@@ -38,6 +39,7 @@ export interface HistoryRowV4 {
   inspectionId: string; // API 호출용 UUID, inspectionNo 아님
   inspectionNo: string | null; // 목록에 없는 경우 "미제공"으로 표시, 상세 GET 후 표시
   partCode: string;
+  source?: InspectionSourceV4 | null; // v4 §6.6 신규; 이전 예시에서는 생략 허용
   displayState: DisplayStateV4;
   receivedAt: string;
   predictedQuality: PredictedQualityV4 | null;
@@ -100,13 +102,15 @@ export function decodeHistoryRowV4(value: unknown): HistoryRowV4 {
   if (!optionalString(value.inspectionNo) || !optionalPrediction(value.predictedQuality) ||
       !optionalReason(value.reviewReason) || !optionalString(value.errorCode) ||
       !optionalUrl(value.thumbnailUrl) || !optionalJudgement(value.finalJudgement) ||
+      (value.source != null && !inspectionSources.includes(value.source as InspectionSourceV4)) ||
       (value.judgedBy != null && value.judgedBy !== 'WORKER' && value.judgedBy !== 'SYSTEM') ||
       (value.confirmedAt != null && !validIso(value.confirmedAt))) {
     throw new ContractV4Error('검사 이력 항목의 선택 필드 형식이 올바르지 않습니다.');
   }
   return {
     inspectionId: value.inspectionId, inspectionNo: nullableField(value.inspectionNo as string | null | undefined),
-    partCode: value.partCode, displayState: value.displayState, receivedAt: value.receivedAt,
+    partCode: value.partCode, source: (value.source ?? null) as InspectionSourceV4 | null,
+    displayState: value.displayState, receivedAt: value.receivedAt,
     predictedQuality: nullableField(value.predictedQuality as PredictedQualityV4 | null | undefined),
     reviewReason: nullableField(value.reviewReason as ReviewReasonV4 | null | undefined),
     errorCode: nullableField(value.errorCode as string | null | undefined),

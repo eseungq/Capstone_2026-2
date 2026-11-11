@@ -20,7 +20,10 @@ const probability = (v: unknown): v is number => typeof v === 'number' && Number
 
 const processingStatuses = ['RECEIVED', 'ANALYZING', 'COMPLETED', 'FAILED'] as const;
 const displayStates = ['ANALYZING', 'AUTO_PASS', 'REVIEW_PENDING', 'REVIEW_DONE', 'FAILED'] as const;
-const reviewReasons = ['DEFECT_PREDICTED', 'NO_ACTIVE_POLICY', 'CALIBRATION_UNAVAILABLE', 'ABOVE_THRESHOLD'] as const;
+const reviewReasons = ['DEFECT_PREDICTED', 'NO_ACTIVE_POLICY', 'CALIBRATION_UNAVAILABLE', 'ABOVE_THRESHOLD', 'AI_UNAVAILABLE'] as const;
+const inspectionSources = ['DEVICE', 'ADMIN', 'RETRY', 'MANUAL'] as const;
+const inspectionUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const inspectionNumber = /^INS-\d{6,}$/;
 const gradcamStatuses = ['GENERATED', 'NOT_REQUIRED', 'FAILED', 'NO_ACTIVATION'] as const;
 
 export const reviewReasonLabels: Record<ReviewReasonV4, string> = {
@@ -28,6 +31,7 @@ export const reviewReasonLabels: Record<ReviewReasonV4, string> = {
   NO_ACTIVE_POLICY: '현재 부품·모델에 적용 가능한 활성 정책이 없습니다.',
   CALIBRATION_UNAVAILABLE: '보정 불량 확률이 없어 작업자 확인이 필요합니다.',
   ABOVE_THRESHOLD: '보정 불량 확률이 자동 통과 기준을 초과했습니다.',
+  AI_UNAVAILABLE: 'AI 분석 없이 작업자 판정',
 };
 
 export const stateLabels: Record<DisplayStateV4, string> = {
@@ -59,7 +63,7 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
     throw new ContractV4Error('inspectionId, inspectionNo, partCode, receivedAt이 필요합니다.');
   }
   // Mock의 INS-006을 UUID 자리에 넣어 API 호출하지 않도록 검사합니다.
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(d.inspectionId)) {
+  if (!inspectionUuid.test(d.inspectionId)) {
     throw new ContractV4Error('inspectionId가 UUID 형식이 아닙니다.');
   }
   if (!oneOf(d.status, processingStatuses) || !oneOf(d.displayState, displayStates)) {
@@ -68,7 +72,29 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
   if (!/(Z|[+-]\d{2}:\d{2})$/.test(d.receivedAt) || !Number.isFinite(Date.parse(d.receivedAt))) {
     throw new ContractV4Error('receivedAt은 타임존 오프셋이 포함된 ISO 시각이어야 합니다.');
   }
-  if (!nullableText(d.retryOf)) throw new ContractV4Error('retryOf는 UUID 또는 null이어야 합니다.');
+  if (!nullableText(d.retryOf) || (d.retryOf != null && !inspectionUuid.test(d.retryOf))) {
+    throw new ContractV4Error('retryOf는 UUID 또는 null이어야 합니다.');
+  }
+  if (d.source != null && !oneOf(d.source, inspectionSources)) {
+    throw new ContractV4Error('source 값이 유효하지 않습니다.');
+  }
+  const manualOf = d.manualOf;
+  if (manualOf != null && (!obj(manualOf) || !text(manualOf.inspectionId) ||
+      !inspectionUuid.test(manualOf.inspectionId) ||
+      !text(manualOf.inspectionNo) || !inspectionNumber.test(manualOf.inspectionNo) ||
+      !text(manualOf.errorCode) || !text(manualOf.errorMessage))) {
+    throw new ContractV4Error('manualOf 원본 검사 연결 정보가 유효하지 않습니다.');
+  }
+  const followUp = d.followUp;
+  if (followUp != null && (!obj(followUp) || !text(followUp.inspectionId) ||
+      !inspectionUuid.test(followUp.inspectionId) ||
+      !text(followUp.inspectionNo) || !inspectionNumber.test(followUp.inspectionNo) ||
+      !oneOf(followUp.source, ['RETRY', 'MANUAL'] as const))) {
+    throw new ContractV4Error('followUp 후속 검사 연결 정보가 유효하지 않습니다.');
+  }
+  if (d.source === 'MANUAL' && manualOf == null) {
+    throw new ContractV4Error('MANUAL 검사에 원본 manualOf 정보가 없습니다.');
+  }
 
   const a = d.ai;
   if (a != null && (!obj(a) || !text(a.modelVersion) ||
@@ -145,8 +171,13 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
   }
   if (status === 'FAILED' && displayState !== 'FAILED') throw new ContractV4Error('FAILED 상태와 displayState 불일치');
   if (status === 'FAILED' && e == null) throw new ContractV4Error('FAILED에는 error 블록이 필요합니다.');
-  if (status === 'COMPLETED' && (a == null || p == null)) {
-    throw new ContractV4Error('COMPLETED에는 ai와 policy 블록이 필요합니다.');
+  if (status === 'COMPLETED' && (p == null || (a == null && d.source !== 'MANUAL'))) {
+    throw new ContractV4Error('COMPLETED에는 policy 및 비수동 검사의 ai 블록이 필요합니다.');
+  }
+  if (d.source === 'MANUAL' &&
+      (status !== 'COMPLETED' || a != null || !obj(p) || p.reviewReason !== 'AI_UNAVAILABLE' ||
+       !['REVIEW_PENDING', 'REVIEW_DONE'].includes(displayState))) {
+    throw new ContractV4Error('MANUAL 검사의 상태·AI 미사용·정책 사유가 계약과 다릅니다.');
   }
   if (status === 'COMPLETED' && !['AUTO_PASS', 'REVIEW_PENDING', 'REVIEW_DONE'].includes(displayState)) {
     throw new ContractV4Error('COMPLETED 상태에 유효한 displayState가 없습니다.');
@@ -162,6 +193,9 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
     receivedAt: d.receivedAt,
     completedAt: nullableText(d.completedAt) ? d.completedAt ?? null : null,
     retryOf: (d.retryOf ?? null) as string | null,
+    source: (d.source ?? null) as InspectionDetailV4['source'],
+    manualOf: (manualOf ?? null) as InspectionDetailV4['manualOf'],
+    followUp: (followUp ?? null) as InspectionDetailV4['followUp'],
     ai: a == null ? null : a as unknown as InspectionDetailV4['ai'],
     policy: p == null ? null : p as unknown as InspectionDetailV4['policy'],
     judgement: j == null ? null : j as unknown as InspectionDetailV4['judgement'],
@@ -197,8 +231,12 @@ export function mapInspectionDetailV4(detail: InspectionDetailV4): InspectionVie
     gradcamStatus: detail.images?.gradcamStatus ?? null,
     imageUrlExpiresAt: detail.images?.urlExpiresAt ?? null,
     retryOf: detail.retryOf ?? null,
+    source: detail.source ?? null,
+    manualOf: detail.manualOf ?? null,
+    followUp: detail.followUp ?? null,
     canOfferConfirm: detail.displayState === 'REVIEW_PENDING',
-    canOfferRetry: detail.displayState === 'FAILED',
+    canOfferRetry: detail.displayState === 'FAILED' && detail.error?.retryable === true && !detail.followUp,
+    canOfferManual: detail.displayState === 'FAILED' && detail.error?.retryable === true && !detail.followUp,
     isServerAutoPass: detail.displayState === 'AUTO_PASS',
   };
 }

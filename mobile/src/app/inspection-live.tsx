@@ -18,7 +18,7 @@ import { authV4 } from '../api/backendV4/authRuntime';
 import type { BackendRole } from '../api/backendV4/authCore';
 import { createInspectionWriteServiceV4 } from '../api/backendV4/inspectionWriteService';
 import { WriteV4ValidationError, writeErrorLabelV4 } from '../api/backendV4/inspectionWriteCore';
-import type { RetryReplyV4 } from '../api/backendV4/inspectionWriteCore';
+import type { ManualReplyV4, RetryReplyV4 } from '../api/backendV4/inspectionWriteCore';
 import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
 import type { FinalJudgementV4, InspectionViewV4 } from '../api/backendV4/types';
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
@@ -115,10 +115,12 @@ export default function InspectionLiveScreen() {
   const [role, setRole] = useState<BackendRole | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
   const [comment, setComment] = useState('');
-  const [submitting, setSubmitting] = useState<'confirm' | 'retry' | null>(null);
+  const [submitting, setSubmitting] = useState<'confirm' | 'retry' | 'manual' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [retryResult, setRetryResult] = useState<RetryReplyV4 | null>(null);
+  const [manualResult, setManualResult] = useState<ManualReplyV4 | null>(null);
+  const [modelAvailable, setModelAvailable] = useState<boolean | null>(null);
   const submitLock = useRef(false);
   const currentIdRef = useRef(id);
   currentIdRef.current = id;
@@ -141,6 +143,8 @@ export default function InspectionLiveScreen() {
     setActionError(null);
     setActionMessage(null);
     setRetryResult(null);
+    setManualResult(null);
+    setModelAvailable(null);
     setComment('');
   }, [id]);
 
@@ -238,10 +242,32 @@ export default function InspectionLiveScreen() {
 
   // 새 검사로 이동하는 첫 렌더에서도 이전 검사의 데이터를 숨깁니다.
   const visibleDetail = detail?.inspectionId === id ? detail : null;
+  const isManualInspection = visibleDetail?.source === 'MANUAL' ||
+    visibleDetail?.reviewReasonCode === 'AI_UNAVAILABLE';
+
+  // /monitoring/parts의 AI 가용성은 버튼 우선순위에만 사용합니다.
+  // 조회 실패/AI 중지 상태라도 수동 전환 자체는 허용됩니다.
+  useEffect(() => {
+    if (!visibleDetail?.canOfferManual) {
+      setModelAvailable(null);
+      return;
+    }
+    let active = true;
+    setModelAvailable(null);
+    void inspectionReader.parts().then((result) => {
+      if (active) {
+        setModelAvailable(result.value.find((part) => part.partCode === visibleDetail.partCode)?.modelAvailable ?? null);
+      }
+    }).catch(() => {
+      if (active) setModelAvailable(null);
+    });
+    return () => { active = false; };
+  }, [visibleDetail?.inspectionId, visibleDetail?.partCode, visibleDetail?.canOfferManual]);
 
   // 실제 서버 POST 이전에 GET으로 현재 상태를 확인합니다.
   // 오류나 타임아웃이 발생하면 자동 재전송하지 않습니다.
-  const submitAction = async (action: 'confirm' | 'retry', judgement?: FinalJudgementV4) => {
+  const submitAction = async (action: 'confirm' | 'retry' | 'manual', judgement?: FinalJudgementV4) => {
+    let manualNewInspectionId: string | null = null;
     if (submitLock.current || !visibleDetail || !id) return;
     const submittedId = id;
     submitLock.current = true;
@@ -249,6 +275,7 @@ export default function InspectionLiveScreen() {
     setActionError(null);
     setActionMessage(null);
     if (action === 'retry') setRetryResult(null);
+    if (action === 'manual') setManualResult(null);
     try {
       const session = await authV4.restore();
       if (!session.signedIn || !session.role) throw new Error('실제 서버 로그인 상태와 역할을 다시 확인해 주세요.');
@@ -258,6 +285,9 @@ export default function InspectionLiveScreen() {
       if (action === 'retry' && session.role !== 'WORKER' && session.role !== 'ADMIN') {
         throw new Error('FAILED 재검사는 WORKER 또는 ADMIN만 요청할 수 있습니다.');
       }
+      if (action === 'manual' && session.role !== 'WORKER') {
+        throw new Error('수동 판정 전환은 WORKER 계정에서만 가능합니다.');
+      }
       const latest = (await inspectionReader.detail(submittedId)).value;
       if (currentIdRef.current !== submittedId) return;
       setDetail(latest);
@@ -265,6 +295,7 @@ export default function InspectionLiveScreen() {
         inspectionId: latest.inspectionId,
         displayState: latest.displayState,
         finalJudgement: latest.finalJudgement,
+        retriedBy: latest.followUp?.inspectionId ?? null,
       };
       const writer = createInspectionWriteServiceV4({
         mode: 'api',
@@ -281,19 +312,43 @@ export default function InspectionLiveScreen() {
         });
         if (currentIdRef.current !== submittedId) return;
         setActionMessage(`${reply.value.inspectionNo}: ${reply.value.finalJudgement} 판정이 서버에 저장됐습니다. (${formatTime(reply.value.confirmedAt)})`);
-      } else {
-        if (latest.displayState !== 'FAILED') {
-          throw new Error('검사 상태가 변경되었습니다. FAILED 검사만 재검사할 수 있습니다.');
+      } else if (action === 'retry') {
+        if (!latest.canOfferRetry) {
+          throw new Error('이미 후속 검사가 있거나 재검사할 수 없는 상태입니다. 최신 검사 정보를 확인해 주세요.');
         }
         const reply = await writer.retry(origin);
         if (currentIdRef.current !== submittedId) return;
         setRetryResult(reply.value);
         setActionMessage(`새 검사 ${reply.value.inspectionNo} 접수 완료 (RECEIVED). 원본 FAILED 기록은 유지됩니다.`);
+      } else {
+        if (!latest.canOfferManual) {
+          throw new Error('이미 후속 검사가 있거나 수동 판정으로 전환할 수 없는 상태입니다. 최신 검사 정보를 확인해 주세요.');
+        }
+        const reply = await writer.manual(origin);
+        if (currentIdRef.current !== submittedId) return;
+        setManualResult(reply.value);
+        manualNewInspectionId = reply.value.inspectionId;
+        setActionMessage(`수동 판정 검사 ${reply.value.inspectionNo} 생성 완료. 원본 FAILED 기록은 유지됩니다.`);
       }
       // 성공 후 화면의 상태/URL을 서버에서 다시 조회합니다.
       await load(false);
+      if (manualNewInspectionId && currentIdRef.current === submittedId) {
+        router.push({ pathname: '/inspection-live', params: { inspectionId: manualNewInspectionId } });
+      }
     } catch (cause) {
-      if (currentIdRef.current === submittedId) setActionError(actionErrorMessage(cause));
+      if (currentIdRef.current === submittedId) {
+        // 다른 기기/작업자가 먼저 원본 FAILED를 전환했다면 최신 followUp을 가져와
+        // 원본 상세의 '후속 검사 상세 보기' 카드가 즉시 나타나게 합니다.
+        // POST를 재전송하지 않으며, 최초 409 오류 메시지는 유지합니다.
+        setActionError(actionErrorMessage(cause));
+        if (
+          cause instanceof ApiV4RequestError &&
+          cause.httpStatus === 409 &&
+          (cause.code === 'ALREADY_RETRIED' || cause.code === 'NOT_MANUAL_CONVERTIBLE')
+        ) {
+          await load(false);
+        }
+      }
     } finally {
       submitLock.current = false;
       if (currentIdRef.current === submittedId) setSubmitting(null);
@@ -324,6 +379,47 @@ export default function InspectionLiveScreen() {
     );
   };
 
+  const requestManual = () => {
+    if (!visibleDetail || submitting || !visibleDetail.canOfferManual || role !== 'WORKER') return;
+    Alert.alert(
+      '실제 서버 수동 판정 전환',
+      `${visibleDetail.inspectionNo}의 FAILED 기록은 유지하고, AI 분석 없이 작업자 판정용 새 검사를 만들까요? 재검사와 수동 전환은 원본당 한 번만 가능합니다.`,
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '수동 판정으로 전환', onPress: () => { void submitAction('manual'); } },
+      ],
+    );
+  };
+
+  const canShowRetry = !roleLoading && (role === 'WORKER' || role === 'ADMIN') &&
+    visibleDetail?.canOfferRetry === true;
+  const canShowManual = !roleLoading && role === 'WORKER' &&
+    visibleDetail?.canOfferManual === true;
+  const followUpSubmitted = submitting !== null || retryResult !== null || manualResult !== null;
+  const retryButton = canShowRetry ? (
+    <Pressable
+      style={[styles.button, followUpSubmitted && styles.disabledButton]}
+      disabled={followUpSubmitted}
+      onPress={requestRetry}
+      accessibilityRole="button"
+    >
+      <Text style={styles.buttonText}>{retryResult ? '재검사 접수됨' : 'FAILED 재검사 요청'}</Text>
+    </Pressable>
+  ) : null;
+  const manualButton = canShowManual ? (
+    <Pressable
+      style={[modelAvailable === true ? styles.secondaryButton : styles.button,
+        followUpSubmitted && styles.disabledButton]}
+      disabled={followUpSubmitted}
+      onPress={requestManual}
+      accessibilityRole="button"
+    >
+      <Text style={modelAvailable === true ? styles.secondaryButtonText : styles.buttonText}>
+        {manualResult ? '수동 검사 생성됨' : '수동 판정으로 전환'}
+      </Text>
+    </Pressable>
+  ) : null;
+
   const gradcamMissing = visibleDetail?.gradcamStatus === 'NO_ACTIVATION'
     ? 'AI 예측은 완료됐지만, 위치별 강조 반응이 없어 판단 근거 이미지를 제공하기 어렵습니다.'
     : visibleDetail?.gradcamStatus === 'NOT_REQUIRED'
@@ -340,7 +436,7 @@ export default function InspectionLiveScreen() {
           <Text style={styles.back}>‹ 모니터링으로 돌아가기</Text>
         </Pressable>
         <Text style={styles.title}>실제 서버 검사 상세</Text>
-        <Text style={styles.muted}>SERVER · 검사 UUID로 조회 · 권한별 판정/재검사</Text>
+        <Text style={styles.muted}>SERVER · 검사 UUID로 조회 · 권한별 판정/재검사/수동 전환</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
@@ -379,10 +475,56 @@ export default function InspectionLiveScreen() {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>{visibleDetail.inspectionNo}</Text>
               <Field label="부품" value={visibleDetail.partCode} />
+              <Field label="검사 생성 경로" value={visibleDetail.source ?? '미제공'} />
               <Field label="상태" value={`${visibleDetail.displayStateLabel} (${visibleDetail.displayState})`} />
               <Field label="접수 시각" value={formatTime(visibleDetail.receivedAt)} />
               <Field label="검사 UUID" value={visibleDetail.inspectionId} />
             </View>
+
+            {isManualInspection && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>AI 분석 없이 작업자 판정</Text>
+                <Text style={styles.muted}>
+                  AI 결과가 없는 수동 검사입니다. 원본 사진을 확인하고 WORKER가 PASS/FAIL을 직접 판정합니다.
+                </Text>
+                {visibleDetail.manualOf && (
+                  <>
+                    <Field label="원래 FAILED 검사" value={visibleDetail.manualOf.inspectionNo} />
+                    <Field label="원본 AI 오류 코드" value={visibleDetail.manualOf.errorCode} />
+                    <Text style={styles.muted}>{visibleDetail.manualOf.errorMessage}</Text>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => router.push({
+                        pathname: '/inspection-live',
+                        params: { inspectionId: visibleDetail.manualOf!.inspectionId },
+                      })}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.secondaryButtonText}>원본 {visibleDetail.manualOf.inspectionNo} 상세 보기 ›</Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
+            )}
+            {visibleDetail.followUp && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>이미 생성된 후속 검사</Text>
+                <Text style={styles.muted}>
+                  원본 FAILED 기록은 유지됩니다. 이미 후속 검사가 있어 재검사·수동 판정 전환을 다시 요청할 수 없습니다.
+                </Text>
+                <Field label="후속 검사 유형" value={visibleDetail.followUp.source === 'MANUAL' ? '수동 판정' : '재검사'} />
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => router.push({
+                    pathname: '/inspection-live',
+                    params: { inspectionId: visibleDetail.followUp!.inspectionId },
+                  })}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.secondaryButtonText}>후속 검사 {visibleDetail.followUp.inspectionNo} 상세 보기 ›</Text>
+                </Pressable>
+              </View>
+            )}
 
             {imageNotice && (
               <View style={styles.staleCard}>
@@ -397,25 +539,33 @@ export default function InspectionLiveScreen() {
               onLoadError={handleImageError}
             />
 
-            <ImagePanel
-              title="AI 판단 근거"
-              url={visibleDetail.gradcamImageUrl}
-              missingText={gradcamMissing}
-              caption="AI가 반응한 영역입니다. 원본 사진과 함께 확인해 주세요."
-              onLoadError={handleImageError}
-            />
+            {!isManualInspection && (
+              <ImagePanel
+                title="AI 판단 근거"
+                url={visibleDetail.gradcamImageUrl}
+                missingText={gradcamMissing}
+                caption="AI가 반응한 영역입니다. 원본 사진과 함께 확인해 주세요."
+                onLoadError={handleImageError}
+              />
+            )}
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>AI 분석 · 정책 · 최종 판정</Text>
-              <Field label="AI 예측" value={visibleDetail.prediction ?? '미제공'} />
-              <Field
-                label="보정 불량 확률"
-                value={visibleDetail.calibratedDefectProbability === null
-                  ? '미준비 / 미제공'
-                  : `${(visibleDetail.calibratedDefectProbability * 100).toFixed(2)}%`}
-              />
-              <Field label="AI 모델" value={visibleDetail.modelVersion ?? '미제공'} />
-              <Field label="REVIEW 사유" value={visibleDetail.reviewReasonText ?? '해당 없음'} />
+              <Text style={styles.cardTitle}>{isManualInspection ? '수동 판정 · 최종 판정' : 'AI 분석 · 정책 · 최종 판정'}</Text>
+              {isManualInspection ? (
+                <Field label="판정 방식" value="AI 분석 없이 작업자 판정" />
+              ) : (
+                <>
+                  <Field label="AI 예측" value={visibleDetail.prediction ?? '미제공'} />
+                  <Field
+                    label="보정 불량 확률"
+                    value={visibleDetail.calibratedDefectProbability === null
+                      ? '미준비 / 미제공'
+                      : `${(visibleDetail.calibratedDefectProbability * 100).toFixed(2)}%`}
+                  />
+                  <Field label="AI 모델" value={visibleDetail.modelVersion ?? '미제공'} />
+                  <Field label="REVIEW 사유" value={visibleDetail.reviewReasonText ?? '해당 없음'} />
+                </>
+              )}
               <Field label="최종 작업자 판정" value={visibleDetail.finalJudgement ?? '미확정'} />
               <Field label="판정 주체" value={visibleDetail.judgedBy ?? '미제공'} />
               <Field label="판정 시각" value={formatTime(visibleDetail.confirmedAt)} />
@@ -424,7 +574,7 @@ export default function InspectionLiveScreen() {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>실제 서버 판정 · 재검사</Text>
+              <Text style={styles.cardTitle}>실제 서버 판정 · 재검사 · 수동 전환</Text>
               <Text style={styles.muted}>
                 서버가 최종 권한과 상태를 검증합니다. 제출 후 자동으로 재전송하지 않습니다.
               </Text>
@@ -468,20 +618,23 @@ export default function InspectionLiveScreen() {
                   </View>
                 </>
               )}
-              {!roleLoading && (role === 'WORKER' || role === 'ADMIN') && visibleDetail.canOfferRetry && (
-                <Pressable
-                  style={[styles.button, (submitting || retryResult) && styles.disabledButton]}
-                  disabled={submitting !== null || retryResult !== null}
-                  onPress={requestRetry}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.buttonText}>
-                    {retryResult ? '재검사 접수됨' : 'FAILED 재검사 요청'}
-                  </Text>
-                </Pressable>
+              {visibleDetail.canOfferManual && (
+                <Text style={styles.muted}>
+                  AI 모델 사용 가능: {modelAvailable === true ? '예 · 재검사 우선' :
+                    modelAvailable === false ? '아니요 · 수동 판정 우선' : '확인 중/미확인 · 수동 전환 가능'}
+                  {'\n'}재검사와 수동 판정 전환은 둘 중 하나만 가능합니다.
+                </Text>
               )}
-              {!visibleDetail.canOfferConfirm && !visibleDetail.canOfferRetry && (
-                <Text style={styles.muted}>현재 서버 상태에서는 제출 가능한 판정 또는 재검사 요청이 없습니다.</Text>
+              {modelAvailable === true ? (
+                <>{retryButton}{manualButton}</>
+              ) : (
+                <>{manualButton}{retryButton}</>
+              )}
+              {!visibleDetail.canOfferConfirm && !visibleDetail.canOfferRetry && !visibleDetail.canOfferManual && !visibleDetail.followUp && (
+                <Text style={styles.muted}>현재 서버 상태에서는 제출 가능한 판정 또는 후속 검사 요청이 없습니다.</Text>
+              )}
+              {!roleLoading && role === 'ADMIN' && visibleDetail.canOfferManual && (
+                <Text style={styles.muted}>수동 판정으로 전환하려면 WORKER 계정으로 로그인해 주세요.</Text>
               )}
               {submitting && (
                 <View style={styles.submitStatus}>
@@ -495,6 +648,18 @@ export default function InspectionLiveScreen() {
                   {actionError}{'\n'}
                   제출 여부가 불확실하면 새 요청 전에 서버의 최신 검사 상세를 조회해 주세요.
                 </Text>
+              )}
+              {manualResult && (
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => router.push({
+                    pathname: '/inspection-live',
+                    params: { inspectionId: manualResult.inspectionId },
+                  })}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.secondaryButtonText}>수동 검사 {manualResult.inspectionNo} 상세 보기 ›</Text>
+                </Pressable>
               )}
               {retryResult && (
                 <Pressable
@@ -532,7 +697,7 @@ export default function InspectionLiveScreen() {
               </Pressable>
             </View>
             <Text style={styles.muted}>
-              이 화면은 실제 서버 데이터만 사용합니다. 판정·재검사는 서버가 최종 검증합니다.
+              이 화면은 실제 서버 데이터만 사용합니다. 판정·재검사·수동 전환은 서버가 최종 검증합니다.
               판단 근거 이미지는 결함 위치를 확정하는 좌표나 마스크가 아닙니다.
             </Text>
           </>

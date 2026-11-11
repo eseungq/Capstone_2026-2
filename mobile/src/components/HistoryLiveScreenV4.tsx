@@ -271,7 +271,11 @@ export default function HistoryLiveScreenV4() {
             </View>
             <Text style={styles.itemState}>{stateLabels[item.displayState]} ({item.displayState})</Text>
             <Text style={styles.caption}>접수: {dateText(item.receivedAt)}</Text>
-            <Text style={styles.caption}>AI 예측: {item.predictedQuality ?? '미제공'}</Text>
+            {item.source === 'MANUAL' || item.reviewReason === 'AI_UNAVAILABLE' ? (
+              <Text style={styles.itemState}>AI 분석 없이 작업자 판정</Text>
+            ) : (
+              <Text style={styles.caption}>AI 예측: {item.predictedQuality ?? '미제공'}</Text>
+            )}
             {item.finalJudgement && (
               <Text style={styles.itemState}>최종 판정: {item.finalJudgement} · {item.judgedBy ?? '미제공'}</Text>
             )}
