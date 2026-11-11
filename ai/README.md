@@ -1,9 +1,9 @@
-# ai · 실제 e02 추론 서버와 학습 코드
+# ai · 추론 서버와 학습 코드
 
 담당: 김도현. 백엔드가 호출하는 `POST /internal/v1/predict`, `GET /internal/v1/models`를 포함합니다.
 연동 기준은 [API 계약 v4 7장](../docs/백엔드_API계약_v4.md#7-ai-연동-규격-합의-1015)입니다.
 
-## 현재 상태
+## 도어 e02 상태
 
 - 모델: `door-swin-tiny-e02-28a2dd1cb40b-dev`, DOOR, Swin-Tiny 224, epoch 2.
 - SHA256: `28a2dd1cb40b4bbecf3fc4e34dfc5354179dcb31c0c37297f1d3ee3bfe3d985e`.
@@ -80,3 +80,39 @@ Stub HTTP 점검은 모델·GPU·실제 사진을 사용하지 않습니다. 이
 ## Git에 넣지 않는 것
 
 모델 가중치, AI-Hub 사진·라벨·분할 CSV, JPEG CAM, 개인 경로가 포함된 설정, 서명 URL, 토큰·비밀번호·키를 올리지 않습니다. 공개 저장소이므로 ai/.gitignore와 공개 파일 검사 결과를 함께 확인합니다.
+
+## 프레임·카울커버 DGX 시연 서버
+
+| 부품 | DGX 포트 | 모델 버전 | 보정기 버전 | 추론 장치 |
+|---|---:|---|---|---|
+| `FRAME` | 8774 | `frame-swin-tiny-unified-e08-2425d7e46572-dev` | `frame-e08-temperature-5d4299808c3e-demo` | GPU |
+| `COWL_COVER` | 8778 | `cowl-cover-unified-swin-tiny-e08-458a07d46453-dev` | `cowl-unified-e08-temperature-2d80fc926685-demo` | CPU |
+
+백엔드는 부품별 DGX 주소로 `POST /internal/v1/predict`를 호출합니다. `GET /internal/v1/models`로 모델·보정기 버전과 `loadable=true`를 확인합니다. 추론 서버에는 백엔드가 발급하는 서명 이미지 URL의 출처를 설정합니다.
+
+### DGX에서 재실행
+
+기존 DGX 작업 디렉터리와 모델·보정기 파일을 사용합니다. 이 저장소의 `run_server.sh`는 도어용이며 아래 명령은 기존 DGX 시험 배포를 복구하는 절차입니다. 재실행 전 해당 포트의 기존 프로세스 상태를 확인합니다.
+
+프레임은 아래 환경변수에 기존 경로를 지정한 뒤 DGX 작업 디렉터리에서 실행합니다. `FRAME_RUNTIME`은 `frame_policy_trial_20261109.py`가 들어 있는 8774 배포 디렉터리입니다.
+
+```bash
+cd "$PROJECT"
+"$DGX_PYTHON" -u "$FRAME_RUNTIME/frame_policy_trial_20261109.py" \
+  "$PROJECT" "$FRAME_RUNTIME" --host "$(tailscale ip -4)" --port 8774 --origin "$BACKEND_ORIGIN"
+```
+
+카울커버는 DGX의 보정 배포 디렉터리(`COWL_DEPLOYMENT`)에서 생성된 `launch.sh`로 복구합니다. `COWL_RUN_DIR`에는 아직 없는 새 실행 디렉터리를 지정합니다.
+
+```bash
+bash "$COWL_DEPLOYMENT/launch.sh" "$COWL_RUN_DIR" --port 8778 --image-origin "$BACKEND_ORIGIN" --serve
+```
+
+카울커버 서버는 DGX의 루프백 8778에서 실행됩니다. 백엔드 접속용 전달 프로세스가 내려간 경우, DGX의 Tailscale 주소에만 다시 연결합니다. 기존 전달 프로세스가 동작 중이면 재사용합니다.
+
+```bash
+systemd-socket-activate --listen="$(tailscale ip -4):8778" \
+  /usr/lib/systemd/systemd-socket-proxyd --connections-max=32 127.0.0.1:8778
+```
+
+재실행 명령은 DGX의 지속 세션에서 유지합니다. 서버 복구 후 백엔드 호스트에서 `http://<DGX_TAILSCALE_IP>:8774/internal/v1/models`와 `http://<DGX_TAILSCALE_IP>:8778/internal/v1/models`를 조회합니다. 시연 기준과 검증 범위는 [실행 증빙](VALIDATION.md)을 참고합니다.
