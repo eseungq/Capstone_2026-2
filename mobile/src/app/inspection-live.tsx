@@ -18,7 +18,7 @@ import { authV4 } from '../api/backendV4/authRuntime';
 import type { BackendRole } from '../api/backendV4/authCore';
 import { createInspectionWriteServiceV4 } from '../api/backendV4/inspectionWriteService';
 import { WriteV4ValidationError, writeErrorLabelV4 } from '../api/backendV4/inspectionWriteCore';
-import type { RetryReplyV4 } from '../api/backendV4/inspectionWriteCore';
+import type { ManualReplyV4, RetryReplyV4 } from '../api/backendV4/inspectionWriteCore';
 import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
 import type { FinalJudgementV4, InspectionViewV4 } from '../api/backendV4/types';
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
@@ -115,10 +115,12 @@ export default function InspectionLiveScreen() {
   const [role, setRole] = useState<BackendRole | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
   const [comment, setComment] = useState('');
-  const [submitting, setSubmitting] = useState<'confirm' | 'retry' | null>(null);
+  const [submitting, setSubmitting] = useState<'confirm' | 'retry' | 'manual' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [retryResult, setRetryResult] = useState<RetryReplyV4 | null>(null);
+  const [manualResult, setManualResult] = useState<ManualReplyV4 | null>(null);
+  const [modelAvailable, setModelAvailable] = useState<boolean | null>(null);
   const submitLock = useRef(false);
   const currentIdRef = useRef(id);
   currentIdRef.current = id;
@@ -141,6 +143,8 @@ export default function InspectionLiveScreen() {
     setActionError(null);
     setActionMessage(null);
     setRetryResult(null);
+    setManualResult(null);
+    setModelAvailable(null);
     setComment('');
   }, [id]);
 
@@ -238,10 +242,32 @@ export default function InspectionLiveScreen() {
 
   // 새 검사로 이동하는 첫 렌더에서도 이전 검사의 데이터를 숨깁니다.
   const visibleDetail = detail?.inspectionId === id ? detail : null;
+  const isManualInspection = visibleDetail?.source === 'MANUAL' ||
+    visibleDetail?.reviewReasonCode === 'AI_UNAVAILABLE';
+
+  // /monitoring/parts의 AI 가용성은 버튼 우선순위에만 사용합니다.
+  // 조회 실패/AI 중지 상태라도 수동 전환 자체는 허용됩니다.
+  useEffect(() => {
+    if (!visibleDetail?.canOfferManual) {
+      setModelAvailable(null);
+      return;
+    }
+    let active = true;
+    setModelAvailable(null);
+    void inspectionReader.parts().then((result) => {
+      if (active) {
+        setModelAvailable(result.value.find((part) => part.partCode === visibleDetail.partCode)?.modelAvailable ?? null);
+      }
+    }).catch(() => {
+      if (active) setModelAvailable(null);
+    });
+    return () => { active = false; };
+  }, [visibleDetail?.inspectionId, visibleDetail?.partCode, visibleDetail?.canOfferManual]);
 
   // 실제 서버 POST 이전에 GET으로 현재 상태를 확인합니다.
   // 오류나 타임아웃이 발생하면 자동 재전송하지 않습니다.
-  const submitAction = async (action: 'confirm' | 'retry', judgement?: FinalJudgementV4) => {
+  const submitAction = async (action: 'confirm' | 'retry' | 'manual', judgement?: FinalJudgementV4) => {
+    let manualNewInspectionId: string | null = null;
     if (submitLock.current || !visibleDetail || !id) return;
     const submittedId = id;
     submitLock.current = true;
@@ -249,6 +275,7 @@ export default function InspectionLiveScreen() {
     setActionError(null);
     setActionMessage(null);
     if (action === 'retry') setRetryResult(null);
+    if (action === 'manual') setManualResult(null);
     try {
       const session = await authV4.restore();
       if (!session.signedIn || !session.role) throw new Error('실제 서버 로그인 상태와 역할을 다시 확인해 주세요.');
@@ -258,6 +285,9 @@ export default function InspectionLiveScreen() {
       if (action === 'retry' && session.role !== 'WORKER' && session.role !== 'ADMIN') {
         throw new Error('FAILED 재검사는 WORKER 또는 ADMIN만 요청할 수 있습니다.');
       }
+      if (action === 'manual' && session.role !== 'WORKER') {
+        throw new Error('수동 판정 전환은 WORKER 계정에서만 가능합니다.');
+      }
       const latest = (await inspectionReader.detail(submittedId)).value;
       if (currentIdRef.current !== submittedId) return;
       setDetail(latest);
@@ -265,6 +295,7 @@ export default function InspectionLiveScreen() {
         inspectionId: latest.inspectionId,
         displayState: latest.displayState,
         finalJudgement: latest.finalJudgement,
+        retriedBy: latest.followUp?.inspectionId ?? null,
       };
       const writer = createInspectionWriteServiceV4({
         mode: 'api',
@@ -281,17 +312,29 @@ export default function InspectionLiveScreen() {
         });
         if (currentIdRef.current !== submittedId) return;
         setActionMessage(`${reply.value.inspectionNo}: ${reply.value.finalJudgement} 판정이 서버에 저장됐습니다. (${formatTime(reply.value.confirmedAt)})`);
-      } else {
-        if (latest.displayState !== 'FAILED') {
-          throw new Error('검사 상태가 변경되었습니다. FAILED 검사만 재검사할 수 있습니다.');
+      } else if (action === 'retry') {
+        if (!latest.canOfferRetry) {
+          throw new Error('이미 후속 검사가 있거나 재검사할 수 없는 상태입니다. 최신 검사 정보를 확인해 주세요.');
         }
         const reply = await writer.retry(origin);
         if (currentIdRef.current !== submittedId) return;
         setRetryResult(reply.value);
         setActionMessage(`새 검사 ${reply.value.inspectionNo} 접수 완료 (RECEIVED). 원본 FAILED 기록은 유지됩니다.`);
+      } else {
+        if (!latest.canOfferManual) {
+          throw new Error('이미 후속 검사가 있거나 수동 판정으로 전환할 수 없는 상태입니다. 최신 검사 정보를 확인해 주세요.');
+        }
+        const reply = await writer.manual(origin);
+        if (currentIdRef.current !== submittedId) return;
+        setManualResult(reply.value);
+        manualNewInspectionId = reply.value.inspectionId;
+        setActionMessage(`수동 판정 검사 ${reply.value.inspectionNo} 생성 완료. 원본 FAILED 기록은 유지됩니다.`);
       }
       // 성공 후 화면의 상태/URL을 서버에서 다시 조회합니다.
       await load(false);
+      if (manualNewInspectionId && currentIdRef.current === submittedId) {
+        router.push({ pathname: '/inspection-live', params: { inspectionId: manualNewInspectionId } });
+      }
     } catch (cause) {
       if (currentIdRef.current === submittedId) setActionError(actionErrorMessage(cause));
     } finally {
