@@ -99,6 +99,26 @@ export function decodeCowlPolicyListV4(raw: unknown): AdminPolicyV4[] {
   return policies;
 }
 
+/**
+ * 동일 모델·보정기에서 기준치가 이미 존재하는지 확인합니다.
+ * 정책 목록 조회 당시와 POST 직전 최신 목록 모두에 같은 규칙을 적용합니다.
+ */
+export function findEquivalentPolicyVersionV4(
+  policies: readonly AdminPolicyV4[],
+  activePolicy: AdminPolicyV4,
+  threshold: number,
+): AdminPolicyV4 | null {
+  if (!Number.isFinite(threshold)) return null;
+  return policies.find((policy) =>
+    policy.partCode === COWL_PART_CODE_V4 &&
+    policy.modelVersion === activePolicy.modelVersion &&
+    policy.calibratorVersion === activePolicy.calibratorVersion &&
+    policy.ready &&
+    policy.passThreshold != null &&
+    Math.abs(policy.passThreshold - threshold) < 0.0000005
+  ) ?? null;
+}
+
 export function percentageTextV4(fraction: number | null, digits = 2): string {
   return fraction == null ? '미제공' : `${(fraction * 100).toFixed(digits)}%`;
 }
