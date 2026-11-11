@@ -8,7 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { authV4 } from '../api/backendV4/authRuntime';
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
 import {
-  createAdminPolicyServiceV4, parsePolicyPercentInputV4, percentageTextV4, rootPolicyForV4,
+  createAdminPolicyServiceV4, findEquivalentPolicyVersionV4,
+  parsePolicyPercentInputV4, percentageTextV4, rootPolicyForV4,
 } from '../api/backendV4/adminPolicyServiceV4';
 import type { AdminPolicyV4 } from '../api/backendV4/adminPolicyServiceV4';
 
@@ -120,12 +121,7 @@ export default function PolicyLiveScreen() {
   if (active && activeHasBounds) {
     try {
       const candidate = parsePolicyPercentInputV4(percentInput, active);
-      const existing = policies.find((p) =>
-        p.modelVersion === active.modelVersion &&
-        p.calibratorVersion === active.calibratorVersion &&
-        p.ready && p.passThreshold != null &&
-        Math.abs(p.passThreshold - candidate) < 0.0000005
-      );
+      const existing = findEquivalentPolicyVersionV4(policies, active, candidate);
       if (existing) {
         validationText = existing.active
           ? '현재 적용 중인 기준치입니다. 다른 값을 입력해 주세요.'
@@ -182,12 +178,7 @@ export default function PolicyLiveScreen() {
             const latest = await assertLatest(base);
             const current = latest.find((p) => p.policyId === base.policyId);
             if (!current?.active) throw new Error('원래 정책이 더 이상 활성 상태가 아닙니다.');
-            const matching = latest.find((p) =>
-              p.modelVersion === current.modelVersion &&
-              p.calibratorVersion === current.calibratorVersion &&
-              p.ready && p.passThreshold != null &&
-              Math.abs(p.passThreshold - value) < 0.0000005
-            );
+            const matching = findEquivalentPolicyVersionV4(latest, current, value);
             if (matching) {
               setPolicies(latest);
               throw new Error(`동일 기준치의 ${matching.policyVersion} 정책이 이미 존재합니다. 기존 버전을 사용해 주세요.`);
