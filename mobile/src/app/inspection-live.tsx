@@ -606,20 +606,23 @@ export default function InspectionLiveScreen() {
                   </View>
                 </>
               )}
-              {!roleLoading && (role === 'WORKER' || role === 'ADMIN') && visibleDetail.canOfferRetry && (
-                <Pressable
-                  style={[styles.button, (submitting || retryResult) && styles.disabledButton]}
-                  disabled={submitting !== null || retryResult !== null}
-                  onPress={requestRetry}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.buttonText}>
-                    {retryResult ? '재검사 접수됨' : 'FAILED 재검사 요청'}
-                  </Text>
-                </Pressable>
+              {visibleDetail.canOfferManual && (
+                <Text style={styles.muted}>
+                  AI 모델 사용 가능: {modelAvailable === true ? '예 · 재검사 우선' :
+                    modelAvailable === false ? '아니요 · 수동 판정 우선' : '확인 중/미확인 · 수동 전환 가능'}
+                  {'\n'}재검사와 수동 판정 전환은 둘 중 하나만 가능합니다.
+                </Text>
               )}
-              {!visibleDetail.canOfferConfirm && !visibleDetail.canOfferRetry && (
-                <Text style={styles.muted}>현재 서버 상태에서는 제출 가능한 판정 또는 재검사 요청이 없습니다.</Text>
+              {modelAvailable === true ? (
+                <>{retryButton}{manualButton}</>
+              ) : (
+                <>{manualButton}{retryButton}</>
+              )}
+              {!visibleDetail.canOfferConfirm && !visibleDetail.canOfferRetry && !visibleDetail.canOfferManual && !visibleDetail.followUp && (
+                <Text style={styles.muted}>현재 서버 상태에서는 제출 가능한 판정 또는 후속 검사 요청이 없습니다.</Text>
+              )}
+              {!roleLoading && role === 'ADMIN' && visibleDetail.canOfferManual && (
+                <Text style={styles.muted}>수동 판정으로 전환하려면 WORKER 계정으로 로그인해 주세요.</Text>
               )}
               {submitting && (
                 <View style={styles.submitStatus}>
@@ -633,6 +636,18 @@ export default function InspectionLiveScreen() {
                   {actionError}{'\n'}
                   제출 여부가 불확실하면 새 요청 전에 서버의 최신 검사 상세를 조회해 주세요.
                 </Text>
+              )}
+              {manualResult && (
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => router.push({
+                    pathname: '/inspection-live',
+                    params: { inspectionId: manualResult.inspectionId },
+                  })}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.secondaryButtonText}>수동 검사 {manualResult.inspectionNo} 상세 보기 ›</Text>
+                </Pressable>
               )}
               {retryResult && (
                 <Pressable
@@ -670,7 +685,7 @@ export default function InspectionLiveScreen() {
               </Pressable>
             </View>
             <Text style={styles.muted}>
-              이 화면은 실제 서버 데이터만 사용합니다. 판정·재검사는 서버가 최종 검증합니다.
+              이 화면은 실제 서버 데이터만 사용합니다. 판정·재검사·수동 전환은 서버가 최종 검증합니다.
               판단 근거 이미지는 결함 위치를 확정하는 좌표나 마스크가 아닙니다.
             </Text>
           </>
