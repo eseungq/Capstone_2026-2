@@ -191,7 +191,8 @@ test('original policy is recovered from t1/t2 ancestry; missing links/cycles ret
   assert.equal(rootPolicyForV4(appliedT1, [appliedT1, ORIGINAL]).policyId, ORIGINAL.policyId);
   assert.equal(rootPolicyForV4(t2, [t2, EXISTING_T1, ORIGINAL]).policyId, ORIGINAL.policyId);
   assert.equal(rootPolicyForV4(t2, [t2]), null);
-  assert.equal(rootPolicyForV4({ ...ORIGINAL, basedOnPolicyId: ORIGINAL.policyId }, [ORIGINAL]), null);
+  const selfReferential = { ...ORIGINAL, basedOnPolicyId: ORIGINAL.policyId };
+  assert.equal(rootPolicyForV4(selfReferential, [selfReferential]), null);
 });
 
 test('server-side 403 propagates; UI must not treat it as a successful activation', async () => {
