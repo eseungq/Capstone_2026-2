@@ -67,23 +67,28 @@ function ImagePanel({
   title,
   url,
   missingText,
+  caption,
   onLoadError,
 }: {
   title: string;
   url: string | null;
   missingText: string;
+  caption?: string;
   onLoadError: (url: string) => void;
 }) {
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{title}</Text>
       {url ? (
-        <Image
-          source={{ uri: url }}
-          style={styles.inspectionImage}
-          resizeMode="contain"
-          onError={() => onLoadError(url)}
-        />
+        <>
+          <Image
+            source={{ uri: url }}
+            style={styles.inspectionImage}
+            resizeMode="contain"
+            onError={() => onLoadError(url)}
+          />
+          {caption && <Text style={styles.muted}>{caption}</Text>}
+        </>
       ) : (
         <Text style={styles.muted}>{missingText}</Text>
       )}
@@ -322,10 +327,10 @@ export default function InspectionLiveScreen() {
   const gradcamMissing = visibleDetail?.gradcamStatus === 'NO_ACTIVATION'
     ? 'AI 예측은 완료됐지만, 위치별 강조 반응이 없어 판단 근거 이미지를 제공하기 어렵습니다.'
     : visibleDetail?.gradcamStatus === 'NOT_REQUIRED'
-      ? 'AI가 GOOD으로 예측하여 Grad-CAM을 생성하지 않았습니다.'
+      ? 'AI가 GOOD으로 예측하여 판단 근거 이미지를 생성하지 않았습니다.'
       : visibleDetail?.gradcamStatus === 'FAILED'
-        ? 'Grad-CAM 생성에 실패했습니다. 원본 사진과 AI 예측을 참고하세요.'
-        : 'Grad-CAM 이미지가 제공되지 않았습니다.';
+        ? '판단 근거 이미지 생성에 실패했습니다. 원본 사진과 AI 예측을 참고하세요.'
+        : 'AI 판단 근거 이미지가 제공되지 않았습니다.';
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -393,9 +398,10 @@ export default function InspectionLiveScreen() {
             />
 
             <ImagePanel
-              title="AI 판단 근거 · Grad-CAM"
+              title="AI 판단 근거"
               url={visibleDetail.gradcamImageUrl}
               missingText={gradcamMissing}
+              caption="AI가 반응한 영역입니다. 원본 사진과 함께 확인해 주세요."
               onLoadError={handleImageError}
             />
 
@@ -527,7 +533,7 @@ export default function InspectionLiveScreen() {
             </View>
             <Text style={styles.muted}>
               이 화면은 실제 서버 데이터만 사용합니다. 판정·재검사는 서버가 최종 검증합니다.
-              Grad-CAM은 판단 근거이지 결함 좌표나 마스크가 아닙니다.
+              판단 근거 이미지는 결함 위치를 확정하는 좌표나 마스크가 아닙니다.
             </Text>
           </>
         )}
