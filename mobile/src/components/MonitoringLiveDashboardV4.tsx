@@ -221,7 +221,11 @@ export default function MonitoringLiveDashboardV4() {
             >
               <Text style={styles.itemTitle}>{item.inspectionNo ?? '검사번호 미제공'}</Text>
               <Text>{item.displayState === 'FAILED' ? 'AI 분석 실패' : '작업자 확인 필요'}</Text>
-              <Text>AI 예측: {item.predictedQuality ?? '미제공'}</Text>
+              {item.reviewReason === 'AI_UNAVAILABLE' ? (
+                <Text>AI 분석 없이 작업자 판정</Text>
+              ) : (
+                <Text>AI 예측: {item.predictedQuality ?? '미제공'}</Text>
+              )}
               <Text style={styles.detailLink}>상세 보기 ›</Text>
             </Pressable>
           ))
