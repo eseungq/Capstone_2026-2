@@ -336,7 +336,19 @@ export default function InspectionLiveScreen() {
         router.push({ pathname: '/inspection-live', params: { inspectionId: manualNewInspectionId } });
       }
     } catch (cause) {
-      if (currentIdRef.current === submittedId) setActionError(actionErrorMessage(cause));
+      if (currentIdRef.current === submittedId) {
+        // 다른 기기/작업자가 먼저 원본 FAILED를 전환했다면 최신 followUp을 가져와
+        // 원본 상세의 '후속 검사 상세 보기' 카드가 즉시 나타나게 합니다.
+        // POST를 재전송하지 않으며, 최초 409 오류 메시지는 유지합니다.
+        setActionError(actionErrorMessage(cause));
+        if (
+          cause instanceof ApiV4RequestError &&
+          cause.httpStatus === 409 &&
+          (cause.code === 'ALREADY_RETRIED' || cause.code === 'NOT_MANUAL_CONVERTIBLE')
+        ) {
+          await load(false);
+        }
+      }
     } finally {
       submitLock.current = false;
       if (currentIdRef.current === submittedId) setSubmitting(null);
