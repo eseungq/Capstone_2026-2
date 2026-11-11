@@ -7,11 +7,23 @@ export type ProcessingStatusV4 = 'RECEIVED' | 'ANALYZING' | 'COMPLETED' | 'FAILE
 export type DisplayStateV4 = 'ANALYZING' | 'AUTO_PASS' | 'REVIEW_PENDING' | 'REVIEW_DONE' | 'FAILED';
 export type PredictedQualityV4 = 'GOOD' | 'DEFECT';
 export type FinalJudgementV4 = 'PASS' | 'FAIL';
+export type InspectionSourceV4 = 'DEVICE' | 'ADMIN' | 'RETRY' | 'MANUAL';
+export interface ManualOriginV4 {
+  inspectionId: string;
+  inspectionNo: string;
+  errorCode: string;
+  errorMessage: string;
+}
+export interface InspectionFollowUpV4 {
+  inspectionId: string;
+  inspectionNo: string;
+  source: 'RETRY' | 'MANUAL';
+}
 export type RecommendedActionV4 = 'AUTO_PASS' | 'REVIEW';
 export type JudgedByV4 = 'SYSTEM' | 'WORKER';
 export type ReviewReasonV4 =
   | 'DEFECT_PREDICTED' | 'NO_ACTIVE_POLICY'
-  | 'CALIBRATION_UNAVAILABLE' | 'ABOVE_THRESHOLD';
+  | 'CALIBRATION_UNAVAILABLE' | 'ABOVE_THRESHOLD' | 'AI_UNAVAILABLE';
 export type GradcamStatusV4 = 'GENERATED' | 'NOT_REQUIRED' | 'FAILED' | 'NO_ACTIVATION';
 
 export interface ImageReferenceV4 {
@@ -30,6 +42,9 @@ export interface InspectionDetailV4 {
   receivedAt: string;           // ISO8601 + 오프셋 (capturedAt과 혼동 금지)
   completedAt?: string | null;
   retryOf?: string | null;      // 원본 검사 inspectionId (UUID)
+  source?: InspectionSourceV4 | null;
+  manualOf?: ManualOriginV4 | null;
+  followUp?: InspectionFollowUpV4 | null;
   ai: {
     modelVersion: string;
     calibratorVersion: string | null;
@@ -91,6 +106,10 @@ export interface InspectionViewV4 {
   gradcamStatus: GradcamStatusV4 | null;
   imageUrlExpiresAt: string | null;
   retryOf: string | null; // 기존 검사 표시 번호가 아닌 서버 UUID
+  source: InspectionSourceV4 | null;
+  manualOf: ManualOriginV4 | null;
+  followUp: InspectionFollowUpV4 | null;
+  canOfferManual: boolean; // WORKER 권한·서버 충돌 검증이 별도로 필요
   canOfferConfirm: boolean; // 화면 표시 힌트. 서버 권한 검사를 대신하지 않음.
   canOfferRetry: boolean;   // 화면 표시 힌트. 서버 409 검사 필수.
   isServerAutoPass: boolean; // Mock AUTO_PASS_EXAMPLE과 혼동 금지
