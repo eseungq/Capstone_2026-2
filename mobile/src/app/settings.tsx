@@ -104,14 +104,14 @@ export default function SettingsScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>설정</Text>
         <Text style={styles.subtitle}>
-          {isAdmin ? '시스템 관리자 계정 · Mock' : '현장 작업자 계정 · Mock'}
+          {isAdmin ? (mode === 'live' ? '시스템 관리자 계정 · SERVER' : '시스템 관리자 계정 · Mock') : (mode === 'live' ? '현장 작업자 계정 · SERVER' : '현장 작업자 계정 · Mock')}
         </Text>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <Card title="계정 정보">
           <Field label="권한" value={isAdmin ? '시스템 관리자' : '현장 작업자'} />
-          <Field label="로그인 상태" value="시연용" />
+          <Field label="로그인 상태" value={mode === 'live' ? '실제 서버 모드' : 'Mock 시연'} />
         </Card>
 
         <Card title="사용 가능한 메뉴">
@@ -130,14 +130,16 @@ export default function SettingsScreen() {
 
         {isAdmin && (
           <Pressable style={[styles.button, styles.primary]} 
-onPress={() =>
-  router.push({
-    pathname: '/policy',
-    params: { role: 'ADMIN' },
-  })
-}
+onPress={() => {
+  if (mode === 'live') {
+    // 실제 서버 화면은 로그인 세션 role=ADMIN을 별도 검증합니다.
+    router.push('/policy-live');
+  } else {
+    router.push({ pathname: '/policy', params: { role: 'ADMIN' } });
+  }
+}}
  accessibilityRole="button">
-            <Text style={[styles.buttonText, { color: color.white }]}>자동 통과 기준 관리로 이동</Text>
+            <Text style={[styles.buttonText, { color: color.white }]}>{mode === 'live' ? 'COWL_COVER 실서버 정책 관리' : '자동 통과 기준 관리 · Mock'}</Text>
           </Pressable>
         )}
 
@@ -244,7 +246,7 @@ onPress={() =>
 
         <View style={styles.notice}>
           <Text style={styles.noticeText}>
-            {isAdmin ? '정책 관리 화면은 연결 전 · ' : ''}로그아웃 후 로그인 화면 이동 · 인증 연동 여부는 별도 확인
+            {isAdmin && mode === 'mock' ? '정책 관리 화면은 Mock · ' : ''}{isAdmin && mode === 'live' ? '실서버 정책 관리 화면에서 정책을 실제 변경할 수 있습니다. · ' : ''}로그아웃 메뉴는 별도 시연 동작입니다.
           </Text>
         </View>
       </ScrollView>
