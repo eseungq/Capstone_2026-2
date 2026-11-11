@@ -120,10 +120,20 @@ export default function PolicyLiveScreen() {
   if (active && activeHasBounds) {
     try {
       const candidate = parsePolicyPercentInputV4(percentInput, active);
-      validInput = active.passThreshold == null || Math.abs(candidate - active.passThreshold) > 0.0000005;
-      validationText = validInput
-        ? '검증 범위 안의 값입니다. 저장 시 새 비활성 정책 버전이 생성됩니다.'
-        : '현재 적용 중인 기준치와 같습니다. 다른 값을 입력해 주세요.';
+      const existing = policies.find((p) =>
+        p.modelVersion === active.modelVersion &&
+        p.calibratorVersion === active.calibratorVersion &&
+        p.ready && p.passThreshold != null &&
+        Math.abs(p.passThreshold - candidate) < 0.0000005
+      );
+      if (existing) {
+        validationText = existing.active
+          ? '현재 적용 중인 기준치입니다. 다른 값을 입력해 주세요.'
+          : `이미 ${existing.policyVersion} 정책이 같은 기준치로 저장돼 있습니다. 아래 정책 목록에서 기존 버전을 적용해 주세요.`;
+      } else {
+        validInput = true;
+        validationText = '검증 범위 안의 값입니다. 저장 시 새 비활성 정책 버전이 생성됩니다.';
+      }
     } catch (cause) {
       validationText = errorText(cause);
     }
@@ -171,6 +181,16 @@ export default function PolicyLiveScreen() {
             const latest = await assertLatest(base);
             const current = latest.find((p) => p.policyId === base.policyId);
             if (!current?.active) throw new Error('원래 정책이 더 이상 활성 상태가 아닙니다.');
+            const matching = latest.find((p) =>
+              p.modelVersion === current.modelVersion &&
+              p.calibratorVersion === current.calibratorVersion &&
+              p.ready && p.passThreshold != null &&
+              Math.abs(p.passThreshold - value) < 0.0000005
+            );
+            if (matching) {
+              setPolicies(latest);
+              throw new Error(`동일 기준치의 ${matching.policyVersion} 정책이 이미 존재합니다. 기존 버전을 사용해 주세요.`);
+            }
             const result = await service.saveNewVersion(current, input);
             setSavedPolicy(result);
             setActionNotice(`새 정책 ${result.policyVersion} 저장 완료. 아직 적용되지 않았습니다.\n다음 단계에서 새 버전 적용을 눌러야 합니다.`);
