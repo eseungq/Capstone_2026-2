@@ -1,6 +1,7 @@
 -- V5 제약 위반 테스트: "-- EXPECT ERROR:" 아래 문장은 모두 거부되어야 정상.
 -- 실행: V1~V5 적용된 DB에서 Workbench "오류 시 중지"를 끄고 전체 실행 (또는 mysql --force).
 -- 11/05: N27(FAILED 예측값)·N28(GOOD+NO_ACTIVATION) 추가, DEFECT+NO_ACTIVATION 정상 행 추가
+-- 11/11: V6 수동 판정 반영. N10 제약 이름 v6로 변경, 정상 수동 판정 행 추가, N29~N33 추가 (33건)
 -- 테스트용 행은 v5t- 접두어로 따로 만들고, 마지막 ROLLBACK으로 모두 지운다. 기존 데이터는 건드리지 않는다.
 -- 예상 오류: 3819(CHECK 위반), 1062(중복), 1452(외래키). [ ] 안은 걸려야 하는 제약 이름 (|는 그중 하나)
 
@@ -36,6 +37,16 @@ INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, mo
 VALUES ('v5t-insp-noact', 'V5T-000002', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'v5t-policy-a',
   'COMPLETED', 'DEFECT', 0.700000, 0.600000, 'v5t-cal', TRUE, 0.050000, 'REVIEW', 'DEFECT_PREDICTED', 'NO_ACTIVATION',
   '2026-10-28 10:01:20', '2026-10-28 10:01:22');
+-- 정상 수동 판정 1건 (V6): 두 번째 FAILED → MANUAL 전환. AI 결과·정책 값 없이 완료
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, status,
+                        automation_policy_ready, error_code, received_at, completed_at) VALUES
+ ('v5t-insp-failed2', 'V5T-000003', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a',
+  'FAILED', FALSE, 'AI_SERVER_ERROR', '2026-10-28 10:01:30', '2026-10-28 10:01:31');
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, status,
+                        automation_policy_ready, recommended_action, review_reason, retry_of_inspection_id,
+                        received_at, completed_at) VALUES
+ ('v5t-insp-manual', 'V5T-000004', 'v5t-user-worker', 'MANUAL', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a',
+  'COMPLETED', FALSE, 'REVIEW', 'AI_UNAVAILABLE', 'v5t-insp-failed2', '2026-10-28 10:01:40', '2026-10-28 10:01:40');
 
 -- ---------------- 거부되어야 하는 문장 ----------------
 
@@ -101,7 +112,7 @@ INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, mo
 VALUES ('v5t-n09', 'V5T-N09', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'COMPLETED', 'GOOD',
   0.100000, FALSE, 'REVIEW', 'NO_ACTIVE_POLICY', 'GENERATED', '2026-10-28 10:02:00', '2026-10-28 10:02:02');
 
--- EXPECT ERROR: N10 분석 완료인데 Grad-CAM 상태 없음 [chk_insp_completed_v5]
+-- EXPECT ERROR: N10 분석 완료인데 Grad-CAM 상태 없음 [chk_insp_completed_v6]
 INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, status, predicted_quality,
   raw_defect_probability, automation_policy_ready, recommended_action, review_reason, received_at, completed_at)
 VALUES ('v5t-n10', 'V5T-N10', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'COMPLETED', 'GOOD',
@@ -201,6 +212,38 @@ INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, mo
   raw_defect_probability, automation_policy_ready, recommended_action, review_reason, gradcam_status, received_at, completed_at)
 VALUES ('v5t-n28', 'V5T-N28', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'COMPLETED', 'GOOD',
   0.100000, FALSE, 'REVIEW', 'NO_ACTIVE_POLICY', 'NO_ACTIVATION', '2026-10-28 10:05:00', '2026-10-28 10:05:02');
+
+-- ---------------- V6 수동 판정 (11/11) ----------------
+
+-- EXPECT ERROR: N29 수동 판정 건에 AI 예측값이 있음 [chk_insp_manual]
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, status, predicted_quality,
+  automation_policy_ready, recommended_action, review_reason, retry_of_inspection_id, received_at, completed_at)
+VALUES ('v5t-n29', 'V5T-N29', 'v5t-user-worker', 'MANUAL', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'COMPLETED', 'GOOD',
+  FALSE, 'REVIEW', 'AI_UNAVAILABLE', 'v5t-insp-failed', '2026-10-28 10:06:00', '2026-10-28 10:06:00');
+
+-- EXPECT ERROR: N30 수동 판정 건에 원본 FAILED 연결 없음 [chk_insp_manual]
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, status,
+  automation_policy_ready, recommended_action, review_reason, received_at, completed_at)
+VALUES ('v5t-n30', 'V5T-N30', 'v5t-user-worker', 'MANUAL', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'COMPLETED',
+  FALSE, 'REVIEW', 'AI_UNAVAILABLE', '2026-10-28 10:06:00', '2026-10-28 10:06:00');
+
+-- EXPECT ERROR: N31 일반 검사(DEVICE)에 AI_UNAVAILABLE 사유 [chk_insp_reason_ai_unavailable]
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, status, predicted_quality,
+  raw_defect_probability, automation_policy_ready, recommended_action, review_reason, gradcam_status, received_at, completed_at)
+VALUES ('v5t-n31', 'V5T-N31', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'COMPLETED', 'GOOD',
+  0.100000, FALSE, 'REVIEW', 'AI_UNAVAILABLE', 'NOT_REQUIRED', '2026-10-28 10:06:00', '2026-10-28 10:06:02');
+
+-- EXPECT ERROR: N32 수동 전환한 FAILED를 다시 재검사 (재검사·수동 중 1건만) [uq_insp_retry_of]
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, status, automation_policy_ready,
+  retry_of_inspection_id, received_at)
+VALUES ('v5t-n32', 'V5T-N32', 'v5t-user-worker', 'RETRY', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'RECEIVED', FALSE,
+  'v5t-insp-failed2', '2026-10-28 10:06:00');
+
+-- EXPECT ERROR: N33 일반 검사(DEVICE)가 AI 예측 없이 완료 (V4 규칙이 V6 통합 후에도 유지되는지) [chk_insp_completed_v6]
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, status,
+  automation_policy_ready, recommended_action, review_reason, received_at, completed_at)
+VALUES ('v5t-n33', 'V5T-N33', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'COMPLETED',
+  FALSE, 'REVIEW', 'NO_ACTIVE_POLICY', '2026-10-28 10:06:00', '2026-10-28 10:06:02');
 
 -- ---------------- 정리 ----------------
 ROLLBACK;
