@@ -56,3 +56,33 @@ CARS-AD 개발용 원본 100장으로 온도 보정값 0.6025595860743578을 적
 ## 요청 구간별 시간 로그
 
 다운로드 `imageDownloadMs`, 전처리 `preprocessingMs`, CAM 생성 `camGenerationMs`의 요청 단위 로그는 [PR #5](https://github.com/eseungq/Capstone_2026-2/pull/5)로 `main`에 반영됐습니다. 구간별 정의는 [AI 실행 안내](README.md)에 있습니다.
+
+## 프레임·카울커버 실제 모델 연동 (2026-11-11)
+
+| 부품 | 기본 기준치 | 관리자 조정 범위 | 평가 정상 자동 통과 | 평가 불량 자동 통과 |
+|---|---:|---:|---:|---:|
+| FRAME | 3.67% | 3.00~3.67% | 846/1,439장 | 0/1,802장 |
+| COWL_COVER | 1.63% | 1.00~1.63% | 109/1,250장 | 0/1,281장 |
+
+범위와 기준치는 캡스톤 시연용입니다. 프레임 3.67%의 근거는 기존 평가 사진 비교입니다. 카울커버 1.63%는 기준치를 고정한 뒤 별도 평가 사진에 적용했고, 조정 범위는 기존 점수로 사후 비교했습니다. 평가 단위는 사진이며 독립된 실물 부품을 대상으로 한 운영 검증은 남아 있습니다.
+
+실제 DGX–백엔드–iPhone 시험에서 다음을 확인했습니다. AI 응답의 `predictedQuality`와 `calibratedDefectProbability`를 사용해 백엔드가 최종 동작을 결정합니다.
+
+| 검사 | 부품 | AI 예측 / 보정 확률 | 백엔드·앱 확인 결과 |
+|---|---|---|---|
+| INS-000103 | FRAME | GOOD / 1.26% | AUTO_PASS, 최종 PASS / SYSTEM |
+| INS-000104 | FRAME | GOOD / 11.90% | REVIEW, ABOVE_THRESHOLD |
+| INS-000105 | FRAME | DEFECT / 98.00% | REVIEW, DEFECT_PREDICTED, LayerCAM JPEG |
+| INS-000106 | COWL_COVER | GOOD / 1.45% | AUTO_PASS, 최종 PASS / SYSTEM |
+| INS-000107 | COWL_COVER | GOOD / 1.84% | REVIEW, ABOVE_THRESHOLD |
+| INS-000108·109 | COWL_COVER | DEFECT / 99.82%·99.73% | REVIEW, DEFECT_PREDICTED, 고정핀·연결부 LayerCAM JPEG |
+
+두 모델의 판단 근거는 28×28 LayerCAM입니다. 생성 성공 시 기존 `gradcam`의 `targetClass=DEFECT`, `status=GENERATED`, `format=jpeg` 및 `imageBase64`로 반환합니다. `GOOD` 응답은 `gradcam=null`이며, 앱은 `images.gradcam`을 조회해 공통 제목 ‘AI 판단 근거’로 표시합니다.
+
+프레임 8774 단독 중지 시 FRAME만 실패했고, 복구 후 재검사 INS-000113이 완료됐습니다. F8에서 같은 정상 사진이 정책 중지 상태에는 REVIEW(114), 재적용 후에는 AUTO_PASS(115)로 표시됐으며 기존 103번 이력이 유지됐습니다. 자세한 결과는 [통합 점검표](../docs/통합_점검표.md)를 참고합니다.
+
+카울커버 106번의 AI 응답 16.22초 중 원본 다운로드가 15.92초, 모델 분류가 0.20초였습니다. 이후 세 건의 다운로드는 1.20~2.63초였습니다. 리허설에서는 Mac 백엔드에서 같은 정상 사진을 두 번 접수하고 첫 요청과 다음 요청의 다운로드·왕복 시간을 비교합니다.
+
+프레임 예비 JPEG는 2,404,539바이트로 기존 PNG(10,333,596바이트)보다 76.7% 작습니다. DGX에서 8774와 같은 어댑터로 JPEG를 두 번 분석해 모두 GOOD, 보정 확률 1.1855%, 3.67% 정책에서 AUTO_PASS 조건 충족을 확인했습니다. DGX 내부 HTTP 측정에서 JPEG의 API 시간은 429ms·134ms였으며 Mac 서명 URL을 통한 첫 요청 지연 시험은 리허설에서 확인합니다.
+
+실제 기준치 조정 리허설 후보로 카울커버 106번과 같은 사진(보정 확률 1.4526%)을 사용할 수 있습니다. 1.00% 적용 후 새 검사에서 REVIEW, 1.63% 적용 후 새 검사에서 AUTO_PASS를 예상합니다. 이 시나리오는 프레임 정책 중지·재적용 시험과 별도입니다.
