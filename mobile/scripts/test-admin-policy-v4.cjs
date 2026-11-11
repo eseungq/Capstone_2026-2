@@ -23,6 +23,7 @@ Module._extensions['.ts'] = (module, filename) => {
 const {
   COWL_PART_CODE_V4,
   createAdminPolicyServiceV4,
+  findEquivalentPolicyVersionV4,
   decodeAdminPolicyV4,
   decodeCowlPolicyListV4,
   parsePolicyPercentInputV4,
@@ -71,6 +72,39 @@ function fakeTransport({
   };
   return { transport, calls };
 }
+
+test('existing 1.00% t1 is reused; no duplicate policy needs to be saved', () => {
+  assert.equal(
+    findEquivalentPolicyVersionV4([ORIGINAL, EXISTING_T1], ORIGINAL, 0.01)?.policyId,
+    EXISTING_T1.policyId,
+  );
+  assert.equal(findEquivalentPolicyVersionV4([ORIGINAL, EXISTING_T1], ORIGINAL, 0.012), null);
+});
+
+test('equivalent policy check requires same model, calibrator, part and ready state', () => {
+  const t1 = EXISTING_T1;
+  const variants = [
+    { ...t1, partCode: 'DOOR' },
+    { ...t1, modelVersion: 'some-other-model' },
+    { ...t1, calibratorVersion: 'some-other-calibrator' },
+    { ...t1, ready: false },
+    { ...t1, passThreshold: null },
+  ];
+  for (const variant of variants) {
+    assert.equal(findEquivalentPolicyVersionV4([variant], ORIGINAL, 0.01), null);
+  }
+  assert.equal(findEquivalentPolicyVersionV4([t1], ORIGINAL, Number.NaN), null);
+});
+
+test('refresh before POST detects a policy version created since the initial screen load', () => {
+  const firstList = [ORIGINAL];
+  const refreshedList = [ORIGINAL, EXISTING_T1];
+  assert.equal(findEquivalentPolicyVersionV4(firstList, ORIGINAL, 0.01), null);
+  assert.equal(
+    findEquivalentPolicyVersionV4(refreshedList, ORIGINAL, 0.01)?.policyId,
+    EXISTING_T1.policyId,
+  );
+});
 
 test('ADMIN GET loads exactly COWL_COVER policies with original 1.63% and existing t1 1.00%', async () => {
   const { transport, calls } = fakeTransport();
