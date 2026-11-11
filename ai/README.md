@@ -86,7 +86,7 @@ Stub HTTP 점검은 모델·GPU·실제 사진을 사용하지 않습니다. 이
 | 부품 | DGX 포트 | 모델 버전 | 보정기 버전 | 추론 장치 |
 |---|---:|---|---|---|
 | `FRAME` | 8774 | `frame-swin-tiny-unified-e08-2425d7e46572-dev` | `frame-e08-temperature-5d4299808c3e-demo` | GPU |
-| `COWL_COVER` | 8778 | `cowl-cover-unified-swin-tiny-e08-458a07d46453-dev` | `cowl-unified-e08-temperature-2d80fc926685-demo` | CPU |
+| `COWL_COVER` | 8778 | `cowl-cover-unified-swin-tiny-e08-458a07d46453-dev` | `cowl-unified-e08-temperature-2d80fc926685-demo` | GPU (NVIDIA GB10, FP32) |
 
 백엔드는 부품별 DGX 주소로 `POST /internal/v1/predict`를 호출합니다. `GET /internal/v1/models`로 모델·보정기 버전과 `loadable=true`를 확인합니다. 추론 서버에는 백엔드가 발급하는 서명 이미지 URL의 출처를 설정합니다.
 
@@ -102,7 +102,7 @@ cd "$PROJECT"
   "$PROJECT" "$FRAME_RUNTIME" --host "$(tailscale ip -4)" --port 8774 --origin "$BACKEND_ORIGIN"
 ```
 
-카울커버는 DGX의 보정 배포 디렉터리(`COWL_DEPLOYMENT`)에서 생성된 `launch.sh`로 복구합니다. `COWL_RUN_DIR`에는 아직 없는 새 실행 디렉터리를 지정합니다.
+카울커버는 DGX의 GPU 배포 디렉터리(`COWL_DEPLOYMENT`, `outputs/cowl_gpu_live_*` 중 현재 배포)의 `launch.sh`로 복구합니다. `COWL_RUN_DIR`에는 아직 없는 새 실행 디렉터리를 지정합니다. 시작 로그에 `COWL_DEVICE=cuda`가 표시되고 모델 목록에 기존 모델·보정기 버전이 반환되는지 확인합니다.
 
 ```bash
 bash "$COWL_DEPLOYMENT/launch.sh" "$COWL_RUN_DIR" --port 8778 --image-origin "$BACKEND_ORIGIN" --serve
