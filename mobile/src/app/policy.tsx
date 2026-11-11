@@ -8,10 +8,11 @@ import {
 } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { DOOR_AUTOPASS_DEMO_V4 as DEMO } from '../api/backendV4/demoPolicyScenarioV4';
 
 // Figma: FyGAGiL2xkZgaDfegUk10A / 99:720, 99:616, 99:668 (2026-10-27)
-// 화면 시연 전용입니다. 정책 계산, 검증, 저장, 적용 또는 API 호출은 하지 않습니다.
-// 특히 관리자가 passThreshold를 임의로 입력하거나 적용하지 않도록 구성했습니다.
+// 운영 정책 조회/변경 화면이 아닙니다. 시연 상태 탭은 Mock 화면 예시입니다.
+// 실제 e02 보정값/보정기 버전은 null이며 30% 기준을 운영에 사용하지 않습니다.
 
 type Scenario = 'UNREADY' | 'READY_DEMO' | 'ACTIVE_DEMO';
 type Role = 'ADMIN' | 'WORKER';
@@ -89,9 +90,9 @@ function BottomNav({ role }: { role: Role }) {
 }
 
 const examples: { key: Scenario; label: string }[] = [
-  { key: 'UNREADY', label: '미준비 · 예시' },
-  { key: 'READY_DEMO', label: '준비됨 · 예시' },
-  { key: 'ACTIVE_DEMO', label: '적용 중 · 예시' },
+  { key: 'UNREADY', label: '운영 미준비' },
+  { key: 'READY_DEMO', label: '시연 준비' },
+  { key: 'ACTIVE_DEMO', label: '시연 적용' },
 ];
 
 export default function PolicyScreen() {
@@ -152,14 +153,14 @@ export default function PolicyScreen() {
         </View>
 
         <View style={styles.blueNote}>
-          <Text style={styles.blueNoteText}>실제 운영 상태는 미준비·미적용입니다. 아래 ready/active 탭은 시연 시나리오일 뿐 실제 정책 상태를 의미하지 않습니다.</Text>
+          <Text style={styles.blueNoteText}>실제 e02의 운영 보정기와 적용 정책은 미준비입니다. 다른 탭은 11/09 Mock 시연 정책 예시이며 DGX/e02 상태를 변경하지 않습니다.</Text>
         </View>
         <Panel title="정책 연결 정보">
           <InfoRow title="부품 / 검사 범위" value="DOOR · 모델 지원 범위" />
-          <InfoRow title="정책 버전" value="example-policy-v1 · Mock" />
+          <InfoRow title="정책 버전" value={unready ? '실제 e02 활성 정책 없음' : `${DEMO.basePolicyVersion} · 시연 Mock`} />
           <InfoRow title="기준 관리" value="passThreshold" />
-          <InfoRow title="모델 버전" value="mock-swin-t-v0" />
-          <InfoRow title="AI 서버 로드 가능" value="미확인 · Mock" />
+          <InfoRow title="모델 버전" value={unready ? 'door-swin-tiny-e02-28a2dd1cb40b-dev' : `${DEMO.mockModelVersion} · Mock`} />
+          <InfoRow title="서버 구분" value={unready ? '실제 e02 · 정책 미준비' : '독립 Mock 시연 (운영 미적용)'} />
         </Panel>
 
         <Panel title="정책 준비 · 적용 상태">
@@ -181,16 +182,16 @@ export default function PolicyScreen() {
               <InfoRow title="적용 가능 후보 값" value="검증 전 · 없음" />
               <InfoRow title="passThreshold" value="확정 전" />
               <Text style={styles.warningText}>유효한 정책이 없어 분석 완료 건은 REVIEW와 확인 필요 알림으로 처리합니다.</Text>
-              <InfoRow title="검증 범위(최소~최대)" value="미제공 · Mock" />
+              <InfoRow title="운영 검증 범위" value="미제공" />
             </>
           ) : (
             <>
-              <InfoRow title="passThreshold" value="0.08 · Mock" color={C.blue} />
-              <InfoRow title="검증 근거(실측)" value="미제공" />
+              <InfoRow title="passThreshold" value={`${(DEMO.initialThreshold*100).toFixed(0)}% · 시연 Mock`} color={C.blue} />
+              <InfoRow title="시연 조정 허용 범위" value={`${(DEMO.validatedMin*100).toFixed(2)}~${(DEMO.validatedMax*100).toFixed(2)}% · Mock`} color={C.blue} />
+              <InfoRow title="조정 시연 예시" value="30% → 35%, GOOD/32% 재접수" />
               <Text style={styles.warningText}>
-                기준치 0.08은 가상 값이며 실제 검증된 후보·허용 범위가 아닙니다.
+                이 범위는 도현님이 제공한 시연 전용 수치입니다. 30%는 동일 평가 사진에 사후 적용한 값이며, 독립 검증된 운영 정책이 아닙니다.
               </Text>
-              <InfoRow title="검증 범위(최소~최대)" value="미제공 · Mock" color={C.blue} />
             </>
           )}
         </Panel>
@@ -204,13 +205,13 @@ export default function PolicyScreen() {
           style={[styles.actionButton, unready ? styles.previewButton : styles.activePreviewButton]}
         >
           <Text style={[styles.actionText, unready ? styles.previewText : styles.activePreviewText]}>
-            {unready ? '기준치 조정 화면 · 검증 전 Mock' : '기준치 조정 · Mock'}
+            {unready ? '정책 조정 화면 · 운영 미준비' : '30% → 35% 조정 시연 · Mock'}
           </Text>
         </Pressable>
 
         <View style={styles.blueNote}>
           <Text style={styles.blueNoteText}>
-            목표 미검출률을 입력해 기준 후보를 산출하는 기존 방식은 10/14 합의에 따라 폐지되었습니다. 정책 저장과 적용은 별도 단계이며 실제 검증·API 연동 전에는 불가능합니다.
+            목표 미검출률 입력을 통한 후보 계산은 10/14 합의에 따라 사용하지 않습니다. 운영 정책 저장·적용은 아직 연결되지 않았으며, Mock 조정 시연은 다음 화면에서만 진행합니다.
           </Text>
         </View>
       </ScrollView>

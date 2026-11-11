@@ -3,15 +3,20 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { validateThresholdEditV4 } from '../api/backendV4/policyThresholdV4';
+import { DOOR_AUTOPASS_DEMO_V4, evaluateMockDoorAutopassDemoV4 } from '../api/backendV4/demoPolicyScenarioV4';
 
 /**
- * 화면 상태만 바꾸는 완전 독립 Mock 시연. 실측 값/운영 정책이 아닙니다.
- * 서버, API, AsyncStorage, 기존 검사 기록/통계에는 접근하지 않습니다.
+ * 11/09 도어 시연 합의의 Mock 재현입니다.
+ * 실제 e02 보정값/보정기 버전은 null이며 실서버는 REVIEW를 유지합니다.
+ * 서버, API, AsyncStorage, 운영 검사 기록/통계에는 접근하지 않습니다.
  */
-const MOCK = {
-  part:'DOOR', model:'mock-door-model', policy:'example-policy-v1',
-  min:0.02, max:0.10, current:0.08,
-} as const;
+const MOCK = DOOR_AUTOPASS_DEMO_V4;
+type DemoReceipt = {
+  id: number;
+  threshold: number;
+  policyVersion: string;
+  decision: 'AUTO_PASS' | 'REVIEW';
+};
 
 type Phase = 'EDITING' | 'SAVED' | 'ACTIVE';
 type Role = 'ADMIN' | 'WORKER';
@@ -42,52 +47,74 @@ export default function AssumedPolicyScreen(){
   const params=useLocalSearchParams<{role?:string}>();
   const role:Role=params.role==='ADMIN'?'ADMIN':'WORKER';
   const [phase,setPhase]=useState<Phase>('EDITING');
-  const [value,setValue]=useState(String(MOCK.current));
+  const [value,setValue]=useState(String(MOCK.adjustedThreshold));
   const [savedValue,setSavedValue]=useState<number|null>(null);
-  // 이 경계값은 현실의 AI 검증 결과가 아니라 가상 시연 전용입니다.
-  const result=validateThresholdEditV4(value,{validatedMin:MOCK.min,validatedMax:MOCK.max,evidenceVerified:true});
+  const [demoReceipts,setDemoReceipts]=useState<DemoReceipt[]>([]);
+  // evidenceVerified는 Mock UI의 입력 검증에만 사용합니다. 운영 승인 여부가 아닙니다.
+  const result=validateThresholdEditV4(value,{
+    validatedMin:MOCK.validatedMin,
+    validatedMax:MOCK.validatedMax,
+    evidenceVerified:true,
+  });
+  const appliedThreshold=phase==='ACTIVE' && savedValue!==null ? savedValue : MOCK.initialThreshold;
+  const appliedVersion=phase==='ACTIVE' ? MOCK.adjustedPolicyVersion : MOCK.basePolicyVersion;
+  const expectedDecision=evaluateMockDoorAutopassDemoV4(
+    MOCK.samplePrediction,MOCK.sampleCalibratedDefectProbability,appliedThreshold,true,
+  );
   const save=()=>{
     if(!result.ok || phase!=='EDITING') return;
     const candidate=result.value;
-    Alert.alert('가상 새 버전 저장',
-      `기준치 ${candidate}을(를) example-policy-v2에 저장한 화면만 시연합니다. 실제 정책 저장은 발생하지 않습니다.`,[
+    Alert.alert('시연용 새 버전 저장',
+      `기준치 ${candidate}를 ${MOCK.adjustedPolicyVersion}에 저장한 화면만 시연합니다. 실제 서버 요청은 없습니다.`,[
         {text:'취소',style:'cancel'},
         {text:'Mock 저장',onPress:()=>{setSavedValue(candidate);setPhase('SAVED');}},
       ]);
   };
   const activate=()=>{
     if(phase!=='SAVED'||savedValue===null)return;
-    Alert.alert('가상 정책 적용',
-      'example-policy-v2를 적용 중으로 표시합니다. 실제 정책·자동 통과·검사 결과는 변경되지 않습니다.',[
+    Alert.alert('시연용 정책 적용',
+      `${MOCK.adjustedPolicyVersion}을(를) 적용한 것으로 시연합니다. 실제 정책·검사 DB는 변경되지 않습니다.`,[
         {text:'취소',style:'cancel'},
         {text:'Mock 적용',onPress:()=>setPhase('ACTIVE')},
       ]);
   };
+  const submitMock=()=>{
+    // 새 시연 건만 생성하며, 앞서 접수한 REVIEW 기록은 소급 변경하지 않습니다.
+    const decision=evaluateMockDoorAutopassDemoV4(
+      MOCK.samplePrediction,MOCK.sampleCalibratedDefectProbability,appliedThreshold,true,
+    );
+    setDemoReceipts(previous=>[...previous,{
+      id:previous.length+1,threshold:appliedThreshold,policyVersion:appliedVersion,decision,
+    }]);
+  };
   return <SafeAreaView style={s.screen} edges={['top','bottom']}>
     <Stack.Screen options={{headerShown:false}} />
     <View style={s.header}>
-      <Text style={s.title}>기준치 조정 · Mock 시연</Text>
-      <Text style={s.subtitle}>합의 v4 절차 시연 · AI 실측 검증/서버 연동 아님</Text>
+      <Text style={s.title}>도어 AUTO_PASS · Mock 시연</Text>
+      <Text style={s.subtitle}>11/09 팀 합의 30% → 35% · 실서버/운영 정책 미연동</Text>
     </View>
     {role!=='ADMIN'?<View style={s.body}><Card title="관리자 전용"><Text style={s.note}>WORKER 시연 역할에서는 접근할 수 없습니다.</Text></Card></View>:
       <ScrollView style={s.scroller} contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
         <View style={s.warningBox}><Text style={s.warning}>
-          아래 모든 값·검증 범위·정책 버전은 가상 예시입니다. 실제 운영 저장/적용은 불가하며, 이 화면에서 상태는 앱 메모리 안에서만 바뀝니다.
+          도현님이 제공한 30% 기준과 28.01~37.52% 범위를 Mock 화면으로 재현합니다. 독립 검증된 운영 기준은 아니며, 앱 메모리만 변경하고 서버에는 전송하지 않습니다.
         </Text></View>
-        <Card title="시연 조건 · 예시 데이터">
-          <Row name="부품/모델" value={`${MOCK.part} / ${MOCK.model}`} />
-          <Row name="기존 정책" value={`${MOCK.policy} · Mock`} />
-          <Row name="가상 검증 허용 범위" value={`${MOCK.min.toFixed(2)} ~ ${MOCK.max.toFixed(2)}`} />
-          <Row name="기존 기준치" value={`${MOCK.current.toFixed(2)} · Mock`} />
+        <Card title="시연 조건 · Mock 전용">
+          <Row name="부품/모델" value={`${MOCK.partCode} / ${MOCK.mockModelVersion}`} />
+          <Row name="시연 기본 정책" value={`${MOCK.basePolicyVersion} · Mock`} />
+          <Row name="시연 조정 허용 범위" value={`${(MOCK.validatedMin*100).toFixed(2)}~${(MOCK.validatedMax*100).toFixed(2)}%`} />
+          <Row name="기본 passThreshold" value={`${(MOCK.initialThreshold*100).toFixed(0)}% · Mock`} />
+          <Row name="비교용 새 기준치" value={`${(MOCK.adjustedThreshold*100).toFixed(0)}% · Mock`} />
+          <Row name="비교 입력" value="GOOD / 보정 불량 확률 32%" />
+          <Text style={s.note}>실제 e02의 보정값·보정기 버전은 미제공입니다. 아래 결과는 시연 전용이며 실제 AI·DB 결과가 아닙니다.</Text>
         </Card>
         <Card title="1. 검증 범위 내 기준치 조정">
-          <Text style={s.note}>목표 미검출률이 아니라, 가상의 허용 범위에 속하는 passThreshold 값을 직접 지정합니다. 실제 허용 범위는 아직 제공되지 않았습니다.</Text>
+          <Text style={s.note}>목표 미검출률이 아닌 passThreshold를 입력합니다. 도현님이 제공한 범위는 시연 정책에만 사용하며 실제 운영 기준으로 사용할 수 없습니다.</Text>
           <View style={s.inputRow}>
             <Text style={s.inputLabel}>passThreshold (0~1)</Text>
             <TextInput accessibilityLabel="Mock 기준치" keyboardType="decimal-pad" style={[s.input,phase!=='EDITING'&&s.inputDisabled]}
               value={value} maxLength={12} editable={phase==='EDITING'} onChangeText={setValue}/>
           </View>
-          {phase==='EDITING' && !result.ok?<Text style={s.warning}>{result.reason==='OUT_OF_RANGE'?'가상 검증 범위 내 값을 입력해 주세요.':'0~1 사이의 올바른 소수를 입력해 주세요.'}</Text>:null}
+          {phase==='EDITING' && !result.ok?<Text style={s.warning}>{result.reason==='OUT_OF_RANGE'?'시연 허용 범위(0.2801~0.3752) 안의 값을 입력해 주세요.':'0~1 사이의 올바른 소수를 입력해 주세요.'}</Text>:null}
           <Pressable accessibilityRole="button" disabled={phase!=='EDITING'||!result.ok}
             accessibilityState={{disabled:phase!=='EDITING'||!result.ok}} onPress={save}
             style={[s.action,(phase!=='EDITING'||!result.ok)&&s.disabled]}>
@@ -97,22 +124,50 @@ export default function AssumedPolicyScreen(){
           </Pressable>
         </Card>
         <Card title="2. 저장 후 별도 적용">
-          <Row name="새 버전" value={savedValue===null?'없음':'example-policy-v2 · Mock'} />
-          <Row name="저장된 기준치" value={savedValue===null?'없음':`${savedValue} · Mock`} />
-          <Row name="ready" value={savedValue===null?'미준비':'준비됨 가정 · Mock'} />
-          <Row name="active" value={phase==='ACTIVE'?'적용됨 가정 · Mock':'미적용'} />
+          <Row name="새 버전" value={savedValue===null?'없음':`${MOCK.adjustedPolicyVersion} · Mock`} />
+          <Row name="저장된 기준치" value={savedValue===null?'없음':`${(savedValue*100).toFixed(2)}% · Mock`} />
+          <Row name="ready" value={savedValue===null?'미준비':'시연 준비됨 · Mock'} />
+          <Row name="active" value={phase==='ACTIVE'?'새 시연 정책 적용':'기본 30% 시연 정책 유지'} />
           <Text style={s.note}>기준치를 저장해도 자동 적용되지 않습니다. 실제 환경에서는 서버가 ready·활성 모델·보정기 호환성을 검증합니다.</Text>
           <Pressable accessibilityRole="button" disabled={phase!=='SAVED'} accessibilityState={{disabled:phase!=='SAVED'}}
             onPress={activate} style={[s.action,phase!=='SAVED'&&s.disabled]}>
             <Text style={[s.actionText,phase!=='SAVED'&&s.disabledText]}>{phase==='ACTIVE'?'적용 시연 완료':'저장된 새 정책 적용 · Mock'}</Text>
           </Pressable>
         </Card>
-        <Card title="시연 결과">
-          <Row name="현재 시연 단계" value={phase==='EDITING'?'조정 전':phase==='SAVED'?'저장 완료·미적용':'적용 중 가정'} />
+        <Card title="3. 같은 Mock 입력으로 검사 접수 비교">
+          <Row name="현재 활성 시연 정책" value={`${appliedVersion} · Mock`} />
+          <Row name="현재 기준치" value={`${(appliedThreshold*100).toFixed(2)}%`} />
+          <Row name="GOOD / 보정 불량 확률 32%" value={`${expectedDecision} · Mock 예상`} />
+          {phase==='SAVED' && <Text style={s.note}>새 기준치는 저장되었지만 아직 적용되지 않아 30% 정책으로 판정합니다.</Text>}
+          <Pressable accessibilityRole="button" style={s.action} onPress={submitMock}>
+            <Text style={s.actionText}>GOOD / 32% 새 검사 접수 · Mock</Text>
+          </Pressable>
+          {demoReceipts.length===0
+            ? <Text style={s.note}>먼저 30% 상태에서 Mock 검사를 접수한 뒤, 35% 새 버전을 저장·적용하고 같은 입력을 새로 접수해 비교하세요.</Text>
+            : demoReceipts.map(receipt=><View key={receipt.id} style={s.receipt}>
+                <Text style={s.receiptTitle}>시연 검사 #{receipt.id} · 운영 DB 기록 아님</Text>
+                <Row name="사용한 정책" value={receipt.policyVersion} />
+                <Row name="접수 당시 기준치" value={`${(receipt.threshold*100).toFixed(2)}%`} />
+                <Text style={[s.receiptResult,{color:receipt.decision==='AUTO_PASS'?C.green:C.red}]}>
+                  {receipt.decision==='AUTO_PASS'
+                    ? 'AUTO_PASS · SYSTEM 최종 PASS (시연)'
+                    : 'REVIEW · 작업자 확인 필요 (시연)'}
+                </Text>
+              </View>)}
+          <Text style={s.note}>기존 REVIEW 검사는 정책이 바뀌어도 그대로 남습니다. 실제 REVIEW의 작업자 PASS/FAIL은 서버에서 반환한 검사 UUID의 상세 화면에서만 수행합니다.</Text>
+        </Card>
+        <Card title="시연 상태">
+          <Row name="진행 단계" value={phase==='EDITING'
+            ? '30% 기본 정책'
+            : phase==='SAVED'
+              ? `${((savedValue??MOCK.adjustedThreshold)*100).toFixed(2)}% 저장·미적용`
+              : `${(appliedThreshold*100).toFixed(2)}% 새 정책 적용`} />
           <Row name="서버 API 요청" value="없음" />
           <Row name="운영 정책/검사 기록 변경" value="없음" />
-          {phase!=='EDITING'?<Pressable accessibilityRole="button" onPress={()=>{setPhase('EDITING');setValue(String(savedValue??MOCK.current));setSavedValue(null);}} style={s.secondary}>
-            <Text style={s.secondaryText}>기준치 재조정 시연 다시 시작</Text>
+          {phase!=='EDITING'||demoReceipts.length>0?<Pressable accessibilityRole="button" onPress={()=>{
+            setPhase('EDITING');setValue(String(MOCK.adjustedThreshold));setSavedValue(null);setDemoReceipts([]);
+          }} style={s.secondary}>
+            <Text style={s.secondaryText}>시연 초기화 · 30% 기준으로 돌아가기</Text>
           </Pressable>:null}
         </Card>
         <Pressable accessibilityRole="button" onPress={()=>router.replace({pathname:'/policy-adjust',params:{role:'ADMIN'}})} style={s.secondary}>
@@ -135,6 +190,8 @@ const s=StyleSheet.create({
   inputDisabled:{backgroundColor:'#F0F4FA',color:C.muted},action:{minHeight:46,borderRadius:12,backgroundColor:C.blue,alignItems:'center',justifyContent:'center',padding:12},
   actionText:{color:C.white,fontSize:13,fontWeight:'700',textAlign:'center'},disabled:{backgroundColor:C.gray},disabledText:{color:C.muted},
   secondary:{minHeight:46,borderRadius:12,backgroundColor:C.bluePale,alignItems:'center',justifyContent:'center',padding:12},secondaryText:{color:C.blue,fontSize:13,fontWeight:'700',textAlign:'center'},
+  receipt:{padding:12,borderWidth:1,borderColor:C.border,borderRadius:10,gap:7,backgroundColor:'#FAFCFF'},
+  receiptTitle:{color:C.text,fontSize:12,fontWeight:'700'},receiptResult:{fontSize:13,fontWeight:'700'},
   nav:{height:58,marginHorizontal:20,marginBottom:7,borderWidth:1,borderColor:C.border,borderRadius:15,backgroundColor:C.white,flexDirection:'row',alignItems:'center'},
   navItem:{flex:1,alignItems:'center',justifyContent:'center',gap:2,minHeight:46},navSymbol:{fontSize:17,color:C.muted},navLabel:{fontSize:11,color:C.muted,fontWeight:'600'},selected:{color:C.blue,fontWeight:'700'}
 });

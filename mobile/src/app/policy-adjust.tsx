@@ -6,8 +6,9 @@ import { validateThresholdEditV4 } from '../api/backendV4/policyThresholdV4';
 
 /**
  * v4 합의: 목표 미검출률 입력 → 후보 계산 방식은 사용하지 않습니다.
- * AI 실측 검증 범위가 없는 현재는 운영 정책을 저장/적용할 수 없습니다.
- * 조건 가정 화면은 별도 Mock이며 서버/AsyncStorage/검사 결과를 변경하지 않습니다.
+ * 도현님이 제공한 0.2801~0.3752 범위는 시연 Mock 전용입니다.
+ * 운영 e02는 보정기가 미제공이므로 운영 정책 저장/적용을 비활성화합니다.
+ * 별도 Mock 시연은 서버/AsyncStorage/검사 결과를 변경하지 않습니다.
  */
 
 type Role = 'ADMIN' | 'WORKER';
@@ -45,7 +46,7 @@ export default function PolicyAdjustScreen() {
   const params=useLocalSearchParams<{role?:string}>();
   // 화면 시연용 라우트 역할 값. 운영 인가는 로그인된 서버 토큰과 백엔드가 수행합니다.
   const role:Role = params.role === 'ADMIN' ? 'ADMIN' : 'WORKER';
-  // 아직 도현님이 검증된 실측 허용 범위를 제공하지 않았습니다.
+  // 시연용 범위가 제공되었지만, 실제 e02 운영용 독립 검증 범위는 없습니다.
   const current = {validatedMin:null,validatedMax:null,evidenceVerified:false};
   const threshold = validateThresholdEditV4('',current);
   const allowOperation = threshold.ok; // 항상 false: 검증된 범위/값 미제공
@@ -60,7 +61,7 @@ export default function PolicyAdjustScreen() {
       <Card title="관리자 전용 기능"><Text style={s.note}>작업자 역할에서는 정책 관리 기능을 사용할 수 없습니다.</Text></Card>
     </View> : <ScrollView style={s.scroller} contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
       <View style={s.notice}><Text style={s.noticeText}>
-        현재 운영 상태: 검증된 보정기·기준치·허용 범위가 제공되지 않았습니다. 자동 통과 정책은 준비 전이며 저장과 적용이 비활성화되어 있습니다.
+        실제 e02 운영 상태: 보정기·운영 기준치·독립 검증 범위 미제공. 아래 저장·적용 버튼은 비활성입니다. 30% 시연 정책은 별도 Mock 화면에서만 확인할 수 있습니다.
       </Text></View>
       <Card title="정책 정보 · 실제 상태">
         <Row name="부품" value="DOOR" />
@@ -73,7 +74,7 @@ export default function PolicyAdjustScreen() {
         <Row name="검증된 최소값 (validatedMin)" value="미제공" />
         <Row name="검증된 최대값 (validatedMax)" value="미제공" />
         <Row name="실측 검증 근거" value="미제공" />
-        <Text style={s.note}>허용 범위와 평가 근거는 AI 팀이 제공하고 백엔드에서 검증합니다. 가상 수치를 운영 허용 범위처럼 사용하지 않습니다.</Text>
+        <Text style={s.note}>AI 팀에서 시연용 0.2801~0.3752 범위를 제공했지만, 운영 e02에 적용할 수 있는 검증 범위는 아닙니다. Mock 범위를 운영 권한으로 사용하지 않습니다.</Text>
       </Card>
       <Card title="2. passThreshold 조정 및 저장">
         <Text style={s.note}>검증된 범위가 확인되면 관리자가 범위 안의 기준치를 입력할 수 있습니다. 저장하면 기존 정책을 덮어쓰지 않고 새 버전을 만듭니다.</Text>
@@ -91,7 +92,7 @@ export default function PolicyAdjustScreen() {
       </Card>
       <Pressable accessibilityRole="button" style={s.demoButton}
         onPress={()=>router.push({pathname:'/policy-assumed',params:{role:'ADMIN'}})}>
-        <Text style={s.demoButtonText}>검증 범위가 있다고 가정한 흐름 시연 · Mock →</Text>
+        <Text style={s.demoButtonText}>DOOR 30% → 35% 정책 조정 · 독립 Mock 시연 →</Text>
       </Pressable>
       <View style={s.notice}><Text style={s.noticeText}>
         위 화면은 정책 관리 구조를 구현한 프론트엔드 준비 화면입니다. 현재 서버 API 호출, 정책 저장·적용, 검사 판정 변경은 발생하지 않습니다. 별도 Mock 시연 역시 운영 기록에 반영되지 않습니다.
