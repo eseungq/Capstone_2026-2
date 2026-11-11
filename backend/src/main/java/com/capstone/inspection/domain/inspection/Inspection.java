@@ -155,6 +155,23 @@ public class Inspection {
         this.capturedAt = capturedAt != null ? capturedAt : this.receivedAt; // 없으면 접수 시각 (계약 6.2)
     }
 
+    // 수동 판정 전환 (V6): FAILED 원본의 부품·검사항목·모델·사진을 이어받아 바로 COMPLETED·REVIEW(AI_UNAVAILABLE)
+    // AI 결과·정책 값은 모두 비워 두고, 판정은 기존 작업자 확인으로 기록
+    public static Inspection manualOf(Inspection failed, String inspectionNo, User requester, String traceId) {
+        Inspection m = new Inspection(inspectionNo, requester, InspectionSource.MANUAL, failed.getPart(),
+                failed.getItem(), failed.getModel(), failed.getLineCode(), failed.getCapturedAt(), null,
+                failed.getId(), traceId);
+        m.status = InspectionStatus.COMPLETED;
+        m.recommendedAction = RecommendedAction.REVIEW;
+        m.reviewReason = ReviewReason.AI_UNAVAILABLE;
+        m.completedAt = m.receivedAt;
+        return m;
+    }
+
+    public boolean isManual() {
+        return source == InspectionSource.MANUAL;
+    }
+
     public void startAnalysis() {
         this.status = InspectionStatus.ANALYZING;
         this.startedAt = LocalDateTime.now();

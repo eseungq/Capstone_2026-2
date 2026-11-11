@@ -1,6 +1,6 @@
 # 백엔드 API 계약 v4 (11/10 갱신 · 최종 확정 전)
 
-3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장) · 11/02 갱신 (구현 세부 반영: 6.1~6.4, 6.6~6.9, 7.4, 8장, 10장, 12장) · 11/04 갱신 (실제 AI 연결 확인: 7.3, 7.4, 12장 TBD-01) · 11/05 갱신 (통합 시험: 6.2 모델 확인 타임아웃, 8.4 앱 시험, 12장 TBD-01·14) · 11/09 갱신 (12장 TBD-01 실행 타임아웃 20초) · 11/10 갱신 (6.1·6.9 계정 잠금 해제, 9.1 통계, 10장 USER_NOT_FOUND, 12장 TBD-10·14) · 11/11 갱신 (6.3 recent inspectionNo, 12장 TBD-01 부품별 AI 서버)
+3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장) · 11/02 갱신 (구현 세부 반영: 6.1~6.4, 6.6~6.9, 7.4, 8장, 10장, 12장) · 11/04 갱신 (실제 AI 연결 확인: 7.3, 7.4, 12장 TBD-01) · 11/05 갱신 (통합 시험: 6.2 모델 확인 타임아웃, 8.4 앱 시험, 12장 TBD-01·14) · 11/09 갱신 (12장 TBD-01 실행 타임아웃 20초) · 11/10 갱신 (6.1·6.9 계정 잠금 해제, 9.1 통계, 10장 USER_NOT_FOUND, 12장 TBD-10·14) · 11/11 갱신 (6.3 recent inspectionNo, 12장 TBD-01 부품별 AI 서버, **수동 판정** 3장·4장·6.1·6.5·6.6·6.8·6.10·10장)
 
 - 기준 1: 「자동차부품_공정모니터링_개발계획서_최종합의반영」(10/14 합의본)
 - 기준 2: 「요구사항명세서_패치검사_개정본3」(9/30)의 규칙 중 합의본과 충돌하지 않는 것은 그대로 승계
@@ -97,6 +97,7 @@
 | `finalJudgement` | `PASS` / `FAIL` / `null` | 최종 판정 [승계] |
 | `judgedBy` | `SYSTEM` / `WORKER` / `null` | 최종 판정 주체. AUTO_PASS는 SYSTEM [제안] |
 | `displayState` | 아래 표 | 앱 표시용 파생 값 [제안] |
+| `source` | `DEVICE` / `ADMIN` / `RETRY` / `MANUAL` | 검사가 생긴 경로. `MANUAL`은 AI 없이 작업자 판정용으로 만든 검사 (6.10) [구현 11/11] |
 
 ### 3.2 상태 조합 (앱은 `displayState`만 보고 표시해도 됨)
 
@@ -114,6 +115,7 @@
 - REVIEW는 불량 확정이 아님. 정상 쪽 예측이어도 AUTO_PASS 조건을 못 맞추면 REVIEW [확정]
 - 불량(DEFECT) 예측은 보정 확률과 관계없이 항상 REVIEW. 자동 FAIL은 없음 [합의 10/15]
 - 작업자 판정은 AI 결과·정책 결과를 덮어쓰지 않고 별도로 저장 [확정·승계]
+- 수동 판정 건(`source=MANUAL`)은 COMPLETED·REVIEW(`AI_UNAVAILABLE`)로 생성되어 위 표의 `REVIEW_PENDING` → `REVIEW_DONE`을 그대로 따름. AI 결과·정책 값은 없음 (6.10) [구현 11/11]
 
 ### 3.3 상태 전이
 
@@ -123,6 +125,8 @@ RECEIVED ──▶ ANALYZING ──▶ COMPLETED (AUTO_PASS)
                        └─▶ FAILED (이후 변경 없음)
                                 │
                      재검사 요청 → 새 inspectionId로 RECEIVED (retryOf = 원래 ID)
+                     또는 수동 판정 전환 → 새 inspectionId로 COMPLETED·REVIEW(AI_UNAVAILABLE) → 작업자 PASS/FAIL
+                     (FAILED 1건당 재검사·수동 전환 중 1건만)
 ```
 
 ---
@@ -151,6 +155,7 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 | 2 | `NO_ACTIVE_POLICY` | 부품·모델·보정기 버전에 맞는 정책이 없거나 ready·active가 아님 |
 | 3 | `CALIBRATION_UNAVAILABLE` | 보정 확률이 null |
 | 4 | `ABOVE_THRESHOLD` | 보정 불량 확률 > passThreshold |
+| — | `AI_UNAVAILABLE` | AI 결과 없이 작업자가 판정하는 수동 판정 건 전용. 판정 규칙으로 정해지는 값이 아님 (6.10) [구현 11/11] |
 
 - 여러 사유가 동시에 해당하면 우선순위가 가장 높은 **하나만** 기록 [제안]. 나머지 근거는 상세의 `ai`·`policy` 블록 값으로 확인 가능
 - 예: DEFECT 예측 + 정책 없음 → `DEFECT_PREDICTED`
@@ -196,6 +201,7 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 | GET | `/inspections/{id}` | 검사 상세 (원본·Grad-CAM 접근 정보 포함) | WORKER, ADMIN |
 | POST | `/inspections/{id}/confirm` | REVIEW 최종 판정 | **WORKER** |
 | POST | `/inspections/{id}/retry` | FAILED 재검사 (새 검사 생성) | WORKER, ADMIN |
+| POST | `/inspections/{id}/manual` | FAILED를 AI 없이 작업자 판정으로 전환 (새 검사 생성) [구현 11/11] | **WORKER** |
 | POST | `/notifications/devices` | 푸시 기기 토큰 등록 | WORKER, ADMIN |
 | DELETE | `/notifications/devices/{token}` | 기기 토큰 해제 | WORKER, ADMIN |
 | GET | `/admin/models` | 모델 버전·로드 가능 여부 조회 | ADMIN |
@@ -355,7 +361,10 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
     "displayState": "REVIEW_PENDING",
     "receivedAt": "...",
     "completedAt": "...",
+    "source": "DEVICE",
     "retryOf": null,
+    "manualOf": null,
+    "followUp": null,
 
     "ai": {
       "modelVersion": "mock-door-swin-t-v1",
@@ -399,13 +408,16 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
   - 넷 다 판정에는 영향 없음
 - 이미지 접근 정보는 만료됨. 만료되면 상세를 다시 조회 [승계]. 저장소가 로컬이든 S3든 앱 쪽 계약은 같음 (TBD-01)
 - `width`·`height`는 방향 보정된 표시 기준 [승계]. 원본과 Grad-CAM의 방향을 맞추는 처리 지점은 [TBD-09]
-- FAILED이면 `ai`·`policy`는 null, `error`에 `{ "code", "message", "retryable" }`
+- FAILED이면 `ai`·`policy`는 null, `error`에 `{ "code", "message", "retryable" }`. `retryable`은 아직 재검사·수동 전환을 하지 않았을 때만 true [11/11]
+- `source` [구현 11/11]: `DEVICE`·`ADMIN`·`RETRY`·`MANUAL`. `retryOf`는 `RETRY`일 때만 원래 FAILED ID
+- `manualOf` [구현 11/11]: `MANUAL`일 때만 `{ inspectionId, inspectionNo, errorCode, errorMessage }` (원래 FAILED와 AI 실패 사유). 이때 `ai`는 null, `policy`는 `{ automationPolicyReady: false, policyVersion: null, passThreshold: null, recommendedAction: "REVIEW", reviewReason: "AI_UNAVAILABLE" }`, `images.gradcam`·`gradcamStatus`는 null
+- `followUp` [구현 11/11]: FAILED 건에 재검사·수동 전환 검사가 이미 있으면 `{ inspectionId, inspectionNo, source }` (`RETRY`/`MANUAL`). 앱은 버튼을 숨기고 그 검사로 이동
 - 앱은 passThreshold를 해석해 상태를 바꾸지 않고 백엔드가 준 상태를 표시 [승계]
 
 ### 6.6 검사 이력 `GET /inspections`
 
 쿼리: `partCode`, `displayState`, `from`, `to`, `page`(0부터), `size`(기본 20)
-응답: 6.4 항목 형식 + `finalJudgement`, `judgedBy`, `confirmedAt`
+응답: 6.4 항목 형식 + `source`, `finalJudgement`, `judgedBy`, `confirmedAt` (`source`는 11/11 추가, `MANUAL`이면 "AI 분석 없이 작업자 판정" 표시)
 
 - 작업자도 모든 검사를 조회 가능 [제안]. 합의본 표현은 "공통 업무 범위에서 조회"
 - receivedAt 최신순(같으면 id), 기간은 `from ≤ receivedAt < to`, `size` 최대 100, 없는 `partCode`는 `400 INVALID_PART_CODE` [구현 10/19]
@@ -429,7 +441,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - 권한: WORKER·ADMIN 모두 허용 [확정 10/15]
 - 저장된 원본을 다시 사용하므로 사진을 다시 올리지 않음. 새 검사의 `retryOf`에 원래 ID 기록 [제안]
 - 응답 `202`: 새 검사의 `{ inspectionId, inspectionNo, status: "RECEIVED", retryOf }`
-- 오류: `409 NOT_RETRYABLE` (FAILED가 아님), `409 ALREADY_RETRIED` (이미 재검사함) [제안]
+- 오류: `409 NOT_RETRYABLE` (FAILED가 아님), `409 ALREADY_RETRIED` (이미 재검사 **또는 수동 전환**함, 11/11 문구 "이미 재검사 또는 수동 판정으로 전환된 검사입니다.") [제안]
 - 새 검사의 `capturedAt`·`lineCode`는 원래 검사 값을 이어 쓰고, Idempotency-Key는 받지 않음 [구현 10/19]
 - 모델 확인은 접수와 같은 규칙: NOT_LOADABLE만 `422 MODEL_NOT_AVAILABLE`, UNKNOWN은 진행 (6.2) [구현 11/02]
 
@@ -477,6 +489,41 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - **activate** → `200` 정책 1건. ready, 모델 active, 정책·모델 보정기 일치를 모두 만족해야 함. 이미 적용 중이면 그대로 200(`activatedAt` 유지). 같은 모델의 다른 정책은 자동 중지 (V5: 모델당 active 1개, 보정기 무관). 동시 요청은 순서대로 처리되어 active는 1개만 남음
 - **deactivate** → `200` 정책 1건. 이미 중지 상태여도 200, `activatedAt`은 마지막 적용 시각으로 남음
 - **계정 잠금 해제** `POST /admin/users/{loginId}/unlock` → `200` `{ loginId, locked: false, failedLoginCount: 0 }`. 잠기지 않은 계정도 200(실패 횟수만 초기화), 없는 계정은 `404 USER_NOT_FOUND` [구현 11/10, TBD-10]
+
+### 6.10 수동 판정 전환 `POST /inspections/{id}/manual` [구현 11/11, 합의 11/11 김도현·홍승인]
+
+AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 직접 판정하도록 새 검사로 전환 (교수님 피드백 "AI 무응답 시 수동 판정", `docs/수동판정_결정안.md` B안)
+
+흐름 (2단계, 판정 화면 재사용)
+1. FAILED 상세에서 `POST /inspections/{failedId}/manual` (요청 본문 없음)
+2. 응답의 새 `inspectionId` 상세로 이동 → 기존 **`POST /inspections/{newId}/confirm`** 으로 PASS/FAIL (6.7 그대로, comment 선택 200자)
+
+- 권한: **WORKER만** (ADMIN·DEVICE `403 ACCESS_DENIED`). ADMIN은 상세·이력 조회
+- 대상: `status=FAILED`이면 **실패 사유와 상관없이 모두** (`AI_SERVER_ERROR`·`AI_SERVER_TIMEOUT`·`AI_REQUEST_REJECTED`·`AI_RESPONSE_INVALID`·`INTERNAL_SERVER_ERROR`)
+- **AI 상태를 확인하지 않음**: AI가 꺼져 있거나 상태를 알 수 없어도 가능. AI가 정상이어도 허용 (앱은 `/parts`의 `modelAvailable=true`면 재검사를 기본 버튼, 수동 판정을 보조 버튼으로)
+- 원본 사진을 그대로 다시 씀 (재검사와 같음). 원본이 손상·다른 부품이라 판정할 수 없으면 작업자는 전환하지 않고 재촬영·재접수
+- 원래 FAILED 기록은 바뀌지 않음. 원래 건 상세의 `followUp`에 새 검사가 표시되고 `error.retryable=false`
+- 응답 `201`
+  ```json
+  { "data": { "inspectionId": "...", "inspectionNo": "INS-000120", "partCode": "FRAME",
+              "source": "MANUAL", "status": "COMPLETED", "displayState": "REVIEW_PENDING",
+              "reviewReason": "AI_UNAVAILABLE", "receivedAt": "...",
+              "manualOf": "<원래 FAILED ID>", "manualOfInspectionNo": "INS-000110",
+              "manualOfErrorCode": "AI_SERVER_ERROR" } }
+  ```
+- 새 검사 상세(6.5): `source=MANUAL`, `manualOf`에 원래 FAILED 번호·오류 코드, `ai=null`(AI 예측·확률 표시 안 함), `policy.reviewReason=AI_UNAVAILABLE`, `images.original`만 있음. 판정 후 `judgement`에 최종 판정·`judgedBy=WORKER`·판정자·판정 시각 → AI 실패 사유와 작업자 판정이 한 화면에 남음
+- 앱 표시: `source=MANUAL` 또는 `reviewReason=AI_UNAVAILABLE`이면 "AI 분석 없이 작업자 판정"
+- 모니터링: 전환한 FAILED는 실패 건수·대기열에서 빠지고, 새 검사는 판정 전까지 확인 필요 건수·대기열(`/monitoring/queue`)에 포함. 대기열 항목의 `predictedQuality`는 null
+- 알림: 보내지 않음 (작업자가 직접 만든 검사)
+- 오류
+  | HTTP | 코드 | 상황 |
+  |---|---|---|
+  | 409 | `NOT_MANUAL_CONVERTIBLE` | FAILED가 아님 (분석 중·완료 건) |
+  | 409 | `ALREADY_RETRIED` | 이미 재검사 또는 수동 전환함. 동시에 눌러도 1건만 생성 (재검사와 같은 원본 연결 칸, DB UNIQUE) |
+  | 409 | `ORIGINAL_IMAGE_MISSING` | 원본 사진 기록이 없음 → 재촬영·재접수 |
+  | 404 | `INSPECTION_NOT_FOUND` | 없는 검사 |
+- 저장 (V6): `source=MANUAL`, `retry_of_inspection_id`=원래 FAILED, `model_id`=원래 FAILED의 모델(어떤 모델이 실패했는지), AI 결과·정책 칸은 모두 null
+- 한계: AI가 응답은 하지만 모델이 없다고 하면(`NOT_LOADABLE`) 접수 자체가 `422`라 검사 기록이 없어 수동 판정 불가. AI가 응답하지 않으면 접수 후 FAILED가 되므로 가능
 
 ---
 
@@ -709,7 +756,9 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 | 추가 | 409 | `POLICY_VERSION_DUPLICATE` | 같은 policyVersion이 이미 있음 [구현 11/02] |
 | 추가 | 404 | `IMAGE_NOT_AVAILABLE` | Grad-CAM 없음·이미지 유실 |
 | 추가 | 409 | `NOT_RETRYABLE` | FAILED가 아닌 건 재검사 |
-| 추가 | 409 | `ALREADY_RETRIED` | 이미 재검사한 FAILED 건 |
+| 추가 | 409 | `ALREADY_RETRIED` | 이미 재검사 또는 수동 전환한 FAILED 건 (11/11 문구 변경) |
+| 추가 | 409 | `NOT_MANUAL_CONVERTIBLE` | FAILED가 아닌 건 수동 전환 [구현 11/11] |
+| 추가 | 409 | `ORIGINAL_IMAGE_MISSING` | 원본 사진 기록이 없어 수동 전환 불가 [구현 11/11] |
 | 추가 | 400 | `INVALID_DEVICE_TOKEN` | 기기 토큰 형식 오류 |
 | 추가 | 502 | `AI_REQUEST_REJECTED` | AI 서버가 4xx로 요청을 거절 (검사는 FAILED, 재시도 안 함) |
 | 미사용 | 409 | `REQUEST_IN_PROGRESS` | 비동기 접수로 불필요 (6.2) [제안] |

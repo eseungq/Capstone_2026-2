@@ -11,6 +11,7 @@ import com.capstone.inspection.inspection.dto.ConfirmResponse;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse;
 import com.capstone.inspection.inspection.dto.InspectionHistoryItem;
 import com.capstone.inspection.inspection.dto.InspectionReceiptResponse;
+import com.capstone.inspection.inspection.dto.ManualConversionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -45,6 +46,7 @@ public class InspectionController {
     private final InspectionQueryService queryService;
     private final InspectionConfirmService confirmService;
     private final InspectionRetryService retryService;
+    private final InspectionManualService manualService;
 
     @Operation(summary = "사진 접수", description = "DEVICE(시연용 ADMIN). 원본 저장 후 202와 inspectionId를 바로 반환하고 분석은 비동기로 진행. "
             + "같은 Idempotency-Key 재전송이면 기존 검사를 200으로 반환")
@@ -98,6 +100,18 @@ public class InspectionController {
                                                                         @PathVariable String inspectionId) {
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(ApiResponse.of(InspectionReceiptResponse.of(retryService.retry(user, inspectionId))));
+    }
+
+    @Operation(summary = "수동 판정 전환", description = "WORKER만. AI 결과가 없는 FAILED 건(실패 사유 무관, AI 상태 확인 안 함)을 "
+            + "원본 사진을 재사용한 새 검사(source=MANUAL, REVIEW_PENDING, reviewReason=AI_UNAVAILABLE)로 만들어 201 반환. "
+            + "판정은 새 검사에 기존 confirm으로. 원래 FAILED 기록은 그대로. FAILED가 아니면 409 NOT_MANUAL_CONVERTIBLE, "
+            + "이미 재검사·수동 전환했으면 409 ALREADY_RETRIED, 원본 사진 기록이 없으면 409 ORIGINAL_IMAGE_MISSING")
+    @PostMapping("/{inspectionId}/manual")
+    public ResponseEntity<ApiResponse<ManualConversionResponse>> manual(@AuthenticationPrincipal AuthUser user,
+                                                                        @PathVariable String inspectionId) {
+        InspectionManualService.Result r = manualService.convert(user, inspectionId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.of(ManualConversionResponse.of(r.manual(), r.failed())));
     }
 
     // 시각 파라미터: 오프셋 포함 ISO-8601 (예: 2026-10-16T09:00:00+09:00)

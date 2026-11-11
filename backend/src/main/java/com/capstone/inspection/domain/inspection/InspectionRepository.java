@@ -23,6 +23,9 @@ public interface InspectionRepository extends JpaRepository<Inspection, String>,
     // 이미 재검사한 FAILED인지
     boolean existsByRetryOfInspectionId(String retryOfInspectionId);
 
+    // FAILED 원본의 후속 검사 (재검사 또는 수동 판정, 최대 1건)
+    Optional<Inspection> findByRetryOfInspectionId(String retryOfInspectionId);
+
     // 서버 재시작 시 남은 건 정리
     List<Inspection> findByStatus(InspectionStatus status);
 

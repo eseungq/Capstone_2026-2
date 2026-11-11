@@ -51,6 +51,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, API + "/inspections").hasAnyRole("DEVICE", "ADMIN")
                         // 작업자 확인: WORKER만 (ADMIN은 조회만)
                         .requestMatchers(HttpMethod.POST, API + "/inspections/*/confirm").hasRole("WORKER")
+                        .requestMatchers(HttpMethod.POST, API + "/inspections/*/manual").hasRole("WORKER")
                         // FAILED 재검사: WORKER·ADMIN
                         .requestMatchers(HttpMethod.POST, API + "/inspections/*/retry").hasAnyRole("WORKER", "ADMIN")
                         // 조회: WORKER·ADMIN

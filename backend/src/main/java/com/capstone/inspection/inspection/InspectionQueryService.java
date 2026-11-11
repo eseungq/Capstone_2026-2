@@ -9,6 +9,7 @@ import com.capstone.inspection.domain.inspection.ImageStorageRepository;
 import com.capstone.inspection.domain.inspection.ImageType;
 import com.capstone.inspection.domain.inspection.Inspection;
 import com.capstone.inspection.domain.inspection.InspectionRepository;
+import com.capstone.inspection.domain.inspection.InspectionSource;
 import com.capstone.inspection.domain.inspection.InspectionStatus;
 import com.capstone.inspection.domain.inspection.JudgedBy;
 import com.capstone.inspection.domain.inspection.WorkerConfirmation;
@@ -18,6 +19,8 @@ import com.capstone.inspection.domain.part.PartRepository;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse;
 import com.capstone.inspection.inspection.dto.InspectionHistoryItem;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse.Ai;
+import com.capstone.inspection.inspection.dto.InspectionDetailResponse.FollowUp;
+import com.capstone.inspection.inspection.dto.InspectionDetailResponse.ManualOf;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse.Image;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse.Images;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse.JudgementBlock;
@@ -59,7 +62,7 @@ public class InspectionQueryService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.INSPECTION_NOT_FOUND));
 
         boolean completed = i.getStatus() == InspectionStatus.COMPLETED;
-        Ai ai = completed ? new Ai(i.getModel().getModelVersion(), i.getCalibratorVersion(), i.getPredictedQuality(),
+        Ai ai = completed && !i.isManual() ? new Ai(i.getModel().getModelVersion(), i.getCalibratorVersion(), i.getPredictedQuality(),
                 i.getRawDefectProbability(), i.getCalibratedDefectProbability(), i.getInferenceTimeMs()) : null;
         Policy policy = completed ? new Policy(i.isAutomationPolicyReady(),
                 i.getPolicy() != null ? i.getPolicy().getPolicyVersion() : null, i.getPassThresholdApplied(),
@@ -74,13 +77,29 @@ public class InspectionQueryService {
         if (i.getStatus() == InspectionStatus.FAILED) {
             ErrorCode code = ErrorCode.fromStored(i.getErrorCode());
             // 앱에는 오류 코드와 기본 문구만 전달 (AI 상세는 error_detail에만 보관)
-            error = new InspectionDetailResponse.Error(code.name(), code.getDefaultMessage(), true);
+            // retryable: 아직 재검사·수동 전환을 하지 않았을 때만 true
+            error = new InspectionDetailResponse.Error(code.name(), code.getDefaultMessage(),
+                    !inspectionRepository.existsByRetryOfInspectionId(i.getId()));
         }
+
+        // 수동 판정 건: 원래 FAILED와 AI 실패 사유를 함께 보여 줌 (AI 실패 사유·최종 판정·판정 시각을 한 화면에)
+        ManualOf manualOf = null;
+        if (i.isManual()) {
+            Inspection origin = inspectionRepository.findById(i.getRetryOfInspectionId()).orElseThrow();
+            ErrorCode code = ErrorCode.fromStored(origin.getErrorCode());
+            manualOf = new ManualOf(origin.getId(), origin.getInspectionNo(), code.name(), code.getDefaultMessage());
+        }
+        // FAILED 원본: 이미 재검사·수동 전환한 검사가 있으면 앱이 버튼을 숨기고 그 검사로 이동
+        FollowUp followUp = i.getStatus() == InspectionStatus.FAILED
+                ? inspectionRepository.findByRetryOfInspectionId(i.getId())
+                    .map(f -> new FollowUp(f.getId(), f.getInspectionNo(), f.getSource())).orElse(null)
+                : null;
+        String retryOf = i.getSource() == InspectionSource.RETRY ? i.getRetryOfInspectionId() : null;
 
         return new InspectionDetailResponse(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(),
                 i.getLineCode(), i.getStatus(), DisplayState.of(i), Times.toOffset(i.getReceivedAt()),
-                Times.toOffset(i.getCompletedAt()), i.getRetryOfInspectionId(), ai, policy, judgement,
-                images(i), error);
+                Times.toOffset(i.getCompletedAt()), i.getSource(), retryOf, manualOf, followUp, ai, policy,
+                judgement, images(i), error);
     }
 
     // 검사 이력 (계약 v4 6.6). 작업자도 전체 검사 조회. 기간은 receivedAt 기준 from ≤ receivedAt < to
@@ -120,7 +139,7 @@ public class InspectionQueryService {
                 : confirmationRepository.findByInspectionIds(reviewedIds).stream()
                 .collect(Collectors.toMap(c -> c.getInspection().getId(), WorkerConfirmation::getConfirmedAt));
         return inspections.stream().map(i -> new InspectionHistoryItem(i.getId(), i.getInspectionNo(),
-                i.getPart().getPartCode(), DisplayState.of(i), i.getPredictedQuality(), i.getReviewReason(),
+                i.getPart().getPartCode(), i.getSource(), DisplayState.of(i), i.getPredictedQuality(), i.getReviewReason(),
                 errorCodeOf(i), Times.toOffset(i.getReceivedAt()), urls.get(i.getId()), i.getFinalJudgement(),
                 i.getJudgedBy(), Times.toOffset(confirmedAt.get(i.getId())))).toList();
     }

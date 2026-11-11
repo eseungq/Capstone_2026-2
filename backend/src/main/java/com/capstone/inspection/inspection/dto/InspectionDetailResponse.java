@@ -1,6 +1,7 @@
 package com.capstone.inspection.inspection.dto;
 
 import com.capstone.inspection.domain.inspection.GradcamStatus;
+import com.capstone.inspection.domain.inspection.InspectionSource;
 import com.capstone.inspection.domain.inspection.InspectionStatus;
 import com.capstone.inspection.domain.inspection.JudgedBy;
 import com.capstone.inspection.domain.inspection.Judgement;
@@ -20,12 +21,21 @@ public record InspectionDetailResponse(String inspectionId,
                                        DisplayState displayState,
                                        OffsetDateTime receivedAt,
                                        OffsetDateTime completedAt,
-                                       String retryOf,
-                                       Ai ai,                 // FAILED·분석 중이면 null
+                                       InspectionSource source,  // DEVICE·ADMIN·RETRY·MANUAL (V6 추가)
+                                       String retryOf,        // 재검사(RETRY)면 원래 FAILED ID
+                                       ManualOf manualOf,     // 수동 판정(MANUAL)이면 원래 FAILED와 AI 실패 사유
+                                       FollowUp followUp,     // FAILED에 재검사·수동 전환이 이미 있으면 그 검사
+                                       Ai ai,                 // FAILED·분석 중·수동 판정이면 null
                                        Policy policy,         // FAILED·분석 중이면 null
                                        JudgementBlock judgement,
                                        Images images,
                                        Error error) {         // FAILED일 때만
+
+    public record ManualOf(String inspectionId, String inspectionNo, String errorCode, String errorMessage) {
+    }
+
+    public record FollowUp(String inspectionId, String inspectionNo, InspectionSource source) {
+    }
 
     public record Ai(String modelVersion, String calibratorVersion, PredictedQuality predictedQuality,
                      Double rawDefectProbability, Double calibratedDefectProbability, Integer inferenceTimeMs) {

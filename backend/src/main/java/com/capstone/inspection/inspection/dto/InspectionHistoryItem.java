@@ -1,5 +1,6 @@
 package com.capstone.inspection.inspection.dto;
 
+import com.capstone.inspection.domain.inspection.InspectionSource;
 import com.capstone.inspection.domain.inspection.JudgedBy;
 import com.capstone.inspection.domain.inspection.Judgement;
 import com.capstone.inspection.domain.inspection.PredictedQuality;
@@ -12,6 +13,7 @@ import java.time.OffsetDateTime;
 public record InspectionHistoryItem(String inspectionId,
                                     String inspectionNo,
                                     String partCode,
+                                    InspectionSource source,     // MANUAL이면 "AI 분석 없이 작업자 판정" (V6 추가)
                                     DisplayState displayState,
                                     PredictedQuality predictedQuality,
                                     ReviewReason reviewReason,

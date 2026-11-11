@@ -38,7 +38,9 @@ public enum ErrorCode {
     POLICY_NOT_READY(HttpStatus.CONFLICT, "사용할 수 없는 정책 또는 모델입니다.", false),
     POLICY_VERSION_DUPLICATE(HttpStatus.CONFLICT, "이미 있는 정책 버전입니다.", false),
     NOT_RETRYABLE(HttpStatus.CONFLICT, "분석 실패(FAILED) 검사만 재검사할 수 있습니다.", false),
-    ALREADY_RETRIED(HttpStatus.CONFLICT, "이미 재검사한 검사입니다.", false),
+    ALREADY_RETRIED(HttpStatus.CONFLICT, "이미 재검사 또는 수동 판정으로 전환된 검사입니다.", false),
+    NOT_MANUAL_CONVERTIBLE(HttpStatus.CONFLICT, "분석 실패(FAILED) 검사만 수동 판정으로 전환할 수 있습니다.", false),
+    ORIGINAL_IMAGE_MISSING(HttpStatus.CONFLICT, "원본 사진이 없어 수동 판정할 수 없습니다. 다시 촬영해 접수해 주세요.", false),
 
     // 422 모델 없음
     MODEL_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "해당 부품의 사용 가능한 모델이 없습니다.", false),
