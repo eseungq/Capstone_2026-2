@@ -138,7 +138,8 @@ export default function PolicyLiveScreen() {
       validationText = errorText(cause);
     }
   }
-  const canWrite = access === 'admin' && !loading && !refreshing && writing === null;
+  // 목록 재조회가 실패했다면 오래된 정책 정보로 POST하지 않습니다.
+  const canWrite = access === 'admin' && !loading && !refreshing && writing === null && error === null;
 
   /** 다른 관리자의 동시 변경을 확인해 이전 화면 상태로 POST하지 않습니다. */
   const assertLatest = async (expectedActive: AdminPolicyV4 | null): Promise<AdminPolicyV4[]> => {
