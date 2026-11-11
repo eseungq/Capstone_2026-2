@@ -112,15 +112,18 @@ export default function PolicyLiveScreen() {
 
   const active = policies.find((item) => item.active) ?? null;
   const root = active ? rootPolicyForV4(active, policies) : null;
+  const currentSaved = savedPolicy ? (policies.find((p) => p.policyId === savedPolicy.policyId) ?? savedPolicy) : null;
   const activeHasBounds = active?.ready === true &&
     active.validatedMin != null && active.validatedMax != null;
   let validInput = false;
   let validationText = '활성 정책과 서버 검증 범위를 확인한 후 조정할 수 있습니다.';
   if (active && activeHasBounds) {
     try {
-      parsePolicyPercentInputV4(percentInput, active);
-      validInput = true;
-      validationText = '검증 범위 안의 값입니다. 저장 시 새 비활성 정책 버전이 생성됩니다.';
+      const candidate = parsePolicyPercentInputV4(percentInput, active);
+      validInput = active.passThreshold == null || Math.abs(candidate - active.passThreshold) > 0.0000005;
+      validationText = validInput
+        ? '검증 범위 안의 값입니다. 저장 시 새 비활성 정책 버전이 생성됩니다.'
+        : '현재 적용 중인 기준치와 같습니다. 다른 값을 입력해 주세요.';
     } catch (cause) {
       validationText = errorText(cause);
     }
@@ -197,7 +200,7 @@ export default function PolicyLiveScreen() {
               throw new Error('현재 활성 정책과 모델이 다른 버전은 이 화면에서 적용할 수 없습니다.');
             }
             const result = await service.activate(current);
-            setActionNotice(`${result.policyVersion} 적용 요청 성공. 현재 활성 상태를 다시 확인했습니다.`);
+            setActionNotice(`${result.policyVersion} 정책 적용 응답을 받았습니다. 아래 서버 목록에서 활성 상태를 확인해 주세요.`);
             await load(false);
           });
         } },
@@ -273,14 +276,16 @@ export default function PolicyLiveScreen() {
               <Text style={s.muted}>저장 직후 새 정책은 비활성이며, 이전 활성 정책은 그대로 유지됩니다.</Text>
             </Card>
 
-            {savedPolicy && (
+            {currentSaved && (
               <Card title="3. 마지막으로 저장한 새 버전">
-                <Row label="정책 버전" value={savedPolicy.policyVersion} />
-                <Row label="새 기준치" value={percentageTextV4(savedPolicy.passThreshold)} />
-                <Row label="저장 직후" value="비활성 (별도 적용 필요)" />
-                <Button title="새 버전 적용 · 실서버"
-                  onPress={() => confirmActivate(policies.find((p) => p.policyId === savedPolicy.policyId) ?? savedPolicy)}
-                  disabled={!canWrite || (policies.find((p) => p.policyId === savedPolicy.policyId)?.active ?? false)} />
+                <Row label="정책 버전" value={currentSaved.policyVersion} />
+                <Row label="새 기준치" value={percentageTextV4(currentSaved.passThreshold)} />
+                <Row label="현재 상태" value={currentSaved.active ? '적용 중' : '비활성 (별도 적용 필요)'} />
+                {!currentSaved.active && (
+                  <Button title="새 버전 적용 · 실서버"
+                    onPress={() => confirmActivate(currentSaved)}
+                    disabled={!canWrite || !currentSaved.ready} />
+                )}
               </Card>
             )}
 
