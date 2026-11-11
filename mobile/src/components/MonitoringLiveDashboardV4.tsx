@@ -25,7 +25,7 @@ function secondsText(receivedAt: string, detectedAtMs: number): string {
     : `${(elapsed / 1000).toFixed(1)}초`;
 }
 
-const MONITORED_PARTS = ['DOOR', 'FRAME'] as const;
+const MONITORED_PARTS = ['DOOR', 'FRAME', 'COWL_COVER'] as const;
 type MonitoredPart = (typeof MONITORED_PARTS)[number];
 
 export default function MonitoringLiveDashboardV4() {
@@ -36,6 +36,7 @@ export default function MonitoringLiveDashboardV4() {
   const [observationsByPart, setObservationsByPart] = useState(() => ({
     DOOR: createMonitoringObservationStateV4(),
     FRAME: createMonitoringObservationStateV4(),
+    COWL_COVER: createMonitoringObservationStateV4(),
   }));
   const [visibleQueueCount, setVisibleQueueCount] = useState(20);
 
@@ -43,8 +44,9 @@ export default function MonitoringLiveDashboardV4() {
     setObservationsByPart((previous) => {
       const door = advanceMonitoringObservationV4(previous.DOOR, snapshot, 'DOOR');
       const frame = advanceMonitoringObservationV4(previous.FRAME, snapshot, 'FRAME');
-      return door === previous.DOOR && frame === previous.FRAME
-        ? previous : { DOOR: door, FRAME: frame };
+      const cowlCover = advanceMonitoringObservationV4(previous.COWL_COVER, snapshot, 'COWL_COVER');
+      return door === previous.DOOR && frame === previous.FRAME && cowlCover === previous.COWL_COVER
+        ? previous : { DOOR: door, FRAME: frame, COWL_COVER: cowlCover };
     });
   }, [snapshot]);
 
@@ -252,8 +254,8 @@ export default function MonitoringLiveDashboardV4() {
 const styles = StyleSheet.create({
   container: { gap: 12, paddingBottom: 16 },
   card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 14, padding: 16, gap: 10 },
-  partSelector: { flexDirection: 'row', gap: 10 },
-  partButton: { flex: 1, paddingVertical: 12, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, alignItems: 'center', backgroundColor: '#F8FAFC' },
+  partSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  partButton: { flexGrow: 1, flexBasis: '40%', minWidth: 120, paddingVertical: 12, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, alignItems: 'center', backgroundColor: '#F8FAFC' },
   partButtonActive: { borderColor: '#2054D8', backgroundColor: '#2054D8' },
   partButtonText: { fontSize: 14, fontWeight: '700', color: '#475569' },
   partButtonTextActive: { color: '#FFFFFF' },
