@@ -7,7 +7,7 @@ import type { DisplayStateV4, FinalJudgementV4, PredictedQualityV4 } from './typ
 
 export type WriteRoleV4 = 'WORKER' | 'ADMIN' | 'DEVICE';
 export type WriteSourceV4 = 'CONTRACT_EXAMPLE' | 'SERVER';
-export type WriteActionV4 = 'confirm' | 'retry';
+export type WriteActionV4 = 'confirm' | 'retry' | 'manual';
 export interface WriteInspectionContextV4 {
   inspectionId: string; // API 경로: UUID (INS-000006 X)
   displayState: DisplayStateV4;
@@ -22,7 +22,7 @@ export interface ConfirmInputV4 {
 export interface ConfirmReplyV4 {
   inspectionId: string;
   inspectionNo: string;
-  predictedQuality: PredictedQualityV4;
+  predictedQuality: PredictedQualityV4 | null; // source=MANUAL이면 AI 결과가 없음
   recommendedAction: 'REVIEW';
   finalJudgement: FinalJudgementV4;
   judgedBy: 'WORKER';
@@ -34,6 +34,19 @@ export interface RetryReplyV4 {
   inspectionNo: string; // 신규 표시 번호
   status: 'RECEIVED';
   retryOf: string; // 원래 FAILED UUID
+}
+export interface ManualReplyV4 {
+  inspectionId: string; // 새 수동 검사의 UUID
+  inspectionNo: string;
+  partCode: string;
+  source: 'MANUAL';
+  status: 'COMPLETED';
+  displayState: 'REVIEW_PENDING';
+  reviewReason: 'AI_UNAVAILABLE';
+  receivedAt: string;
+  manualOf: string; // 원본 FAILED UUID
+  manualOfInspectionNo: string;
+  manualOfErrorCode: string;
 }
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -76,14 +89,22 @@ export function ensureRetryAllowedV4(role: WriteRoleV4, inspection: WriteInspect
   assertWriteUuidV4(inspection.inspectionId);
   if (role !== 'WORKER' && role !== 'ADMIN') fail('ACCESS_DENIED', '재검사는 WORKER 또는 ADMIN만 요청할 수 있습니다.');
   if (inspection.displayState !== 'FAILED') fail('NOT_RETRYABLE', 'FAILED 검사만 재검사할 수 있습니다.');
-  if (inspection.retriedBy) fail('ALREADY_RETRIED', '이미 새 재검사가 접수된 검사입니다.');
+  if (inspection.retriedBy) fail('ALREADY_RETRIED', '이미 재검사 또는 수동 판정으로 전환된 검사입니다.');
 }
+/** 수동 판정은 AI 서버 가용성과 관계없이 WORKER에게만 허용됩니다. */
+export function ensureManualAllowedV4(role: WriteRoleV4, inspection: WriteInspectionContextV4): void {
+  assertWriteUuidV4(inspection.inspectionId);
+  if (role !== 'WORKER') fail('ACCESS_DENIED', '수동 판정 전환은 WORKER만 요청할 수 있습니다.');
+  if (inspection.displayState !== 'FAILED') fail('NOT_MANUAL_CONVERTIBLE', 'FAILED 검사만 수동 판정으로 전환할 수 있습니다.');
+  if (inspection.retriedBy) fail('ALREADY_RETRIED', '이미 재검사 또는 수동 판정으로 전환된 검사입니다.');
+}
+
 /** 승인된 계약: 응답은 authorizedRequest가 {data}를 해제한 객체. */
 export function decodeConfirmReplyV4(raw: unknown, originId: string, sent: FinalJudgementV4): ConfirmReplyV4 {
   assertWriteUuidV4(originId);
   if (!object(raw) || !text(raw.inspectionId) || !text(raw.inspectionNo) ||
       !text(raw.confirmedBy) || !iso(raw.confirmedAt) || !noPattern.test(String(raw.inspectionNo)) ||
-      (raw.predictedQuality !== 'GOOD' && raw.predictedQuality !== 'DEFECT') ||
+      (raw.predictedQuality != null && raw.predictedQuality !== 'GOOD' && raw.predictedQuality !== 'DEFECT') ||
       raw.recommendedAction !== 'REVIEW' || (raw.finalJudgement !== 'PASS' && raw.finalJudgement !== 'FAIL') ||
       raw.judgedBy !== 'WORKER') {
     return fail('INVALID_CONFIRM_RESPONSE', '판정 응답의 필수 필드/상태가 계약과 다릅니다.');
@@ -108,13 +129,35 @@ export function decodeRetryReplyV4(raw: unknown, originId: string): RetryReplyV4
   return raw as unknown as RetryReplyV4;
 }
 
+/** 원본 FAILED는 변경하지 않고 새 수동 검사를 201로 돌려받습니다. */
+export function decodeManualReplyV4(raw: unknown, originId: string): ManualReplyV4 {
+  assertWriteUuidV4(originId);
+  if (!object(raw) || !text(raw.inspectionId) || !text(raw.inspectionNo) ||
+      !noPattern.test(raw.inspectionNo) || !text(raw.partCode) ||
+      raw.source !== 'MANUAL' || raw.status !== 'COMPLETED' ||
+      raw.displayState !== 'REVIEW_PENDING' || raw.reviewReason !== 'AI_UNAVAILABLE' ||
+      !iso(raw.receivedAt) || !text(raw.manualOf) ||
+      !text(raw.manualOfInspectionNo) || !noPattern.test(raw.manualOfInspectionNo) ||
+      !text(raw.manualOfErrorCode)) {
+    return fail('INVALID_MANUAL_RESPONSE', '수동 전환 응답의 필수 필드/상태가 계약과 다릅니다.');
+  }
+  assertWriteUuidV4(raw.inspectionId);
+  assertWriteUuidV4(raw.manualOf);
+  if (raw.inspectionId === originId || raw.manualOf !== originId) {
+    return fail('MANUAL_RESPONSE_MISMATCH', '신규 검사 UUID와 원본 연결이 올바르지 않습니다.');
+  }
+  return raw as unknown as ManualReplyV4;
+}
+
 /** 문자열만 사용자 표시. 토큰이나 민감한 요청 본문을 포함하지 않음. 서버 traceId는 별도 전달 가능. */
 export function writeErrorLabelV4(code: string): string {
   const labels: Record<string, string> = {
     ACCESS_DENIED: '접근 권한이 없습니다.', NOT_REVIEWABLE: '확인 대상 검사가 아닙니다. 최신 상태를 다시 조회해 주세요.',
     ALREADY_CONFIRMED: '이미 다른 판정으로 확정됐습니다. 최신 결과를 조회해 주세요.',
     NOT_RETRYABLE: '재검사 가능한 FAILED 상태가 아닙니다.',
-    ALREADY_RETRIED: '이미 재검사가 접수됐습니다. 검사 이력을 새로 조회해 주세요.',
+    ALREADY_RETRIED: '이미 재검사 또는 수동 판정으로 전환된 검사입니다. 새 검사로 이동해 주세요.',
+    NOT_MANUAL_CONVERTIBLE: 'FAILED 상태가 아니므로 수동 판정으로 전환할 수 없습니다.',
+    ORIGINAL_IMAGE_MISSING: '원본 사진이 없어 수동 판정으로 전환할 수 없습니다. 재촬영 후 새 검사로 접수해 주세요.',
     REQUEST_IN_PROGRESS_LOCAL: '처리 중입니다. 중복 제출하지 마세요.',
     NETWORK_ERROR: '서버 연결을 확인한 뒤 검사 상세에서 처리 여부를 먼저 확인해 주세요.',
     NOT_LOGGED_IN: '로그인이 필요합니다.',
