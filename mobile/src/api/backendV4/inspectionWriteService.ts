@@ -4,11 +4,12 @@
  * API 모드는 createAuthV4().authorizedRequest 와 호환. 외부 연결은 명시적 모드일 때만.
  */
 import {
-  decodeConfirmReplyV4, decodeRetryReplyV4, ensureConfirmAllowedV4, ensureRetryAllowedV4,
+  decodeConfirmReplyV4, decodeManualReplyV4, decodeRetryReplyV4,
+  ensureConfirmAllowedV4, ensureManualAllowedV4, ensureRetryAllowedV4,
   makeConfirmBodyV4, makeWritePathV4, WriteV4ValidationError,
 } from './inspectionWriteCore';
 import type {
-  ConfirmInputV4, ConfirmReplyV4, RetryReplyV4, WriteInspectionContextV4, WriteRoleV4, WriteSourceV4,
+  ConfirmInputV4, ConfirmReplyV4, ManualReplyV4, RetryReplyV4, WriteInspectionContextV4, WriteRoleV4, WriteSourceV4,
 } from './inspectionWriteCore';
 import { writeExampleConfirmReplyV4, writeExampleContextV4, writeExampleRetryReplyV4, writeExampleIdsV4 } from './inspectionWriteExamples';
 
@@ -65,7 +66,7 @@ export function createInspectionWriteServiceV4(config: InspectionWriteConfigV4) 
 
   async function retry(origin: WriteInspectionContextV4): Promise<WriteResultV4<RetryReplyV4>> {
     const path = makeWritePathV4(origin.inspectionId, 'retry');
-    return once(`retry:${origin.inspectionId}`, async () => {
+    return once(`followUp:${origin.inspectionId}`, async () => {
       const current = config.mode === 'contract-example' ? viewForDemo(origin) : origin;
       ensureRetryAllowedV4(config.role, current);
       if (config.mode === 'contract-example') {
@@ -79,5 +80,17 @@ export function createInspectionWriteServiceV4(config: InspectionWriteConfigV4) 
       return { source, value: decodeRetryReplyV4(raw, origin.inspectionId) };
     });
   }
-  return { source, confirm, retry };
+  async function manual(origin: WriteInspectionContextV4): Promise<WriteResultV4<ManualReplyV4>> {
+    const path = makeWritePathV4(origin.inspectionId, 'manual');
+    return once(`followUp:${origin.inspectionId}`, async () => {
+      if (config.mode !== 'api') {
+        throw new WriteV4ValidationError('DEMO_NOT_SUPPORTED', '수동 전환은 실서버 모드에서만 실행할 수 있습니다.');
+      }
+      ensureManualAllowedV4(config.role, origin);
+      // 본문을 보내지 않으며, 응답의 원본 UUID/생성 출처/상태를 검증합니다.
+      const raw = await config.transport.authorizedRequest<unknown>(path, { method: 'POST' });
+      return { source, value: decodeManualReplyV4(raw, origin.inspectionId) };
+    });
+  }
+  return { source, confirm, retry, manual };
 }
