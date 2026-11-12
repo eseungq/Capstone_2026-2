@@ -81,3 +81,19 @@ test('Mock app screens and README contain updated labels, not previous 30/35/32%
   assert.match(screen, /SYSTEM 최종 PASS/);
   assert.match(screen, /실제 e02/);
 });
+
+
+test('Mock WORKER entry is distinct from ADMIN; policy screens guard WORKER role', () => {
+  const login = fs.readFileSync(path.join(root, 'src/app/index.tsx'), 'utf8');
+  const settings = fs.readFileSync(path.join(root, 'src/app/settings.tsx'), 'utf8');
+  const policy = fs.readFileSync(path.join(root, 'src/app/policy.tsx'), 'utf8');
+  const mockPolicy = fs.readFileSync(path.join(root, 'src/app/policy-assumed.tsx'), 'utf8');
+
+  assert.match(login, /현장 작업자 시연으로 이동 · Mock/);
+  assert.match(login, /handleWorkerPreview/);
+  assert.match(login, /role: 'WORKER', mode: 'mock'/);
+  assert.match(login, /role: 'ADMIN'/);
+  assert.match(settings, /isAdmin\s*&&\s*mode\s*===\s*'mock'/);
+  assert.match(policy, /role\s*!==\s*'ADMIN'/);
+  assert.match(mockPolicy, /role\s*!==\s*'ADMIN'/);
+});
