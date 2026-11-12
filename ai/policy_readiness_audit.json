@@ -223,6 +223,69 @@
       "frozenPolicy": "fea7d1256bce7d5ee6ffc400f19f17bb591cadb831477883e7b202d4fc4150e0",
       "offlineReport": "3bbec4ae98396a530cf12c3117aed2d1f527d55613b0f7eecda8448ba6dd682a",
       "thresholdSensitivity": "c53f4feadb5946b34228f0e7887519ef7ce00cde7ea82f1e94803ba31b88193d"
+    },
+    "supersededForMockDemoBy": "capstoneGpuDemoDecision"
+  },
+  "capstoneGpuDemoDecision": {
+    "decisionDate": "2026-11-12",
+    "partCode": "DOOR",
+    "scope": "capstone_mock_demo_only",
+    "status": "selected",
+    "modelVersion": "door-swin-tiny-e02-28a2dd1cb40b-dev",
+    "checkpointSHA256": "28a2dd1cb40b4bbecf3fc4e34dfc5354179dcb31c0c37297f1d3ee3bfe3d985e",
+    "inference": {
+      "device": "NVIDIA GB10",
+      "precision": "FP32",
+      "inputSize": [
+        224,
+        224
+      ],
+      "addedPhotos": 199,
+      "referencePhotosWithinOriginalGpuTolerance": 59,
+      "reusedEvaluationPhotos": 968
+    },
+    "offlineCalibration": {
+      "method": "temperature_scaling",
+      "temperature": 1.1173850605473976,
+      "fitPhotos": 632,
+      "policyDevelopmentPhotos": 619
+    },
+    "demoPolicy": {
+      "passThreshold": 0.0092,
+      "validatedMin": 0.0084,
+      "validatedMax": 0.0092,
+      "mockStartingThreshold": 0.0084,
+      "mockGoodCalibratedDefectProbability": 0.0088
+    },
+    "evaluation": {
+      "source": "AI-Hub",
+      "unit": "photo_group",
+      "photos": 1167,
+      "groups": 1159,
+      "unreviewedAdditionalPhotos": 176,
+      "normalGroups": 566,
+      "defectGroups": 593,
+      "thresholds": [
+        {
+          "passThreshold": 0.0084,
+          "normalAutoPass": 189,
+          "defectAutoPass": 0
+        },
+        {
+          "passThreshold": 0.0092,
+          "normalAutoPass": 208,
+          "defectAutoPass": 0
+        }
+      ],
+      "independentPhysicalPartValidation": false
+    },
+    "liveService": {
+      "port": 8771,
+      "modelListHttpStatusAfterRestore": 200,
+      "loadable": true,
+      "calibratorVersion": null,
+      "calibratedDefectProbability": null,
+      "action": "REVIEW"
     }
   }
 }
