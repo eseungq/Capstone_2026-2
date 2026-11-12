@@ -213,6 +213,36 @@ class PolicyIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("도어 시연 11/12 (V6_1): 0.84%에서 보정 0.0088 REVIEW → 범위 밖 0.93% 400 → 0.92% 저장만 하면 REVIEW → 적용 후 AUTO_PASS")
+    void doorDemo0084To0092() throws Exception {
+        ai = r -> response(r, "GOOD", 0.04127, 0.0088);
+        String demoId = jdbc.queryForObject(
+                "select id from automation_policy where policy_version = 'example-door-demo-0084'", String.class);
+        assertThat(activate(demoId).getResponse().getStatus()).isEqualTo(200);
+        assertThat(activeVersions()).containsExactly("example-door-demo-0084");
+
+        JsonNode first = submitAndWait();
+        assertThat(first.at("/policy/reviewReason").asText()).isEqualTo("ABOVE_THRESHOLD");
+        assertThat(first.at("/policy/passThreshold").asDouble()).isEqualTo(0.0084);
+
+        assertThat(errorCode(threshold(demoId, 0.0093))).isEqualTo("POLICY_THRESHOLD_OUT_OF_RANGE");
+        JsonNode adjusted = json(threshold(demoId, 0.0092)).path("data");
+        assertThat(adjusted.path("policyVersion").asText()).startsWith("example-door-demo-0084-t");
+        assertThat(adjusted.path("active").asBoolean()).isFalse();
+        assertThat(submitAndWait().at("/policy/reviewReason").asText()).isEqualTo("ABOVE_THRESHOLD");
+
+        assertThat(activate(adjusted.path("policyId").asText()).getResponse().getStatus()).isEqualTo(200);
+        JsonNode next = submitAndWait();
+        assertThat(next.path("displayState").asText()).isEqualTo("AUTO_PASS");
+        assertThat(next.at("/policy/passThreshold").asDouble()).isEqualTo(0.0092);
+        assertThat(next.at("/judgement/finalJudgement").asText()).isEqualTo("PASS");
+        assertThat(next.at("/judgement/judgedBy").asText()).isEqualTo("SYSTEM");
+        Double past = jdbc.queryForObject("select pass_threshold_applied from inspection where id = ?", Double.class,
+                first.path("inspectionId").asText());
+        assertThat(past).isEqualTo(0.0084);
+    }
+
+    @Test
     @DisplayName("목록 필터: partCode·active, 없는 부품 400")
     void listFilter() throws Exception {
         JsonNode active = json(call(get(POLICIES).param("partCode", "DOOR").param("active", "true"), admin())).path("data");

@@ -25,6 +25,7 @@ uvicorn main:app --port 8090
 | GOOD_DEMO_BOUNDARY | GOOD, 보정 0.30 | 0.05 기준: REVIEW (ABOVE_THRESHOLD) / **시연 30% 기준: AUTO_PASS** (경계 포함) |
 | GOOD_DEMO_ABOVE | GOOD, 보정 0.35 | REVIEW (ABOVE_THRESHOLD). 시연 30% 기준에서도 REVIEW, 35%로 조정하면 AUTO_PASS (경계) |
 | GOOD_DEMO_ADJUST | GOOD, 보정 0.32 | **관리자 조정 시연**: 시연 30% 기준에서 REVIEW (ABOVE_THRESHOLD), 35%로 조정·적용 후 새 접수는 AUTO_PASS |
+| GOOD_DEMO_0088 | GOOD, 보정 0.0088 | **관리자 조정 시연 (11/12 값)**: 0.84% 기준(`example-door-demo-0084`)에서 REVIEW (ABOVE_THRESHOLD), 0.92%로 조정·적용 후 새 접수는 AUTO_PASS |
 | DEFECT_GRADCAM | DEFECT, Grad-CAM PNG (`status: GENERATED`) | COMPLETED · REVIEW (DEFECT_PREDICTED), gradcamStatus GENERATED |
 | DEFECT_GRADCAM_FAIL | DEFECT, Grad-CAM null | COMPLETED · REVIEW (DEFECT_PREDICTED), gradcamStatus FAILED |
 | DEFECT_NO_ACTIVATION | DEFECT, 0맵 (`status: NO_ACTIVATION`, `mapType: ZERO_MAP`, 이미지 null) | COMPLETED · REVIEW (DEFECT_PREDICTED), gradcamStatus NO_ACTIVATION, CAM 이미지 없음 |
@@ -56,4 +57,4 @@ curl localhost:8090/mock/scenario
 - 모델 버전 3개: `mock-door-swin-t-v1`(보정기 `mock-cal-v1`), 실제 DOOR 모델 버전 `door-swin-tiny-e20-8d042c7bfab2`(10/28)·`door-swin-tiny-e02-28a2dd1cb40b-dev`(재학습 2회차, 11/03), 실제 버전은 보정기 없음.
   보정기가 없는 모델은 어떤 시나리오든 보정 확률·보정기 버전을 null로 반환한다 (정책도 없으므로 GOOD은 REVIEW `NO_ACTIVE_POLICY`)
 - 새 시나리오 2종은 AUTO 선택 대상에 넣지 않았다 (기존 사진별 결과 유지). 직접 지정해서 사용
-- 시연 시나리오 3종(`GOOD_DEMO_BOUNDARY`, `GOOD_DEMO_ABOVE`, `GOOD_DEMO_ADJUST`)도 AUTO 선택 대상이 아니다. 직접 지정해서 사용 (11/09)
+- 시연 시나리오 4종(`GOOD_DEMO_BOUNDARY`, `GOOD_DEMO_ABOVE`, `GOOD_DEMO_ADJUST`, `GOOD_DEMO_0088`)도 AUTO 선택 대상이 아니다. 직접 지정해서 사용 (11/09, 11/12)
