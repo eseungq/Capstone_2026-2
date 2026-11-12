@@ -134,7 +134,7 @@ class PolicyEvaluatorTest {
         assertThat(after.passThreshold()).isEqualTo(0.35);
     }
 
-    // 11/12 도어 시연 값 (AI 내부 평가, V6_1 example-door-demo-0084). 소수 넷째 자리 비교에서 경계 포함
+    // 11/12 도어 시연 값 (AI 내부 평가, V6_2 example-door-demo-0092 기본 0.92%·조정 하한 0.84%). 소수 넷째 자리 비교에서 경계 포함
     @Test
     @DisplayName("관리자 조정 시연 11/12: 보정 0.0088은 0.84%에서 REVIEW, 0.92%에서 AUTO_PASS, 0.92% 경계 포함")
     void demoAdjust0084To0092() {
