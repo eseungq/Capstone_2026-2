@@ -6,7 +6,7 @@ import { validateThresholdEditV4 } from '../api/backendV4/policyThresholdV4';
 
 /**
  * v4 합의: 목표 미검출률 입력 → 후보 계산 방식은 사용하지 않습니다.
- * 도현님이 제공한 0.2801~0.3752 범위는 시연 Mock 전용입니다.
+ * 도현님이 11/12 안내한 0.0084~0.0092 범위는 시연 Mock 전용입니다.
  * 운영 e02는 보정기가 미제공이므로 운영 정책 저장/적용을 비활성화합니다.
  * 별도 Mock 시연은 서버/AsyncStorage/검사 결과를 변경하지 않습니다.
  */
@@ -61,7 +61,7 @@ export default function PolicyAdjustScreen() {
       <Card title="관리자 전용 기능"><Text style={s.note}>작업자 역할에서는 정책 관리 기능을 사용할 수 없습니다.</Text></Card>
     </View> : <ScrollView style={s.scroller} contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
       <View style={s.notice}><Text style={s.noticeText}>
-        실제 e02 운영 상태: 보정기·운영 기준치·독립 검증 범위 미제공. 아래 저장·적용 버튼은 비활성입니다. 30% 시연 정책은 별도 Mock 화면에서만 확인할 수 있습니다.
+        실제 e02 운영 상태: 보정기·운영 기준치·독립 검증 범위 미제공. 아래 저장·적용 버튼은 비활성입니다. 0.84→0.92% 시연 정책은 별도 Mock 화면에서만 확인할 수 있습니다.
       </Text></View>
       <Card title="정책 정보 · 실제 상태">
         <Row name="부품" value="DOOR" />
@@ -74,7 +74,7 @@ export default function PolicyAdjustScreen() {
         <Row name="검증된 최소값 (validatedMin)" value="미제공" />
         <Row name="검증된 최대값 (validatedMax)" value="미제공" />
         <Row name="실측 검증 근거" value="미제공" />
-        <Text style={s.note}>AI 팀에서 시연용 0.2801~0.3752 범위를 제공했지만, 운영 e02에 적용할 수 있는 검증 범위는 아닙니다. Mock 범위를 운영 권한으로 사용하지 않습니다.</Text>
+        <Text style={s.note}>AI 팀에서 시연용 0.0084~0.0092(0.84~0.92%) 범위를 안내했지만, 운영 e02에 적용할 수 있는 검증 범위는 아닙니다. Mock 범위를 운영 권한으로 사용하지 않습니다.</Text>
       </Card>
       <Card title="2. passThreshold 조정 및 저장">
         <Text style={s.note}>검증된 범위가 확인되면 관리자가 범위 안의 기준치를 입력할 수 있습니다. 저장하면 기존 정책을 덮어쓰지 않고 새 버전을 만듭니다.</Text>
@@ -92,7 +92,7 @@ export default function PolicyAdjustScreen() {
       </Card>
       <Pressable accessibilityRole="button" style={s.demoButton}
         onPress={()=>router.push({pathname:'/policy-assumed',params:{role:'ADMIN'}})}>
-        <Text style={s.demoButtonText}>DOOR 30% → 35% 정책 조정 · 독립 Mock 시연 →</Text>
+        <Text style={s.demoButtonText}>DOOR 0.84% → 0.92% 정책 조정 · 독립 Mock 시연 →</Text>
       </Pressable>
       <View style={s.notice}><Text style={s.noticeText}>
         위 화면은 정책 관리 구조를 구현한 프론트엔드 준비 화면입니다. 현재 서버 API 호출, 정책 저장·적용, 검사 판정 변경은 발생하지 않습니다. 별도 Mock 시연 역시 운영 기록에 반영되지 않습니다.

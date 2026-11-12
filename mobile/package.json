@@ -39,7 +39,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test:door-demo": "node --test ./scripts/test-door-demo-v4.cjs"
   },
   "private": true
 }
