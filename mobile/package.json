@@ -42,7 +42,8 @@
     "lint": "expo lint",
     "test:admin-policy": "node --test ./scripts/test-admin-policy-v4.cjs",
     "test:monitor-alerts": "node --test ./scripts/test-monitor-alerts-v4.cjs",
-    "test:integration": "node --test ./scripts/test-admin-policy-v4.cjs ./scripts/test-monitor-alerts-v4.cjs"
+    "test:integration": "node --test ./scripts/test-admin-policy-v4.cjs ./scripts/test-monitor-alerts-v4.cjs ./scripts/test-door-demo-v4.cjs",
+    "test:door-demo": "node --test ./scripts/test-door-demo-v4.cjs"
   },
   "private": true
 }
