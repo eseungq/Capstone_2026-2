@@ -213,6 +213,40 @@ class PolicyIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("도어 시연 11/12 (V6_2): 0.92%에서 보정 0.0088 AUTO_PASS → 0.83% 거절 → 0.84% 저장만 하면 AUTO_PASS → 적용 후 REVIEW → 복귀 후 AUTO_PASS")
+    void doorDemo0092To0084() throws Exception {
+        ai = r -> response(r, "GOOD", 0.04127, 0.0088);
+        String baseId = jdbc.queryForObject(
+                "select id from automation_policy where policy_version = 'example-door-demo-0092'", String.class);
+        assertThat(activate(baseId).getResponse().getStatus()).isEqualTo(200);
+        assertThat(activeVersions()).containsExactly("example-door-demo-0092");
+
+        JsonNode first = submitAndWait();
+        assertThat(first.path("displayState").asText()).isEqualTo("AUTO_PASS");
+        assertThat(first.at("/policy/passThreshold").asDouble()).isEqualTo(0.0092);
+        assertThat(first.at("/judgement/finalJudgement").asText()).isEqualTo("PASS");
+        assertThat(first.at("/judgement/judgedBy").asText()).isEqualTo("SYSTEM");
+
+        assertThat(errorCode(threshold(baseId, 0.0083))).isEqualTo("POLICY_THRESHOLD_OUT_OF_RANGE");
+        JsonNode lowered = json(threshold(baseId, 0.0084)).path("data");
+        assertThat(lowered.path("policyVersion").asText()).startsWith("example-door-demo-0092-t");
+        assertThat(lowered.path("active").asBoolean()).isFalse();
+        assertThat(submitAndWait().path("displayState").asText()).isEqualTo("AUTO_PASS");
+
+        assertThat(activate(lowered.path("policyId").asText()).getResponse().getStatus()).isEqualTo(200);
+        JsonNode review = submitAndWait();
+        assertThat(review.at("/policy/reviewReason").asText()).isEqualTo("ABOVE_THRESHOLD");
+        assertThat(review.at("/policy/passThreshold").asDouble()).isEqualTo(0.0084);
+
+        assertThat(activate(baseId).getResponse().getStatus()).isEqualTo(200);
+        assertThat(activeVersions()).containsExactly("example-door-demo-0092");
+        assertThat(submitAndWait().path("displayState").asText()).isEqualTo("AUTO_PASS");
+        String applied = "select pass_threshold_applied from inspection where id = ?";
+        assertThat(jdbc.queryForObject(applied, Double.class, first.path("inspectionId").asText())).isEqualTo(0.0092);
+        assertThat(jdbc.queryForObject(applied, Double.class, review.path("inspectionId").asText())).isEqualTo(0.0084);
+    }
+
+    @Test
     @DisplayName("목록 필터: partCode·active, 없는 부품 400")
     void listFilter() throws Exception {
         JsonNode active = json(call(get(POLICIES).param("partCode", "DOOR").param("active", "true"), admin())).path("data");

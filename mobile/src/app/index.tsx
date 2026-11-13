@@ -61,6 +61,15 @@ const handleLogin = async () => {
 };
 
 
+  // 서버 로그인 없이 화면 권한 표시만 확인하기 위한 독립 Mock WORKER 진입.
+  // 실제 인증 세션이나 백엔드의 권한을 변경하지 않습니다.
+  const handleWorkerPreview = () => {
+    router.replace({
+      pathname: '/monitoring',
+      params: { role: 'WORKER', mode: 'mock' },
+    });
+  };
+
   // 관리자 화면 시연용 이동
   const handleAdminPreview = () => {
     router.replace({
@@ -186,8 +195,18 @@ const handleLogin = async () => {
             </Text>
           </View>
 
-          {/* 관리자 시연 버튼 */}
+          {/* Mock WORKER와 ADMIN 역할별 진입: 실서버 인증이 아닙니다. */}
           <Pressable
+            accessibilityRole="button"
+            style={styles.previewButton}
+            onPress={handleWorkerPreview}
+          >
+            <Text style={styles.previewText}>
+              현장 작업자 시연으로 이동 · Mock
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
             style={styles.previewButton}
             onPress={handleAdminPreview}
           >

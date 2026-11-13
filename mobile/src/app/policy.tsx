@@ -12,7 +12,7 @@ import { DOOR_AUTOPASS_DEMO_V4 as DEMO } from '../api/backendV4/demoPolicyScenar
 
 // Figma: FyGAGiL2xkZgaDfegUk10A / 99:720, 99:616, 99:668 (2026-10-27)
 // 운영 정책 조회/변경 화면이 아닙니다. 시연 상태 탭은 Mock 화면 예시입니다.
-// 실제 e02 보정값/보정기 버전은 null이며 30% 기준을 운영에 사용하지 않습니다.
+// 실제 e02 보정값/보정기 버전은 null이며 시연용 0.84~0.92% 기준을 운영에 사용하지 않습니다.
 
 type Scenario = 'UNREADY' | 'READY_DEMO' | 'ACTIVE_DEMO';
 type Role = 'ADMIN' | 'WORKER';
@@ -186,11 +186,12 @@ export default function PolicyScreen() {
             </>
           ) : (
             <>
-              <InfoRow title="passThreshold" value={`${(DEMO.initialThreshold*100).toFixed(0)}% · 시연 Mock`} color={C.blue} />
+              <InfoRow title="비교 시작 기준치" value={`${(DEMO.initialThreshold*100).toFixed(2)}% · 시연 Mock`} color={C.blue} />
+              <InfoRow title="정책 기본값·조정 후" value={`${(DEMO.defaultThreshold*100).toFixed(2)}% · Mock`} color={C.blue} />
               <InfoRow title="시연 조정 허용 범위" value={`${(DEMO.validatedMin*100).toFixed(2)}~${(DEMO.validatedMax*100).toFixed(2)}% · Mock`} color={C.blue} />
-              <InfoRow title="조정 시연 예시" value="30% → 35%, GOOD/32% 재접수" />
+              <InfoRow title="조정 시연 예시" value="0.84% → 0.92%, GOOD/0.88% 재접수" />
               <Text style={styles.warningText}>
-                이 범위는 도현님이 제공한 시연 전용 수치입니다. 30%는 동일 평가 사진에 사후 적용한 값이며, 독립 검증된 운영 정책이 아닙니다.
+                이 범위는 도현님의 내부 평가에 따른 시연 전용 수치입니다. 실제 e02 운영 정책이나 독립적인 운영 안전성 검증 결과는 아닙니다.
               </Text>
             </>
           )}
@@ -205,7 +206,7 @@ export default function PolicyScreen() {
           style={[styles.actionButton, unready ? styles.previewButton : styles.activePreviewButton]}
         >
           <Text style={[styles.actionText, unready ? styles.previewText : styles.activePreviewText]}>
-            {unready ? '정책 조정 화면 · 운영 미준비' : '30% → 35% 조정 시연 · Mock'}
+            {unready ? '정책 조정 화면 · 운영 미준비' : '0.84% → 0.92% 조정 시연 · Mock'}
           </Text>
         </Pressable>
 
