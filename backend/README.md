@@ -204,7 +204,7 @@ curl -s -X DELETE 'localhost:8080/api/v1/notifications/devices/ExponentPushToken
 
 ## 시연 정책 (도어 Mock 0.92% ↔ 0.84%)
 
-AI가 11/12 도어 e02 내부 평가를 다시 해 정한 시연 기준(기본 0.92%, 조정 하한 0.84%)을 보정기가 있는 Mock 모델로 재현한다. 내부 평가 1,159개 사진 그룹에서 0.92%는 정상 209/566·불량 0/593그룹, 0.84%는 정상 189/566·불량 0/593그룹이 자동 통과 (`metrics`에 기록). 독립 검증된 운영 정책이 아니다. 실제 e02는 보정기가 null이라 정책 적용이 `POLICY_NOT_READY`로 거절되어 실서버는 계속 REVIEW.
+AI가 11/12 도어 e02 내부 평가를 다시 해 정한 시연 기준(기본 0.92%, 조정 하한 0.84%)을 보정기가 있는 Mock 모델로 재현한다. 내부 평가 1,159개 사진 그룹에서 0.92%는 정상 208/566·불량 0/593그룹, 0.84%는 정상 189/566·불량 0/593그룹이 자동 통과 (`metrics`에 기록). 독립 검증된 운영 정책이 아니다. 실제 e02는 보정기가 null이라 정책 적용이 `POLICY_NOT_READY`로 거절되어 실서버는 계속 REVIEW.
 
 1. Mock AI로 백엔드 실행 (`APP_AI_BASEURL=http://localhost:8090`), Mock 모델이 active인지 확인 (`GET /admin/models`)
 2. ADMIN: `example-door-p1` 중지 → `example-door-demo-0092` 적용 (`POST /admin/policies/{id}/deactivate`, `/activate`)
