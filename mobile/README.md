@@ -11,26 +11,29 @@
 > iPhone에서 `localhost`는 개발 PC가 아니므로 백엔드 주소는 PC의 내부 IP로 설정합니다 ([backend README](../backend/README.md) 참고).
 
 
-## 도어 30% → 35% AUTO_PASS 독립 Mock 시연 (2026-11-09 합의)
+## 도어 0.84% → 0.92% AUTO_PASS 독립 Mock 시연 (2026-11-12 도현님 변경 안내)
 
-- 시연 대상: `mock-door-swin-t-v1` / `example-door-demo-30`, 기준치 `0.30`, 허용 범위 `0.2801~0.3752`.
-- 시연 입력: `GOOD` 예측, 보정 불량 확률 `0.32`. 새 버전 `example-door-demo-30-t1`의 조정 기준치는 `0.35`.
-- **실제 e02와 별개**: DGX e02의 `calibratedDefectProbability`와 `calibratorVersion`은 미제공(`null`)이며, 실서버 응답은 계속 `REVIEW`. 시연 30% 결과는 동일 평가 사진에 사후 적용한 값으로 독립 검증된 운영 정책이 아닙니다.
-- `src/api/backendV4/demoPolicyScenarioV4.ts`의 판정 함수는 이 Mock 화면에만 사용합니다. 실서버 응답은 절대로 앱에서 재판정하지 않습니다.
+- 도현님 내부 평가 안내: **정책 기본값 0.92%**, 시연 조정 범위 **0.84~0.92%**. 비교 시나리오 시작 시 Mock **0.84% 정책을 활성화**하고, 다음 버전을 **0.92%**로 저장한 뒤 별도 적용합니다.
+- 시연 전용 모델: `mock-door-swin-t-v1`, 시작 정책 `example-door-demo-0084` (0.0084), 새 정책 `example-door-demo-0084-t1` (0.0092).
+- 비교 입력: AI 예측 `GOOD`, 보정 불량 확률 **0.88%** (코드 값 `0.0088`). 정책 `0.0084`에서 **REVIEW (ABOVE_THRESHOLD)**, 정책 `0.0092`에서 **AUTO_PASS / PASS / SYSTEM**으로 Mock 기록 표시.
+- **실제 e02와 별개**: 운영 e02 보정값·보정기 버전은 제공되지 않아 실서버 `REVIEW` 상태를 그대로 사용합니다. 시연용 판정 함수는 실제 API 데이터·운영 정책·DB 기록을 변경하지 않습니다.
+- 이 화면의 수치는 시연용 내부 평가 안내이며 독립적인 운영 안전성 검증/운영 정책 적용 근거로 간주하지 않습니다.
 
 ### iPhone 시연 절차
 
-1. Expo Go에서 **Mock 관리자**로 이동해 설정 → 자동 통과 기준 → 정책 조정 화면 → **DOOR 30% → 35% 정책 조정 · 독립 Mock 시연**에 들어갑니다.
-2. **GOOD / 32% 새 검사 접수 · Mock**을 눌러 30% 기준에서 `REVIEW`를 확인합니다.
-3. `passThreshold`에 `0.35`를 입력하고 **새 정책 버전 저장 · Mock**을 누릅니다. 저장만 하고 같은 입력을 다시 접수하면 여전히 `REVIEW`입니다.
-4. **저장된 새 정책 적용 · Mock**을 누른 뒤 같은 입력을 새 검사로 접수합니다. 새 Mock 검사만 `AUTO_PASS · SYSTEM 최종 PASS`로 표시됩니다. 이전 REVIEW 시연 기록은 유지됩니다.
-5. 화면에 **서버 API 요청 없음**, **운영 정책/검사 기록 변경 없음**이 표시되는지 확인합니다. 실제 API 연결 화면에서는 반환된 `displayState`를 그대로 사용하고 REVIEW_PENDING만 작업자 판정으로 연결합니다.
+1. Expo Go에서 **Mock ADMIN** → 설정 → 자동 통과 기준 → 정책 조정 화면 → **DOOR 0.84% → 0.92% 정책 조정 · 독립 Mock 시연**.
+2. 초기 활성 정책 **0.84%**에서 `GOOD / 0.88% 새 검사 접수 · Mock` → `REVIEW (ABOVE_THRESHOLD)` 확인.
+3. `passThreshold`에 **`0.0092`** 입력 (0~1 범위 원시 값, 화면 표시 **0.92%**) → **새 정책 버전 저장 · Mock**. 저장만 하고 아직 적용하지 않은 상태에서 새 접수 시 `REVIEW` 유지.
+4. **저장된 새 정책 적용 · Mock** → 같은 `GOOD / 0.88%` 새 검사 접수 → `AUTO_PASS · SYSTEM 최종 PASS`, 이전 REVIEW 시연 기록은 그대로.
+5. **서버 API 요청 없음**, **운영 정책/검사 기록 변경 없음**을 확인. 서버의 진짜 DOOR e02 검사는 원래대로 `REVIEW` 유지.
+6. **시연 초기화**를 누르면 0.84% 시작 상태로 복귀합니다. 이 동작도 Mock 메모리 상태만 초기화합니다.
 
 ### 검증
 
 ```powershell
 cd mobile
+npm run test:door-demo
 npx tsc --noEmit
 ```
 
-GitHub에서 작성한 코드는 iPhone/TypeScript 로컬 검증을 완료하기 전까지 Draft PR로 유지합니다. 실제 백엔드 Mock 시연 API의 등록·저장·적용 시험은 별도로 수행해야 하며 이 화면만으로 API 통합시험을 통과했다고 보고하지 않습니다.
+이 기능은 팀 협업 규칙에 따라 별도 모바일 PR에서 리뷰하고, 실서버 정책 API 검증과 별도로 취급합니다.

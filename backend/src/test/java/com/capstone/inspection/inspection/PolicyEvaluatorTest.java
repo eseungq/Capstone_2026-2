@@ -134,6 +134,24 @@ class PolicyEvaluatorTest {
         assertThat(after.passThreshold()).isEqualTo(0.35);
     }
 
+    // 11/12 도어 시연 값 (AI 내부 평가, V6_2 example-door-demo-0092 기본 0.92%·조정 하한 0.84%). 소수 넷째 자리 비교에서 경계 포함
+    @Test
+    @DisplayName("관리자 조정 시연 11/12: 보정 0.0088은 0.84%에서 REVIEW, 0.92%에서 AUTO_PASS, 0.92% 경계 포함")
+    void demoAdjust0084To0092() {
+        var before = PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.0088, "cal-v1", List.of(policy("cal-v1", 0.0084)));
+        assertThat(before.reviewReason()).isEqualTo(ReviewReason.ABOVE_THRESHOLD);
+        assertThat(before.passThreshold()).isEqualTo(0.0084);
+
+        var adjusted = List.of(policy("cal-v1", 0.0092));
+        var after = PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.0088, "cal-v1", adjusted);
+        assertThat(after.action()).isEqualTo(RecommendedAction.AUTO_PASS);
+        assertThat(after.passThreshold()).isEqualTo(0.0092);
+        assertThat(PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.0092, "cal-v1", adjusted).action())
+                .isEqualTo(RecommendedAction.AUTO_PASS);
+        assertThat(PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.0093, "cal-v1", adjusted).reviewReason())
+                .isEqualTo(ReviewReason.ABOVE_THRESHOLD);
+    }
+
     @Test
     @DisplayName("시연 30%여도 실서버처럼 보정 확률·보정기가 null이면 REVIEW(CALIBRATION_UNAVAILABLE)")
     void demoUncalibratedReview() {

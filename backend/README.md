@@ -56,7 +56,7 @@ uvicorn main:app --port 8090
 
 시드에는 Mock 모델 `mock-door-swin-t-v1`(보정기 `mock-cal-v1`, active)과 예시 정책 `example-door-p1`(passThreshold 0.05, 검증 범위 0.02~0.08, ready·active)도 들어 있다. 실제 검증 값이 아니다.
 실제 DOOR 모델 `door-swin-tiny-e20-8d042c7bfab2`(10/28)와 재학습 2회차 `door-swin-tiny-e02-28a2dd1cb40b-dev`(11/03, V5_2)도 보정기·정책 없이 **비활성**으로 등록되어 있다 (아래 "실제 AI 연결").
-도어 캡스톤 시연 정책 `example-door-demo-30`(Mock 모델, 기준치 0.30, 검증 범위 0.2801~0.3752, ready·**비활성**)도 등록되어 있다 (V5_3, 아래 "시연 정책").
+도어 Mock 시연 정책 `example-door-demo-0092`(Mock 모델, 기본 기준치 0.0092, 조정 범위 0.0084~0.0092, ready·**비활성**)도 등록되어 있다 (V6_2, 11/12 AI 내부 평가, 아래 "시연 정책"). 먼저 넣은 `example-door-demo-0084`(V6_1)와 11/09 값 `example-door-demo-30`(V5_3, 외부 사진 사후 적용 참고값)은 비활성으로 남아 있다.
 **운영 배포 시 `spring.flyway.locations`에서 `classpath:db/seed-dev`를 빼야 한다.**
 
 ## 동작 확인 (curl)
@@ -202,20 +202,23 @@ curl -s -X DELETE 'localhost:8080/api/v1/notifications/devices/ExponentPushToken
 - 실제 DEFECT 응답은 Grad-CAM base64가 약 1,546만 자(15.5MB)로 크다. AI 응답 파싱 문자열 한도는 `app.ai.max-response-string-chars`(기본 5,000만 자, Jackson 기본 2,000만 자)
 - 실제 응답 원문 3종 회귀 테스트: `src/test/resources/ai-samples/` (15MB `02_DEFECT.json`은 저장소에 올리지 않음. 파일이 없으면 해당 테스트는 건너뜀)
 
-## 시연 정책 (도어 30%)
+## 시연 정책 (도어 Mock 0.92% ↔ 0.84%)
 
-AI가 정한 도어 e02 시연 기준(`ai/VALIDATION.md`, 사후 적용값·독립 검증 아님)을 보정기가 있는 Mock 모델로 재현한다. 실제 e02는 보정기가 null이라 정책 적용이 `POLICY_NOT_READY`로 거절되어 실서버는 계속 REVIEW.
+AI가 11/12 도어 e02 내부 평가를 다시 해 정한 시연 기준(기본 0.92%, 조정 하한 0.84%)을 보정기가 있는 Mock 모델로 재현한다. 내부 평가 1,159개 사진 그룹에서 0.92%는 정상 208/566·불량 0/593그룹, 0.84%는 정상 189/566·불량 0/593그룹이 자동 통과 (`metrics`에 기록). 독립 검증된 운영 정책이 아니다. 실제 e02는 보정기가 null이라 정책 적용이 `POLICY_NOT_READY`로 거절되어 실서버는 계속 REVIEW.
 
 1. Mock AI로 백엔드 실행 (`APP_AI_BASEURL=http://localhost:8090`), Mock 모델이 active인지 확인 (`GET /admin/models`)
-2. ADMIN: `example-door-p1` 중지 → `example-door-demo-30` 적용 (`POST /admin/policies/{id}/deactivate`, `/activate`)
-3. Mock 시나리오로 접수 (`PUT localhost:8090/mock/scenario`)
+2. ADMIN: `example-door-p1` 중지 → `example-door-demo-0092` 적용 (`POST /admin/policies/{id}/deactivate`, `/activate`)
+3. Mock 시나리오 `GOOD_DEMO_0088`로 접수 (`PUT localhost:8090/mock/scenario`)
 
-| 순서 | Mock 시나리오 | 적용 정책 | 결과 |
+| 순서 | 동작 | 적용 정책 | 결과 |
 |---|---|---|---|
-| 1 | `GOOD_DEMO_ADJUST` (보정 0.32) | demo-30 (0.30) | REVIEW (ABOVE_THRESHOLD) |
-| 2 | 관리자 기준치 0.35로 조정 `POST /admin/policies/{id}/threshold` | 새 버전 `example-door-demo-30-t1` 생성 (비활성) | 범위 밖(예: 0.38)은 `POLICY_THRESHOLD_OUT_OF_RANGE` |
-| 3 | `-t1` 적용 후 `GOOD_DEMO_ADJUST` 다시 접수 | demo-30-t1 (0.35) | AUTO_PASS (최종 PASS, SYSTEM) |
-| 참고 | `GOOD_DEMO_BOUNDARY` 0.30 / `GOOD_DEMO_ABOVE` 0.35 / `DEFECT_GRADCAM` | 0.30 기준 | AUTO_PASS / REVIEW / REVIEW |
+| 1 | `GOOD_DEMO_0088` (보정 0.0088) 접수 | demo-0092 (0.0092) | AUTO_PASS (최종 PASS, SYSTEM) |
+| 2 | 관리자 기준치 0.0084로 조정 `POST /admin/policies/{id}/threshold` `{"passThreshold":0.0084}` | 새 버전 `example-door-demo-0092-t1` 생성 (비활성). 적용 전 접수는 계속 AUTO_PASS | 범위 밖(예: 0.0083)은 `POLICY_THRESHOLD_OUT_OF_RANGE` |
+| 3 | `-t1` 적용 후 같은 시나리오 접수 | demo-0092-t1 (0.0084) | REVIEW (ABOVE_THRESHOLD) |
+| 4 | 원래 정책 `example-door-demo-0092` 다시 적용 후 접수 | demo-0092 (0.0092) | AUTO_PASS. 1·3번 기록은 0.0092·0.0084 그대로 |
+
+통합 테스트 `PolicyIntegrationTest`의 "도어 시연 11/12 (V6_2)"가 위 순서를 그대로 확인한다. 카울커버 실서버 B 구간(1.63% → 1.00% → 복귀)과 같은 모양이다.
+앱 Mock 화면(PR #24)은 0.84%에서 시작해 0.92%로 올리는 순서지만 같은 기준치·입력에서 같은 판정이 나온다. 11/09 값(`example-door-demo-30` 0.30, `GOOD_DEMO_ADJUST` 0.32 → 0.35)도 남아 있다.
 
 이전 검사는 판정 당시 기준치(`pass_threshold_applied`)와 정책 버전을 그대로 유지한다. 실제 AI로 돌아갈 때는 시연 정책을 중지하고 README "실제 AI 연결" 전환 SQL을 다시 적용.
 

@@ -40,6 +40,8 @@ SCENARIOS = {
     "GOOD_DEMO_ABOVE": dict(quality="GOOD", raw=0.341872, cal=0.350000, calibrated=True),
     # 관리자 기준치 조정 시연용: 0.30에서 REVIEW, 0.35로 조정·적용 후 AUTO_PASS (AI 11/09)
     "GOOD_DEMO_ADJUST": dict(quality="GOOD", raw=0.326514, cal=0.320000, calibrated=True),
+    # 11/12 도어 시연 값(정책 example-door-demo-0092): 0.92%에서 AUTO_PASS, 0.84%로 조정·적용 후 REVIEW
+    "GOOD_DEMO_0088": dict(quality="GOOD", raw=0.041270, cal=0.008800, calibrated=True),
     "DEFECT_GRADCAM": dict(quality="DEFECT", raw=0.912345, cal=0.880000, calibrated=True, gradcam=True),
     "DEFECT_GRADCAM_FAIL": dict(quality="DEFECT", raw=0.871234, cal=0.830000, calibrated=True, gradcam=False),
     # 0맵: 계산 성공·위치별 강조 반응 없음 → 백엔드 gradcamStatus NO_ACTIVATION, 이미지 없음 (합의 10/28)

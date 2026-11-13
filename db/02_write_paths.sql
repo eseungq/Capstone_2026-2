@@ -1,7 +1,7 @@
--- 저장 흐름 예시 (구 03_write_paths v4판): 백엔드가 실행할 저장 쿼리 순서 (V1~V5 명칭 기준, 김남균 DB, 2026-10-28)
+-- 저장 흐름 예시 (구 03_write_paths v4판, 11/11 V6 수동 판정 W8-2 추가): 백엔드가 실행할 저장 쿼리 순서 예시 (V1~V6 명칭 기준, 김남균 DB, 2026-10-28)
 -- 계약 v4 5장 처리 흐름을 SQL로 옮긴 것. 백엔드(JPA) 구현의 기준 순서로 참고하고, 그대로 쓸 필요는 없다.
 --
--- 전제: V1~V5 + 개발 시드(V2 부품 DOOR/SCRATCH, V3_1 계정, V4_1 mock 모델·example 정책) 적용된 개발 DB
+-- 전제: V1~V6 + 개발 시드(V2 부품 DOOR/SCRATCH, V3_1 계정, V4_1 mock 모델·example 정책) 적용된 개발 DB
 -- 값: 모두 예시 값. 검사 ID는 example-wp- 접두어, 이미지 키는 example/ 경로. 실제 검증 값 아님
 -- 실행: 전체를 한 번에 실행하면 마지막 ROLLBACK으로 모두 되돌린다 (흐름 확인용).
 --       결과를 남기고 싶으면 마지막 줄을 COMMIT으로 바꾼다.
@@ -169,6 +169,50 @@ INSERT INTO image_storage (id, inspection_id, image_type, storage_uri, content_t
 SELECT 'example-wp-img-0005', 'example-wp-0005', 'ORIGINAL', storage_uri, content_type, size_bytes, width, height,
        checksum, exif_orientation, '2026-10-28 09:10:00'
 FROM image_storage WHERE inspection_id = 'example-wp-0004' AND image_type = 'ORIGINAL';
+
+-- =====================================================================
+-- W8-2. 수동 판정 전환 (V6, 11/11 B안): AI 무응답으로 FAILED → 원본 재사용한 새 검사(MANUAL) → 작업자 확인
+--       원본 연결은 재검사와 같은 retry_of_inspection_id (UNIQUE) → FAILED 1건당 재검사 또는 수동 전환 중 1건만
+-- =====================================================================
+SELECT last_val INTO @seq FROM inspection_no_seq WHERE name = 'INSPECTION' FOR UPDATE;
+UPDATE inspection_no_seq SET last_val = last_val + 1 WHERE name = 'INSPECTION';
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, line_code, model_id, status,
+                        automation_policy_ready, received_at, captured_at)
+VALUES ('example-wp-0006', CONCAT('INS-', LPAD(@seq + 1, 6, '0')), @device_id, 'DEVICE', @part_id, @item_id,
+        'LINE-A', @model_id, 'RECEIVED', FALSE, '2026-10-28 09:11:00', '2026-10-28 09:10:58');
+INSERT INTO image_storage (id, inspection_id, image_type, storage_uri, content_type, size_bytes, width, height, checksum, created_at)
+VALUES ('example-wp-img-0006', 'example-wp-0006', 'ORIGINAL', 'example/original/2026/10/28/example-wp-0006.jpg',
+        'image/jpeg', 2310000, 4032, 3024, REPEAT('f', 64), '2026-10-28 09:11:00');
+UPDATE inspection SET status = 'ANALYZING', started_at = '2026-10-28 09:11:01'
+WHERE id = 'example-wp-0006' AND status = 'RECEIVED';
+UPDATE inspection SET status = 'FAILED', error_code = 'AI_SERVER_ERROR',
+       error_detail = 'example: AI 서버 연결 실패', completed_at = '2026-10-28 09:11:02'
+WHERE id = 'example-wp-0006' AND status = 'ANALYZING';
+
+-- 전환 (POST /inspections/{id}/manual, WORKER): 새 검사는 바로 COMPLETED·REVIEW·AI_UNAVAILABLE, AI 결과·정책 값 없음
+--   model_id는 필수 칸이라 원래 FAILED의 모델을 그대로 기록 (어떤 모델이 실패했는지 남김)
+SELECT last_val INTO @seq FROM inspection_no_seq WHERE name = 'INSPECTION' FOR UPDATE;
+UPDATE inspection_no_seq SET last_val = last_val + 1 WHERE name = 'INSPECTION';
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, line_code, model_id, status,
+                        automation_policy_ready, recommended_action, review_reason, retry_of_inspection_id,
+                        received_at, captured_at, completed_at)
+SELECT 'example-wp-0007', CONCAT('INS-', LPAD(@seq + 1, 6, '0')), @worker_id, 'MANUAL', o.part_id, o.item_id,
+       o.line_code, o.model_id, 'COMPLETED', FALSE, 'REVIEW', 'AI_UNAVAILABLE', o.id,
+       '2026-10-28 09:12:00', o.captured_at, '2026-10-28 09:12:00'
+FROM inspection o
+WHERE o.id = 'example-wp-0006' AND o.status = 'FAILED';
+
+INSERT INTO image_storage (id, inspection_id, image_type, storage_uri, content_type, size_bytes, width, height,
+                           checksum, exif_orientation, created_at)
+SELECT 'example-wp-img-0007', 'example-wp-0007', 'ORIGINAL', storage_uri, content_type, size_bytes, width, height,
+       checksum, exif_orientation, '2026-10-28 09:12:00'
+FROM image_storage WHERE inspection_id = 'example-wp-0006' AND image_type = 'ORIGINAL';
+
+-- 판정: 기존 작업자 확인(W5)과 같은 방식
+INSERT INTO worker_confirmation (id, inspection_id, worker_id, final_judgement, comment, confirmed_at)
+VALUES ('example-wp-conf-0007', 'example-wp-0007', @worker_id, 'PASS', '예시 메모: 육안 확인', '2026-10-28 09:13:00');
+UPDATE inspection SET final_judgement = 'PASS', judged_by = 'WORKER'
+WHERE id = 'example-wp-0007' AND status = 'COMPLETED' AND recommended_action = 'REVIEW' AND final_judgement IS NULL;
 
 -- =====================================================================
 -- W9. 기준 조정 (관리자): 기존 정책 행은 수정하지 않고 검증 범위 안에서 새 버전 생성

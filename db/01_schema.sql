@@ -1,12 +1,14 @@
--- 최종 스키마 전체 (V1 → V3 → V4 → V5 적용 결과를 한 파일로 합친 것) · 김남균 DB · 2026-10-28
+-- 최종 스키마 전체 (V1 → V2 → V3 → V4 → V5 → V6 적용 결과를 한 파일로 합친 것) · 김남균 DB · 2026-10-28
 --
+-- 11/11 갱신: V6 수동 판정 반영 — source MANUAL, review_reason AI_UNAVAILABLE, 완료 규칙 통합(chk_insp_completed_v6),
+--   chk_insp_manual·chk_insp_reason_ai_unavailable 추가
 -- 용도: 비교·검토용 원본. Flyway에 넣지 않는다 (실제 DB는 V1·V3·V4·V5 마이그레이션이 만든다).
 --   이 파일과 마이그레이션 결과가 다르면 마이그레이션이 기준이다.
 -- 포함: 테이블·컬럼·키·인덱스·제약 + inspection_no_seq 초기 행 (V4에 있는 것)
--- 제외: V2 부품·검사항목 시드, V3_1 계정·V4_1 mock 모델·예시 정책 시드 (db/seed-dev)
+-- 제외: V2 부품·검사항목 시드, seed-dev 시드(V3_1 계정, V4_1·V5_1~V5_5 모델·정책)
 -- 컬럼 순서: 마이그레이션 적용 후 실제 순서와 같게 맞춤 (V4의 AFTER 위치 반영)
 -- 11/05 갱신: 백엔드 적용 V5(10/28 이승규 수정본) 반영 — gradcam_status NO_ACTIVATION 추가, FAILED면 predicted_quality NULL
--- 상태: 이 파일 자체는 MySQL 실행 미확인 (V5 마이그레이션은 백엔드 MySQL 8.0.46에서 적용 확인).
+-- 상태: 이 파일 자체는 MySQL 실행 미확인 (V5·V6 마이그레이션은 백엔드 MySQL에서 적용 확인).
 --       SQLite 대체 실행으로 마이그레이션과 컬럼·제약 일치만 확인
 -- 대상: MySQL 8.0.19 이상 (백엔드 docker compose 기준 8.4)
 
@@ -142,7 +144,7 @@ CREATE TABLE inspection (
     id                            CHAR(36)      NOT NULL PRIMARY KEY,
     inspection_no                 VARCHAR(20)   NOT NULL,      -- V4: 화면 표시용 번호
     user_id                       CHAR(36)      NULL,          -- 접수 계정 (DEVICE 또는 ADMIN). V4에서 NULL 허용
-    source                        VARCHAR(10)   NOT NULL DEFAULT 'DEVICE',   -- V4: DEVICE, ADMIN, RETRY
+    source                        VARCHAR(10)   NOT NULL DEFAULT 'DEVICE',   -- DEVICE, ADMIN, RETRY(V4), MANUAL(V6)
     part_id                       CHAR(36)      NOT NULL,
     item_id                       CHAR(36)      NOT NULL,
     line_code                     VARCHAR(30)   NULL,          -- V4: 향후 라인별 통계 대비
@@ -167,13 +169,13 @@ CREATE TABLE inspection (
     judged_by                     VARCHAR(10)   NULL,          -- V4: SYSTEM, WORKER
     pass_threshold_applied        DECIMAL(7, 6) NULL,          -- V4: 판정 당시 기준치 스냅숏
     gradcam_status                VARCHAR(20)   NULL,          -- V4: GENERATED, NOT_REQUIRED, FAILED, NO_ACTIVATION(V5)
-    retry_of_inspection_id        CHAR(36)      NULL,          -- V4: 재검사 원본 FAILED 검사
+    retry_of_inspection_id        CHAR(36)      NULL,          -- V4: 재검사·수동 판정(V6)의 원본 FAILED 검사
     client_request_id             VARCHAR(100)  NULL,          -- V4: Idempotency-Key
     ai_response_json              JSON          NULL,          -- V4: AI 응답 원문 (이미지 데이터 제외)
     error_detail                  VARCHAR(1000) NULL,          -- V4
     trace_id                      VARCHAR(32)   NULL,          -- V4
     CONSTRAINT uq_insp_no UNIQUE (inspection_no),
-    CONSTRAINT uq_insp_retry_of UNIQUE (retry_of_inspection_id),                 -- FAILED 1건당 재검사 1회
+    CONSTRAINT uq_insp_retry_of UNIQUE (retry_of_inspection_id),                 -- FAILED 1건당 재검사 또는 수동 전환 1건
     CONSTRAINT uq_insp_client_request UNIQUE (user_id, client_request_id),
     CONSTRAINT fk_insp_user FOREIGN KEY (user_id) REFERENCES users (id),
     CONSTRAINT fk_insp_part FOREIGN KEY (part_id) REFERENCES part (id),
@@ -187,27 +189,25 @@ CREATE TABLE inspection (
     INDEX idx_insp_part_received (part_id, received_at),       -- V4
     INDEX idx_insp_queue (status, recommended_action, final_judgement, received_at),   -- V4
 
-    -- ---- V4 상태 조합 (chk_insp_auto_pass는 V5에서 교체) ----
+    -- ---- V4 상태 조합 (chk_insp_auto_pass는 V5에서 교체, chk_insp_completed는 V6에서 통합) ----
     CONSTRAINT chk_insp_status CHECK (status IN ('RECEIVED', 'ANALYZING', 'COMPLETED', 'FAILED')),
     CONSTRAINT chk_insp_failed CHECK (status <> 'FAILED'
         OR (recommended_action IS NULL AND final_judgement IS NULL)),
-    CONSTRAINT chk_insp_completed CHECK (status <> 'COMPLETED'
-        OR (recommended_action IS NOT NULL AND predicted_quality IS NOT NULL)),
     CONSTRAINT chk_insp_review CHECK (recommended_action IS NULL OR recommended_action <> 'REVIEW'
         OR (review_reason IS NOT NULL
             AND (final_judgement IS NULL OR (judged_by IS NOT NULL AND judged_by = 'WORKER')))),
     CONSTRAINT chk_insp_judged_by CHECK (final_judgement IS NULL OR judged_by IS NOT NULL),
 
-    -- ---- V5 허용값·범위 ----
+    -- ---- 허용값 (V5, V6에서 MANUAL·AI_UNAVAILABLE 추가)·범위 (V5) ----
     CONSTRAINT chk_insp_values CHECK (
             (predicted_quality IS NULL OR predicted_quality IN ('GOOD', 'DEFECT'))
         AND (recommended_action IS NULL OR recommended_action IN ('AUTO_PASS', 'REVIEW'))
         AND (final_judgement IS NULL OR final_judgement IN ('PASS', 'FAIL'))
         AND (judged_by IS NULL OR judged_by IN ('SYSTEM', 'WORKER'))
         AND (review_reason IS NULL OR review_reason IN
-                ('DEFECT_PREDICTED', 'NO_ACTIVE_POLICY', 'CALIBRATION_UNAVAILABLE', 'ABOVE_THRESHOLD'))
+                ('DEFECT_PREDICTED', 'NO_ACTIVE_POLICY', 'CALIBRATION_UNAVAILABLE', 'ABOVE_THRESHOLD', 'AI_UNAVAILABLE'))
         AND (gradcam_status IS NULL OR gradcam_status IN ('GENERATED', 'NOT_REQUIRED', 'FAILED', 'NO_ACTIVATION'))
-        AND source IN ('DEVICE', 'ADMIN', 'RETRY')),
+        AND source IN ('DEVICE', 'ADMIN', 'RETRY', 'MANUAL')),
     CONSTRAINT chk_insp_prob_range CHECK (
             (raw_defect_probability IS NULL OR (raw_defect_probability >= 0 AND raw_defect_probability <= 1))
         AND (calibrated_defect_probability IS NULL
@@ -219,9 +219,12 @@ CREATE TABLE inspection (
             predicted_quality IS NULL AND raw_defect_probability IS NULL
         AND recommended_action IS NULL AND final_judgement IS NULL AND judged_by IS NULL
         AND review_reason IS NULL AND gradcam_status IS NULL AND completed_at IS NULL)),
-    CONSTRAINT chk_insp_completed_v5 CHECK (status <> 'COMPLETED' OR (
-            raw_defect_probability IS NOT NULL AND completed_at IS NOT NULL
-        AND gradcam_status IS NOT NULL AND error_code IS NULL)),
+    -- V6: V4 chk_insp_completed + V5 chk_insp_completed_v5 통합. MANUAL만 AI 결과 없이 완료 허용
+    CONSTRAINT chk_insp_completed_v6 CHECK (status <> 'COMPLETED' OR (
+            recommended_action IS NOT NULL AND completed_at IS NOT NULL AND error_code IS NULL
+        AND (source = 'MANUAL' OR (
+                predicted_quality IS NOT NULL AND raw_defect_probability IS NOT NULL
+            AND gradcam_status IS NOT NULL)))),
     -- 실패 시 completed_at 기록, AI 응답 검증 실패여도 predicted_quality 저장 안 함 (10/28 백엔드 확인)
     CONSTRAINT chk_insp_failed_v5 CHECK (status <> 'FAILED' OR (
             error_code IS NOT NULL AND completed_at IS NOT NULL AND predicted_quality IS NULL
@@ -268,7 +271,21 @@ CREATE TABLE inspection (
         OR (policy_id IS NULL AND pass_threshold_applied IS NULL)),
     -- DEFECT 예측이어도 정책 준비됐으면 정책·기준치 기록 (10/28 백엔드 확인)
     CONSTRAINT chk_insp_policy_ready_snapshot CHECK (status <> 'COMPLETED' OR automation_policy_ready = FALSE
-        OR (policy_id IS NOT NULL AND pass_threshold_applied IS NOT NULL))
+        OR (policy_id IS NOT NULL AND pass_threshold_applied IS NOT NULL)),
+
+    -- ---- V6 수동 판정 (AI 무응답 시, 11/11 B안) ----
+    -- MANUAL: 완료·REVIEW·AI_UNAVAILABLE, 원본 FAILED 연결 필수, AI 결과·정책 값 없음
+    CONSTRAINT chk_insp_manual CHECK (source <> 'MANUAL' OR (
+            status = 'COMPLETED' AND retry_of_inspection_id IS NOT NULL
+        AND recommended_action IS NOT NULL AND recommended_action = 'REVIEW'
+        AND review_reason IS NOT NULL AND review_reason = 'AI_UNAVAILABLE'
+        AND predicted_quality IS NULL AND raw_defect_probability IS NULL
+        AND calibrated_defect_probability IS NULL AND calibrator_version IS NULL
+        AND gradcam_status IS NULL AND inference_time_ms IS NULL
+        AND policy_id IS NULL AND automation_policy_ready = FALSE AND pass_threshold_applied IS NULL)),
+    -- AI_UNAVAILABLE 사유는 수동 판정 건에만
+    CONSTRAINT chk_insp_reason_ai_unavailable CHECK (review_reason IS NULL
+        OR review_reason <> 'AI_UNAVAILABLE' OR source = 'MANUAL')
 );
 
 -- 패치 좌표 기록. 패치 검사 범위 제외로 신규 기록 중단, 과거 기록만 보존
