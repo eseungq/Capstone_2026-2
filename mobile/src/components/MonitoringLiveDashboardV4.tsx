@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { liveMonitoringReaderV4 } from '../api/backendV4/monitoringLiveReaderV4';
 import { useMonitoringPollV4 } from '../api/backendV4/useMonitoringPollV4';
+import type { MonitorAlertV4 } from '../api/backendV4/monitoringPollCore';
 import { buildMonitoringViewModelV4 } from '../api/backendV4/monitoringViewModelV4';
 import {
   advanceMonitoringObservationV4,
@@ -28,8 +29,16 @@ function secondsText(receivedAt: string, detectedAtMs: number): string {
 const MONITORED_PARTS = ['DOOR', 'FRAME', 'COWL_COVER'] as const;
 type MonitoredPart = (typeof MONITORED_PARTS)[number];
 
-export default function MonitoringLiveDashboardV4() {
-  const { snapshot } = useMonitoringPollV4(liveMonitoringReaderV4);
+export default function MonitoringLiveDashboardV4({ onNewAlerts }: {
+  onNewAlerts?: (alerts: MonitorAlertV4[]) => void;
+}) {
+  const { snapshot, controller } = useMonitoringPollV4(liveMonitoringReaderV4);
+
+  // 기존 실서버 폴링의 신규 이벤트만 구독합니다. 별도 API·푸시 요청을 만들지 않습니다.
+  useEffect(() => {
+    if (!onNewAlerts) return;
+    return controller.subscribeAlerts(onNewAlerts);
+  }, [controller, onNewAlerts]);
   const [partCode, setPartCode] = useState<MonitoredPart>('DOOR');
   const vm = buildMonitoringViewModelV4(snapshot, partCode);
   // 두 공정 모두 매 폴링에 관측해, 공정 선택 시 과거 데이터를 신규 접수로 오인하지 않습니다.
