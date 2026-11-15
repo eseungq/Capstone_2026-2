@@ -40,7 +40,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test:door-demo": "node --test ./scripts/test-door-demo-v4.cjs"
+    "test:door-demo": "node --test ./scripts/test-door-demo-v4.cjs",
+    "test:admin-policy": "node --test ./scripts/test-admin-policy-v4.cjs"
   },
   "private": true
 }
