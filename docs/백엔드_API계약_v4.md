@@ -226,7 +226,7 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
   "partCode": "DOOR",
   "name": "도어",
   "items": [
-    { "inspectionItemCode": "SCRATCH", "name": "...", "modelAvailable": true, "policyActive": true,
+    { "inspectionItemCode": "UNIFIED", "name": "...", "modelAvailable": true, "policyActive": true,
       "activeModelVersion": "mock-door-swin-t-v1" }
   ]
 }
@@ -540,7 +540,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 }
 ```
 
-`inspectionItemCode`는 TBD-04 결정에 따라 유지·삭제
+`inspectionItemCode`는 유지. 세 부품 모두 `UNIFIED` (TBD-04, 11/17 V7)
 
 ### 7.2 정상 응답
 
@@ -697,7 +697,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | 테이블 | 변경 |
 |---|---|
 | `part` | 그대로. 라인 마스터 테이블은 만들지 않음, partCode가 모니터링 단위 [제안] |
-| `inspection_item` | 유지. 모델이 정상·불량 전체를 분류하므로 항목 코드 이름은 AI·DB가 정함 (예: `APPEARANCE`) [TBD-04] |
+| `inspection_item` | 유지. 모델이 정상·불량 전체를 분류하므로 항목 코드는 세 부품 모두 `UNIFIED` (TBD-04 확정 11/17, V7) |
 | `inspection` | `inspection_no`(UNIQUE, NOT NULL, 표시용 번호 `INS-000006`) 추가 · `user_id` → nullable, `source`(DEVICE/ADMIN) 추가 · `status`에 RECEIVED 추가 · `review_reason`, `judged_by`, `pass_threshold_applied`(스냅숏), `gradcam_status`(GENERATED·NOT_REQUIRED·FAILED·NO_ACTIVATION [합의 10/28]), `calibrator_version`, `received_at`, `retry_of_inspection_id` 추가 · **`line_code`(nullable), `captured_at` 추가 (9.1)** · 개정본3 속성 중 V1에 없는 `client_request_id`, `ai_response_json`, `error_detail`, `trace_id` 추가 [승계] · `patch_inspection_supported`는 신규 기록에서 미사용 |
 | `image_storage` | `storage_uri`는 저장소 상대 키 [합의 10/15] · `image_type`(ORIGINAL/GRADCAM) 추가, `inspection_id` UNIQUE → (`inspection_id`, `image_type`) UNIQUE · `exif_orientation` 추가 [승계, V1에 없음] |
 | `automation_policy` | `target_miss_rate` → nullable (과거 기록 보존), `validated_min`·`validated_max`·`calibrator_version`·`activated_at` 추가. `metrics_json`은 AI 평가 근거로 계속 사용 [승계]. 조정 시 행 수정 대신 새 행 |
@@ -783,7 +783,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | TBD-01 | 배포 환경·이미지 저장소·타임아웃 | 유지 | 개발은 로컬 저장소·Mock AI. 계약은 "만료되는 접근 정보"로만 기술. 11/04 실측: 단건 DEFECT 약 3초·GOOD 0.3~1.2초. AI가 한 건씩 처리해 동시 2건이면 inferenceTimeMs 최대 8.9초 → 10초에 여유 약 1초. **동시 호출 1개, 타임아웃 10초 유지로 결정** [합의 11/04 김도현]: 5건 기준 AI 왕복 최대 4.4초, 전체 처리는 16.0초 → 20.0초로 늘어남 (통합 점검표 B11) 11/05 단건 DEFECT 6.8~7.9초(분류·CAM 인코딩 약 0.5초, 나머지 다운로드·전처리·CAM 생성 구간, 네트워크 지연 의심) → 원인 확인 필요 11/09 원인은 Mac→DGX 네트워크(다운로드 6~9.5초, INS-000097 DGX 처리 약 12.1초)로 확정 → **실행 타임아웃 20초(시연용), 동시 호출 1 유지** [합의 11/09 김도현] 11/11 프레임(8774)·카울커버(8778) 통합 모델은 별도 AI 서버라 **부품별 AI 주소**(`app.ai.part-base-urls`)를 추가. 7장 요청·응답 규격은 같음(8774 응답 형식 확인) | 이승규·김도현·김남균 |
 | TBD-02 | 목표 미검출률 지정 방식 | **폐지** | 합의본에서 passThreshold 조정 방식으로 대체 | — |
 | TBD-03 | ready 판정 기준 값·최소 표본 수 | 일부 확정 | 설정 주체는 확정(검증 자료 등록 시 기준 충족 여부로 결정). 기준 값은 AI 평가 후 제공. 임시 구현: 보정기 일치 + `app.policy.min-sample-count`(기본 0) (6.9) | 김도현 |
-| TBD-04 | 검사항목 코드 이름 | 일부 확정 | 테이블 유지, API 비노출. 이름만 결정 (예: APPEARANCE) | 김남균·김도현 |
+| TBD-04 | 검사항목 코드 이름 | 확정 (11/17) | 테이블 유지, 세 부품 모두 `UNIFIED`(통합 불량). 도어도 스크래치·외관 손상을 한 모델로 분류(김도현). V7에서 도어 `SCRATCH` → `UNIFIED`, 기존 검사·모델·정책은 id 연결이라 영향 없음 | 김남균·김도현 |
 | TBD-05 | AI 응답 세부·오류 본문·Grad-CAM 전달 | **해소** | base64 PNG·JPEG [합의 10/28], DEFECT 예측만 생성, 오류는 공통 형식 (7장) | — |
 | TBD-06 | predictedQuality와 정책 판정의 충돌 처리 | **해소** | DEFECT 예측은 항상 REVIEW, GOOD 예측만 AUTO_PASS 후보 (4장) | — |
 | TBD-07 | rawDefectProbability 명칭 | 유지 | 현재 명칭 유지 | 전체 |

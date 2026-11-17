@@ -49,6 +49,20 @@ class ModelCheckIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("TBD-04: 검사항목 코드 UNIFIED (V7), 도어 모델·정책 연결 유지")
+    void itemCodeUnified() throws Exception {
+        assertThat(partsDoor().path("inspectionItemCode").asText()).isEqualTo("UNIFIED");
+        for (JsonNode part : json(call(get("/api/v1/parts"), worker())).path("data")) {
+            for (JsonNode item : part.path("items")) {
+                assertThat(item.path("inspectionItemCode").asText()).isEqualTo("UNIFIED");
+            }
+        }
+        assertThat(partsDoor().path("activeModelVersion").isNull()).isFalse();
+        assertThat(jdbc.queryForObject("select count(*) from inspection_item where item_code = 'SCRATCH'",
+                Integer.class)).isZero();
+    }
+
+    @Test
     @DisplayName("AVAILABLE: 접수 202, /parts·모니터링 모두 true")
     void available() throws Exception {
         assertThat(partsDoor().path("modelAvailable").asBoolean()).isTrue();

@@ -27,7 +27,7 @@ public class InspectionItem {
     private Part part;          // 소속 부품
 
     @Column(nullable = false, length = 30)
-    private String itemCode;    // 예: SCRATCH (임시)
+    private String itemCode;    // 예: UNIFIED (V7, TBD-04)
 
     @Column(nullable = false, length = 50)
     private String name;        // 예: 스크래치
