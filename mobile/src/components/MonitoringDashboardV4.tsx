@@ -1,9 +1,10 @@
+import Pressable from './TouchPressable';
 /**
  * 73단계: 모니터링 요약, DOOR, REVIEW/FAILED 목록, 신규 이벤트가 동일한
  * CONTRACT_EXAMPLE 폴링 스냅샷을 공유합니다. 실제 설비/서버/푸시와 무관합니다.
  */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {  StyleSheet, Text, View } from 'react-native';
 import { useMonitoringDemoSessionV4 } from '../api/backendV4/monitoringDemoSessionV4';
 import { buildMonitoringViewModelV4 } from '../api/backendV4/monitoringViewModelV4';
 
