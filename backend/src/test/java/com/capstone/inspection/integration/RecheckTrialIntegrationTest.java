@@ -11,8 +11,13 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -135,6 +140,36 @@ class RecheckTrialIntegrationTest extends IntegrationTestBase {
         assertThat(detail.at("/recheck/acknowledgedAt").isNull()).isFalse();
         assertThat(jdbc.queryForMap("select screen_dwell_ms, open_count from auto_pass_recheck where inspection_id = ?",
                 fail)).containsEntry("screen_dwell_ms", 18250L).containsEntry("open_count", 2);
+    }
+
+    @Test
+    @DisplayName("확인함 동시 요청: 두 응답 모두 확인 기록을 담고, DB에는 처음 기록 1건만 남음")
+    void acknowledgeConcurrently() throws Exception {
+        String fail = submitGood(0.045);
+        assertThat(recheck(fail, "FAIL", Map.of()).getResponse().getStatus()).isEqualTo(200);
+
+        CyclicBarrier start = new CyclicBarrier(2);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<MvcResult>> calls = List.of("메모 A", "메모 B").stream()
+                    .map(note -> pool.submit(() -> {
+                        start.await();
+                        return acknowledge(fail, note, admin());
+                    })).toList();
+            for (Future<MvcResult> call : calls) {
+                MvcResult result = call.get();
+                assertThat(result.getResponse().getStatus()).isEqualTo(200);
+                JsonNode recheck = json(result).at("/data/recheck");
+                // 진 요청도 이긴 요청이 남긴 기록을 돌려받음 (확인 전 상태가 아님)
+                assertThat(recheck.path("acknowledgedAt").isNull()).isFalse();
+                assertThat(recheck.path("acknowledgeNote").asText()).isIn("메모 A", "메모 B");
+            }
+        } finally {
+            pool.shutdown();
+        }
+        assertThat(jdbc.queryForObject("""
+                select count(*) from auto_pass_recheck where inspection_id = ? and acknowledged_at is not null""",
+                Long.class, fail)).isEqualTo(1);
     }
 
     @Test

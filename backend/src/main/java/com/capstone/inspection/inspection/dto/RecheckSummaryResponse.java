@@ -22,8 +22,10 @@ public record RecheckSummaryResponse(String partCode,
 
     public static final String UNRECORDED = "UNRECORDED"; // V8로 기록돼 규칙 값이 없는 결정
 
-    // autoPassCount = decidedCount + undecidedCount (이 규칙으로 판정된 AUTO_PASS)
+    // 한 항목 = 추출 규칙 + 부품·정책·모델·보정기 버전이 모두 같은 AUTO_PASS (조건이 다르면 한 불량률로 합치지 않음)
+    // autoPassCount = decidedCount + undecidedCount (이 조합으로 판정된 AUTO_PASS)
     public record RuleSummary(String ruleVersion, String trialName,
+                              String partCode, String policyVersion, String modelVersion, String calibratorVersion,
                               Double nearRatio, Double midRatio, Double nearRate, Double midRate, Double lowRate,
                               long autoPassCount, long decidedCount, long undecidedCount, long sampledCount,
                               long pendingCount, long passCount, long failCount,

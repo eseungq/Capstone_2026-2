@@ -29,7 +29,8 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 // 표본 재확인 요약 계산 (계약 6.11). DB 조회 결과만 받아 계산하므로 단위 테스트로 확인
-//   - 규칙(시험 이름 포함)이 다른 AUTO_PASS는 섞지 않음. 결정 전 건은 판정 당시 검사에 남긴 규칙으로 묶고 구간도 그 규칙으로 셈
+//   - 규칙(시험 이름 포함)·부품·정책·모델·보정기 버전 중 하나라도 다른 AUTO_PASS는 섞지 않음 (계약 6.11 해석)
+//     결정 전 건은 판정 당시 검사에 남긴 규칙으로 묶고 구간도 그 규칙으로 셈
 //   - 대기(재확인 전)는 정상·불량 어느 쪽으로도 세지 않음
 //   - AUTO_PASS 중 불량 비율 추정 [합의 11/18 김도현]: Σ (구간 AUTO_PASS 건수 ÷ 전체 AUTO_PASS 건수) × (구간 FAIL ÷ 구간 완료)
 //     AUTO_PASS가 0건인 구간은 빼고, AUTO_PASS가 있는데 완료가 0건인 구간이 있으면 추정하지 않음 (null)
@@ -88,6 +89,15 @@ final class RecheckSummary {
     private record DwellSample(long ms, int openCount) {
     }
 
+    // 요약 항목을 나누는 기준. ruleKey는 규칙 id(V8 결정은 UNRECORDED)
+    private record GroupKey(String ruleKey, String partCode, String policyVersion, String modelVersion,
+                            String calibratorVersion) {
+
+        static GroupKey of(String ruleKey, AutoPassDecision d) {
+            return new GroupKey(ruleKey, d.partCode(), d.policyVersion(), d.modelVersion(), d.calibratorVersion());
+        }
+    }
+
     private RecheckSummary() {
     }
 
@@ -99,37 +109,43 @@ final class RecheckSummary {
         long withoutRule = decisions.stream()
                 .filter(d -> d.sampled() == null && d.inspectionRuleId() == null).count();
         List<RuleSummary> summaries = group(decisions, rules).entrySet().stream()
-                .map(e -> ruleSummary(e.getKey(), rules.get(e.getKey()), e.getValue(), compareRule))
+                .map(e -> ruleSummary(e.getKey(), rules.get(e.getKey().ruleKey()), e.getValue(), compareRule))
                 .toList();
         return new RecheckSummaryResponse(partCode, Times.toOffset(from), Times.toOffset(to), decisions.size(),
                 decided, decisions.size() - decided, withoutRule, summaries, waits(decisions, reviews),
                 dwell(decisions, reviews));
     }
 
-    // 규칙 id(V8 결정은 UNRECORDED)별 Entry. 판정 당시 규칙도 결정도 없는 건은 묶지 않음 (undecidedWithoutRuleCount)
-    //   순서: UNRECORDED, 그다음 규칙이 만들어진 순
-    private static Map<String, List<Entry>> group(List<AutoPassDecision> decisions,
-                                                  Map<String, RecheckRuleSnapshot> rules) {
-        Map<String, List<Entry>> groups = new TreeMap<>(Comparator
-                .comparing((String key) -> !RecheckSummaryResponse.UNRECORDED.equals(key))
-                .thenComparing(key -> rules.containsKey(key) ? rules.get(key).getCreatedAt() : LocalDateTime.MIN)
-                .thenComparing(Comparator.naturalOrder()));
+    // GroupKey별 Entry. 판정 당시 규칙도 결정도 없는 건은 묶지 않음 (undecidedWithoutRuleCount)
+    //   순서: UNRECORDED, 그다음 규칙이 만들어진 순, 같은 규칙 안에서는 부품·정책·모델·보정기 버전 순
+    private static Map<GroupKey, List<Entry>> group(List<AutoPassDecision> decisions,
+                                                    Map<String, RecheckRuleSnapshot> rules) {
+        Comparator<String> text = Comparator.nullsFirst(Comparator.naturalOrder());
+        Map<GroupKey, List<Entry>> groups = new TreeMap<>(Comparator
+                .comparing((GroupKey key) -> !RecheckSummaryResponse.UNRECORDED.equals(key.ruleKey()))
+                .thenComparing(key -> rules.containsKey(key.ruleKey())
+                        ? rules.get(key.ruleKey()).getCreatedAt() : LocalDateTime.MIN)
+                .thenComparing(GroupKey::ruleKey)
+                .thenComparing(GroupKey::partCode, text)
+                .thenComparing(GroupKey::policyVersion, text)
+                .thenComparing(GroupKey::modelVersion, text)
+                .thenComparing(GroupKey::calibratorVersion, text));
         for (AutoPassDecision d : decisions) {
             if (d.sampled() != null) {
                 String key = d.decisionRuleId() != null ? d.decisionRuleId() : RecheckSummaryResponse.UNRECORDED;
-                groups.computeIfAbsent(key, k -> new ArrayList<>())
+                groups.computeIfAbsent(GroupKey.of(key, d), k -> new ArrayList<>())
                         .add(new Entry(d.stratum(), true, d.sampled(), d.drawValue(), d.result()));
             } else if (d.inspectionRuleId() != null && rules.containsKey(d.inspectionRuleId())) {
                 RecheckStratum stratum = RecheckRules.stratum(d.calibrated(), d.threshold(),
                         rules.get(d.inspectionRuleId()).toRule());
-                groups.computeIfAbsent(d.inspectionRuleId(), k -> new ArrayList<>())
+                groups.computeIfAbsent(GroupKey.of(d.inspectionRuleId(), d), k -> new ArrayList<>())
                         .add(new Entry(stratum, false, false, null, null));
             }
         }
         return groups;
     }
 
-    private static RuleSummary ruleSummary(String key, RecheckRuleSnapshot snapshot, List<Entry> entries,
+    private static RuleSummary ruleSummary(GroupKey key, RecheckRuleSnapshot snapshot, List<Entry> entries,
                                            RecheckRule compareRule) {
         Map<RecheckStratum, List<Entry>> byStratum = new EnumMap<>(RecheckStratum.class);
         for (RecheckStratum s : RecheckStratum.values()) {
@@ -140,8 +156,9 @@ final class RecheckSummary {
                 .toList();
         Counts total = sum(actual.values());
         RecheckRule rule = snapshot == null ? null : snapshot.toRule();
-        return new RuleSummary(snapshot == null ? key : snapshot.getRuleVersion(),
+        return new RuleSummary(snapshot == null ? key.ruleKey() : snapshot.getRuleVersion(),
                 snapshot == null ? null : snapshot.getTrialName(),
+                key.partCode(), key.policyVersion(), key.modelVersion(), key.calibratorVersion(),
                 rule == null ? null : rule.nearRatio(), rule == null ? null : rule.midRatio(),
                 rule == null ? null : rule.nearRate(), rule == null ? null : rule.midRate(),
                 rule == null ? null : rule.lowRate(),

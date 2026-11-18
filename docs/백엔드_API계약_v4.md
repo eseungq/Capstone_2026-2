@@ -633,7 +633,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
   - 재확인 결과가 **FAIL인 건만**. `note` 선택 200자, 본문 생략 가능
   - "확인함"은 관리자가 FAIL을 봤다는 기록이며 **문제 해결 완료가 아님**. 해결 여부·조치 내용 기록은 다음 단계 (TBD-17)
   - 응답 `200`: 재확인 응답과 같은 형식 (`recheck.acknowledgedBy`·`acknowledgedAt`·`acknowledgeNote` 채워짐)
-  - 이미 확인함이면 200(처음 기록 그대로, 메모도 바뀌지 않음), 동시 요청 시 1건만 기록
+  - 이미 확인함이면 200(처음 기록 그대로, 메모도 바뀌지 않음), 동시 요청 시 1건만 기록. 늦은 요청도 먼저 기록된 확인 정보(`acknowledgedBy`·`acknowledgedAt`·`acknowledgeNote`)를 담아 200 [11/18 리뷰 반영]
   - 오류: `409 NOT_ACKNOWLEDGEABLE`(표본이 아니거나 재확인 전이거나 PASS), `404 INSPECTION_NOT_FOUND`, ADMIN 외 `403 ACCESS_DENIED`
 - 푸시 알림·자동 후속 조치는 없음 (TBD-17)
 
@@ -657,6 +657,8 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
       "autoPassCount": 120, "decidedCount": 116, "undecidedCount": 4, "undecidedWithoutRuleCount": 1,
       "rules": [ {
         "ruleVersion": "v1-b40-80-p100-30-10", "trialName": "공동시험 1차",
+        "partCode": "DOOR", "policyVersion": "door-e02-demo-0092",
+        "modelVersion": "door-swin-tiny-e02-28a2dd1cb40b-dev", "calibratorVersion": "door-e02-temperature-30962f5cac45-demo",
         "nearRatio": 0.8, "midRatio": 0.4, "nearRate": 1.0, "midRate": 0.3, "lowRate": 0.1,
         "autoPassCount": 119, "decidedCount": 116, "undecidedCount": 3,
         "sampledCount": 40, "pendingCount": 6, "passCount": 32, "failCount": 2,
@@ -673,7 +675,8 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
       "dwell": { "review": { "count": 30, "averageMs": 15000, "medianMs": 11000, "averageOpenCount": 1.2 },
                  "recheck": { "count": 28, "averageMs": 9000, "medianMs": 7000, "averageOpenCount": 1.1 } } } }
   ```
-- 규칙별·구간별로 `autoPassCount`(그 규칙으로 판정된 AUTO_PASS) = `decidedCount` + `undecidedCount`(결정 누락). 결정 누락 건도 판정 당시 규칙으로 구간을 정해 그 구간에 셈
+- **`rules[]` 한 항목 = 추출 규칙 + 부품·정책·모델·보정기 버전이 모두 같은 AUTO_PASS** [11/18 리뷰 반영]. 같은 규칙이어도 조회 기간 중 정책(기준치)·모델·보정기가 바뀌면 항목을 나눠 불량률을 따로 계산하고 합치지 않음. 화면도 항목마다 따로 표시
+- 항목별·구간별로 `autoPassCount`(그 조합으로 판정된 AUTO_PASS) = `decidedCount` + `undecidedCount`(결정 누락). 결정 누락 건도 판정 당시 규칙으로 구간을 정해 그 구간에 셈
 - `undecidedWithoutRuleCount`: 판정 당시 규칙도 결정도 없는 AUTO_PASS (기능 꺼짐 등). 어느 규칙에도 넣지 않음
 - **대기(`pendingCount`)는 정상·불량 어느 쪽으로도 세지 않음**. `failRateAmongCompleted = fail ÷ (pass + fail)`, 완료 건이 없으면 null
 - `estimatedDefectRateInAutoPass` [합의 11/18 김도현]: 구간별 `failRateAmongCompleted`에 **구간 AUTO_PASS 건수 ÷ 전체 AUTO_PASS 건수**를 곱해 합산 (추출 비율 100·30·10%는 뽑는 비율이고 가중치가 아님). AUTO_PASS가 0건인 구간은 빼고, AUTO_PASS가 있는데 완료가 0건인 구간이 있으면 null
@@ -693,7 +696,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 해석
 - 재확인으로 직접 추정하는 것은 **AUTO_PASS 중 실제 불량 비율**(통과된 검사에 불량이 얼마나 섞였는지)
 - **전체 실제 불량 중 AUTO_PASS로 빠진 비율**(정책의 불량 누락)은 REVIEW 작업자 판정까지 합쳐야 하므로 별도 (다음 단계)
-- 정책·모델·보정기 버전이나 추출 규칙이 다른 검사는 합치지 않음. 요약은 규칙별로 나누고, 정책·모델 구분이 필요하면 `partCode`·기간으로 나눠 조회
+- 정책·모델·보정기 버전이나 추출 규칙이 다른 검사는 합치지 않음. 요약은 이 조합별로 `rules[]` 항목을 나눔 (부품도 정책에 따라 갈림)
 - 건수가 적으면 불확실성이 큼. 신뢰구간 표시 방법은 TBD-16
 
 ## 7. AI 연동 규격 [합의 10/15]

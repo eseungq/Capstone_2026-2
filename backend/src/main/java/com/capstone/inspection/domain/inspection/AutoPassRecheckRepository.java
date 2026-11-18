@@ -82,7 +82,9 @@ public interface AutoPassRecheckRepository extends JpaRepository<AutoPassRecheck
 
     // 요약용 (계약 6.11): 기간 안의 AUTO_PASS와 그 결정 행 (없으면 결정 관련 값 null). receivedAt 기준 [from, to)
     //   규칙은 결정 행의 규칙, 결정 전이면 판정 당시 검사에 남긴 규칙 (둘 다 없으면 null: 기능 꺼짐·V8 기록)
+    //   부품·정책·모델·보정기 버전: 요약에서 서로 다른 검사 조건을 한 불량률로 합치지 않도록 묶는 기준
     record AutoPassDecision(String inspectionId, double calibrated, double threshold,
+                            String partCode, String policyVersion, String modelVersion, String calibratorVersion,
                             String inspectionRuleId, String decisionRuleId,
                             Boolean sampled, RecheckStratum stratum, Double drawValue, Judgement result,
                             LocalDateTime sampledAt, LocalDateTime recheckedAt, Long screenDwellMs, Integer openCount) {
@@ -90,10 +92,11 @@ public interface AutoPassRecheckRepository extends JpaRepository<AutoPassRecheck
 
     @Query("""
             select new com.capstone.inspection.domain.inspection.AutoPassRecheckRepository$AutoPassDecision(
-                   i.id, i.calibratedDefectProbability, i.passThresholdApplied, ir.id, rr.id,
+                   i.id, i.calibratedDefectProbability, i.passThresholdApplied,
+                   p.partCode, pol.policyVersion, m.modelVersion, i.calibratorVersion, ir.id, rr.id,
                    r.sampled, r.stratum, r.drawValue, r.result, r.sampledAt, r.recheckedAt,
                    r.screenTiming.screenDwellMs, r.screenTiming.openCount)
-            from Inspection i join i.part p left join i.recheckRule ir
+            from Inspection i join i.part p join i.model m left join i.policy pol left join i.recheckRule ir
               left join AutoPassRecheck r on r.inspection = i left join r.rule rr
             where i.status = com.capstone.inspection.domain.inspection.InspectionStatus.COMPLETED
               and i.recommendedAction = com.capstone.inspection.domain.inspection.RecommendedAction.AUTO_PASS

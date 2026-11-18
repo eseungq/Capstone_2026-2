@@ -33,17 +33,27 @@ class RecheckSummaryTest {
     private final RecheckRuleSnapshot snapshot = new RecheckRuleSnapshot(TRIAL, "공동시험 1차");
     private final Map<String, RecheckRuleSnapshot> rules = Map.of(snapshot.getId(), snapshot);
 
+    private static final String POLICY = "door-e02-demo-0092";
+    private static final String MODEL = "door-swin-tiny-e02";
+    private static final String CALIBRATOR = "door-e02-temperature-demo";
+
     private AutoPassDecision decided(RecheckStratum stratum, double calibrated, double draw, Judgement result) {
+        return decided(POLICY, stratum, calibrated, draw, result);
+    }
+
+    private AutoPassDecision decided(String policy, RecheckStratum stratum, double calibrated, double draw,
+                                     Judgement result) {
         boolean sampled = draw < TRIAL.rateOf(stratum);
-        return new AutoPassDecision(UUID.randomUUID().toString(), calibrated, THRESHOLD, snapshot.getId(),
+        return new AutoPassDecision(UUID.randomUUID().toString(), calibrated, THRESHOLD, "DOOR", policy, MODEL,
+                CALIBRATOR, snapshot.getId(),
                 snapshot.getId(), sampled, stratum, draw, sampled ? result : null, AT,
                 sampled && result != null ? AT.plusMinutes(5) : null, null, null);
     }
 
     // 결정 저장이 빠진 AUTO_PASS (판정 당시 규칙은 남음)
     private AutoPassDecision undecided(double calibrated) {
-        return new AutoPassDecision(UUID.randomUUID().toString(), calibrated, THRESHOLD, snapshot.getId(), null,
-                null, null, null, null, null, null, null, null);
+        return new AutoPassDecision(UUID.randomUUID().toString(), calibrated, THRESHOLD, "DOOR", POLICY, MODEL,
+                CALIBRATOR, snapshot.getId(), null, null, null, null, null, null, null, null, null);
     }
 
     // NEAR 4건 모두 뽑힘(0.1 FAIL·0.3 PASS·0.6 nearAt06·0.9 FAIL), MID 10건 중 3건(모두 PASS), LOW 20건 중 2건(모두 PASS)
@@ -75,6 +85,10 @@ class RecheckSummaryTest {
 
         assertThat(rule.ruleVersion()).isEqualTo("v1-b40-80-p100-30-10");
         assertThat(rule.trialName()).isEqualTo("공동시험 1차");
+        assertThat(rule.partCode()).isEqualTo("DOOR");
+        assertThat(rule.policyVersion()).isEqualTo(POLICY);
+        assertThat(rule.modelVersion()).isEqualTo(MODEL);
+        assertThat(rule.calibratorVersion()).isEqualTo(CALIBRATOR);
         assertThat(rule.autoPassCount()).isEqualTo(34);
         assertThat(rule.sampledCount()).isEqualTo(9);
         assertThat(rule.completionRate()).isEqualTo(1.0);
@@ -142,5 +156,24 @@ class RecheckSummaryTest {
         assertThat(rule.estimatedDefectRateInAutoPass()).isNull();
         assertThat(rule.strata().get(2).completionRate()).isNull(); // 뽑힌 건 없음
         assertThat(rule.compare().estimatedDefectRateInAutoPass()).isNull();
+    }
+
+    @Test
+    @DisplayName("같은 추출 규칙이어도 조회 기간 중 정책이 바뀌면 항목을 나눠 불량률을 따로 계산 (섞지 않음)")
+    void splitByPolicy() {
+        List<AutoPassDecision> decisions = List.of(
+                decided("door-e02-demo-0084", RecheckStratum.NEAR, 0.045, 0.1, Judgement.FAIL),
+                decided("door-e02-demo-0092", RecheckStratum.NEAR, 0.045, 0.2, Judgement.PASS),
+                decided("door-e02-demo-0092", RecheckStratum.NEAR, 0.045, 0.3, Judgement.PASS));
+        List<RuleSummary> summaries = RecheckSummary.build(null, null, null, decisions, List.of(), rules, null)
+                .rules();
+
+        assertThat(summaries).extracting(RuleSummary::policyVersion)
+                .containsExactly("door-e02-demo-0084", "door-e02-demo-0092");
+        assertThat(summaries).extracting(RuleSummary::ruleVersion).containsOnly("v1-b40-80-p100-30-10");
+        assertThat(summaries.get(0).autoPassCount()).isEqualTo(1);
+        assertThat(summaries.get(0).estimatedDefectRateInAutoPass()).isEqualTo(1.0);
+        assertThat(summaries.get(1).autoPassCount()).isEqualTo(2);
+        assertThat(summaries.get(1).estimatedDefectRateInAutoPass()).isEqualTo(0.0);
     }
 }

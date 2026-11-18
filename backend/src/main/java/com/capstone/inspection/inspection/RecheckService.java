@@ -100,25 +100,36 @@ public class RecheckService {
     }
 
     // 관리자 확인함 (계약 6.11). 재확인 FAIL만, 이미 확인했으면 처음 기록 그대로 200
+    //   동시 요청: 조건부 갱신(acknowledged_at IS NULL)으로 1건만 기록. 진 쪽은 새 트랜잭션에서 이긴 쪽 기록을 읽음
+    //   (같은 트랜잭션에서 다시 읽으면 MySQL 반복 읽기 스냅샷 때문에 확인 전 상태가 보일 수 있음)
     public RecheckResponse acknowledge(AuthUser admin, String inspectionId, String note) {
         String trimmed = trimToNull(note);
-        return tx.execute(status -> {
-            Inspection i = inspectionRepository.findById(inspectionId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.INSPECTION_NOT_FOUND));
-            AutoPassRecheck r = recheckRepository.findSampledByInspectionIdWithUser(inspectionId)
-                    .filter(found -> found.getResult() == Judgement.FAIL)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_ACKNOWLEDGEABLE));
-            if (r.getAcknowledgedAt() == null) {
-                LocalDateTime at = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
-                // 0이면 다른 요청이 먼저 확인함 → 다시 읽은 그 기록으로 응답
-                if (recheckRepository.markAcknowledged(inspectionId, userRepository.getReferenceById(admin.userId()),
-                        at, trimmed) == 1) {
-                    log.info("재확인 FAIL 확인함 {} {} by={}", i.getInspectionNo(), i.getId(), admin.loginId());
-                }
-                r = recheckRepository.findSampledByInspectionIdWithUser(inspectionId).orElseThrow();
-            }
+        RecheckResponse saved = tx.execute(status -> markAcknowledged(admin, inspectionId, trimmed));
+        return saved != null ? saved : readTx.execute(status -> currentRecheck(inspectionId));
+    }
+
+    // 기록했거나 이미 확인돼 있으면 응답, 다른 요청이 먼저 기록했으면 null
+    private RecheckResponse markAcknowledged(AuthUser admin, String inspectionId, String note) {
+        Inspection i = inspectionRepository.findById(inspectionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INSPECTION_NOT_FOUND));
+        AutoPassRecheck r = recheckRepository.findSampledByInspectionIdWithUser(inspectionId)
+                .filter(found -> found.getResult() == Judgement.FAIL)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_ACKNOWLEDGEABLE));
+        if (r.getAcknowledgedAt() != null) {
             return response(i, r);
-        });
+        }
+        LocalDateTime at = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
+        if (recheckRepository.markAcknowledged(inspectionId, userRepository.getReferenceById(admin.userId()),
+                at, note) != 1) {
+            return null;
+        }
+        log.info("재확인 FAIL 확인함 {} {} by={}", i.getInspectionNo(), i.getId(), admin.loginId());
+        return response(i, recheckRepository.findSampledByInspectionIdWithUser(inspectionId).orElseThrow());
+    }
+
+    private RecheckResponse currentRecheck(String inspectionId) {
+        Inspection i = inspectionRepository.findById(inspectionId).orElseThrow();
+        return response(i, recheckRepository.findSampledByInspectionIdWithUser(inspectionId).orElseThrow());
     }
 
     private static String trimToNull(String value) {
