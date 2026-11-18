@@ -9,6 +9,9 @@ public record RecheckRule(double nearRatio, double midRatio, double nearRate, do
 
     public static final String SCHEME = "v1";
 
+    // 아무것도 뽑지 않는 규칙 (재확인 설정이 없을 때 예상 재확인 건수 0)
+    public static final RecheckRule NONE = new RecheckRule(0, 0, 0, 0, 0);
+
     public String version() {
         return SCHEME + "-b" + percent(midRatio) + "-" + percent(nearRatio) + "-p" + percent(nearRate) + "-"
                 + percent(midRate) + "-" + percent(lowRate);

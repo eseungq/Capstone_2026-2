@@ -39,8 +39,8 @@ public class PolicySimulationService {
                     "기준치나 보정기 버전이 없는 정책은 비교할 수 없습니다.");
         }
         double candidate = PolicyRules.round6(candidateThreshold);
-        // 꺼져 있어도 켰을 때 기준으로 예상 재확인 건수를 냄. 설정 자체가 없으면 예상 0 (비율 0 규칙)
-        RecheckRule recheckRule = props.recheck() != null ? props.recheck().rule() : new RecheckRule(0.8, 0.4, 0, 0, 0);
+        // 꺼져 있어도 켰을 때 기준으로 예상 재확인 건수를 냄. 설정 자체가 없으면 예상 0
+        RecheckRule recheckRule = props.recheck() != null ? props.recheck().rule() : RecheckRule.NONE;
         PolicySimulation.Result result = PolicySimulation.run(
                 inspectionRepository.findScored(policy.getModel().getId(), policy.getCalibratorVersion(), from, to),
                 policy.getPassThreshold(), candidate, recheckRule);

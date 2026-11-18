@@ -3,11 +3,8 @@ package com.capstone.inspection.inspection;
 import com.capstone.inspection.auth.security.AuthUser;
 import com.capstone.inspection.common.api.ApiResponse;
 import com.capstone.inspection.common.api.PageResponse;
-import com.capstone.inspection.common.error.BusinessException;
-import com.capstone.inspection.common.error.ErrorCode;
 import com.capstone.inspection.common.time.Times;
 import com.capstone.inspection.domain.inspection.Judgement;
-import com.capstone.inspection.domain.inspection.RecheckRule;
 import com.capstone.inspection.inspection.dto.AcknowledgeRequest;
 import com.capstone.inspection.inspection.dto.RecheckListItem;
 import com.capstone.inspection.inspection.dto.RecheckRequest;
@@ -77,20 +74,6 @@ public class RecheckController {
             @RequestParam(required = false) Double compareMidRate,
             @RequestParam(required = false) Double compareLowRate) {
         return ApiResponse.of(recheckService.summary(partCode, Times.parseParam("from", from),
-                Times.parseParam("to", to), compareRule(compareNearRate, compareMidRate, compareLowRate)));
-    }
-
-    // 비교 비율 → 규칙 (경계는 쓰지 않으므로 0). 셋 다 없으면 null, 일부만·범위 밖이면 400
-    private static RecheckRule compareRule(Double near, Double mid, Double low) {
-        if (near == null && mid == null && low == null) {
-            return null;
-        }
-        for (Double rate : new Double[]{near, mid, low}) {
-            if (rate == null || !Double.isFinite(rate) || rate < 0 || rate > 1) {
-                throw new BusinessException(ErrorCode.INVALID_PARAMETER,
-                        "compareNearRate·compareMidRate·compareLowRate는 셋 다 0~1로 주거나 모두 생략해야 합니다.");
-            }
-        }
-        return new RecheckRule(0, 0, near, mid, low);
+                Times.parseParam("to", to), compareNearRate, compareMidRate, compareLowRate));
     }
 }

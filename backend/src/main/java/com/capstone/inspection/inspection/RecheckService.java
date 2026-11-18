@@ -143,12 +143,13 @@ public class RecheckService {
     }
 
     // 요약 (계약 6.11): 기간 안 AUTO_PASS의 규칙별 구간 집계·누락·대기 시간·체류 시간
-    //   compareRule: 같은 기록으로 다시 셀 비교 비율 (없으면 null)
+    //   compare*Rate: 같은 기록으로 다시 셀 가상 비교 비율 (셋 다 주거나 모두 생략)
     public RecheckSummaryResponse summary(String partCode, LocalDateTime from, LocalDateTime to,
-                                          RecheckRule compareRule) {
+                                          Double compareNearRate, Double compareMidRate, Double compareLowRate) {
         if (from != null && to != null && from.isAfter(to)) {
             throw new BusinessException(ErrorCode.INVALID_PARAMETER, "from은 to보다 늦을 수 없습니다.");
         }
+        RecheckRule compareRule = compareRule(compareNearRate, compareMidRate, compareLowRate);
         String code = partCode == null || partCode.isBlank() ? null : partCode.trim();
         return readTx.execute(s -> {
             if (code != null && partRepository.findByPartCode(code).isEmpty()) {
@@ -169,6 +170,20 @@ public class RecheckService {
             return RecheckSummary.build(code, from, to, decisions, recheckRepository.findReviewTimings(code, from, to),
                     rules, compareRule);
         });
+    }
+
+    // 비교 비율 → 규칙 (경계는 쓰지 않으므로 0). 셋 다 없으면 null, 일부만·범위 밖이면 400
+    private static RecheckRule compareRule(Double near, Double mid, Double low) {
+        if (near == null && mid == null && low == null) {
+            return null;
+        }
+        for (Double rate : new Double[]{near, mid, low}) {
+            if (rate == null || !Double.isFinite(rate) || rate < 0 || rate > 1) {
+                throw new BusinessException(ErrorCode.INVALID_PARAMETER,
+                        "compareNearRate·compareMidRate·compareLowRate는 셋 다 0~1로 주거나 모두 생략해야 합니다.");
+            }
+        }
+        return new RecheckRule(0, 0, near, mid, low);
     }
 
     // 재확인 목록: 뽑힌 순서 (먼저 뽑힌 건부터 확인). result·acknowledged는 완료 목록에서만

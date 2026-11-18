@@ -85,7 +85,7 @@ final class RecheckSummary {
     }
 
     // 화면 체류 시간 1건
-    private record Dwelled(long ms, int openCount) {
+    private record DwellSample(long ms, int openCount) {
     }
 
     private RecheckSummary() {
@@ -224,18 +224,18 @@ final class RecheckSummary {
     private static Dwell dwell(List<AutoPassDecision> decisions, List<ReviewTiming> reviews) {
         return new Dwell(
                 dwellStats(reviews.stream().filter(r -> r.screenDwellMs() != null)
-                        .map(r -> new Dwelled(r.screenDwellMs(), r.openCount())).toList()),
+                        .map(r -> new DwellSample(r.screenDwellMs(), r.openCount())).toList()),
                 dwellStats(decisions.stream().filter(d -> d.screenDwellMs() != null)
-                        .map(d -> new Dwelled(d.screenDwellMs(), d.openCount())).toList()));
+                        .map(d -> new DwellSample(d.screenDwellMs(), d.openCount())).toList()));
     }
 
     private static WaitStats waitStats(List<Long> values, long pending) {
         return new WaitStats(values.size(), pending, average(values), median(values));
     }
 
-    private static DwellStats dwellStats(List<Dwelled> values) {
-        List<Long> ms = values.stream().map(Dwelled::ms).toList();
-        Double opens = values.isEmpty() ? null : values.stream().mapToInt(Dwelled::openCount).average().orElseThrow();
+    private static DwellStats dwellStats(List<DwellSample> values) {
+        List<Long> ms = values.stream().map(DwellSample::ms).toList();
+        Double opens = values.isEmpty() ? null : values.stream().mapToInt(DwellSample::openCount).average().orElseThrow();
         return new DwellStats(values.size(), average(ms), median(ms), opens);
     }
 
