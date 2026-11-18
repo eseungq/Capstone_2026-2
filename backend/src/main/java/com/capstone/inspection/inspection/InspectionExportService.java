@@ -47,8 +47,9 @@ public class InspectionExportService {
     private final InspectionRepository inspectionRepository;
     private final WorkerConfirmationRepository confirmationRepository;
 
-    public byte[] exportCsv(String partCode, DisplayState displayState, LocalDateTime from, LocalDateTime to) {
-        Specification<Inspection> filter = queryService.filter(partCode, displayState, from, to);
+    public byte[] exportCsv(String partCode, DisplayState displayState, ReviewMismatch mismatch,
+                            LocalDateTime from, LocalDateTime to) {
+        Specification<Inspection> filter = queryService.filter(partCode, displayState, mismatch, from, to);
         long count = inspectionRepository.count(filter);
         if (count > MAX_ROWS) {
             throw new BusinessException(ErrorCode.INVALID_PARAMETER,

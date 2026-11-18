@@ -8,11 +8,13 @@ import com.capstone.inspection.domain.inspection.Inspection;
 import com.capstone.inspection.domain.inspection.InspectionRepository;
 import com.capstone.inspection.domain.inspection.JudgedBy;
 import com.capstone.inspection.domain.inspection.Judgement;
+import com.capstone.inspection.domain.inspection.ScreenTiming;
 import com.capstone.inspection.domain.inspection.WorkerConfirmation;
 import com.capstone.inspection.domain.inspection.WorkerConfirmationRepository;
 import com.capstone.inspection.domain.user.UserRepository;
 import com.capstone.inspection.inspection.dto.ConfirmRequest;
 import com.capstone.inspection.inspection.dto.ConfirmResponse;
+import com.capstone.inspection.inspection.dto.ScreenTimings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -22,7 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 // 작업자 확인 (계약 v4 6.7). REVIEW_PENDING 건에 작업자 최종 판정을 기록
 //   - AI 결과·정책 결과는 그대로 두고 worker_confirmation 1건 + inspection의 final_judgement·judged_by만 기록
-//   - 같은 값 재전송은 기존 결과(200), 다른 값은 409 ALREADY_CONFIRMED
+//   - 같은 값 재전송은 기존 결과(200), 다른 값은 409 ALREADY_CONFIRMED. 화면 체류 시간(선택)은 처음 저장한 값 유지
 //   - 동시 제출: 조건부 갱신(final_judgement IS NULL) + worker_confirmation.inspection_id UNIQUE로 1건만 저장.
 //     진 쪽은 저장 트랜잭션을 롤백하고, 새 트랜잭션에서 이긴 쪽 결과를 읽어 재전송 규칙대로 응답
 @Service
@@ -57,15 +59,17 @@ public class InspectionConfirmService {
 
     public ConfirmResponse confirm(AuthUser worker, String inspectionId, ConfirmRequest request) {
         String comment = request.comment() == null || request.comment().isBlank() ? null : request.comment().trim();
+        ScreenTiming timing = ScreenTimings.of(request.screenDwellMs(), request.firstOpenedAt(), request.openCount());
         try {
-            return tx.execute(status -> save(worker, inspectionId, request.finalJudgement(), comment));
+            return tx.execute(status -> save(worker, inspectionId, request.finalJudgement(), comment, timing));
         } catch (LostRace | DataIntegrityViolationException e) {
             log.info("동시 확인 요청: 먼저 저장된 판정 기준으로 응답 {}", inspectionId);
             return readTx.execute(status -> replayExisting(inspectionId, request.finalJudgement()));
         }
     }
 
-    private ConfirmResponse save(AuthUser worker, String inspectionId, Judgement judgement, String comment) {
+    private ConfirmResponse save(AuthUser worker, String inspectionId, Judgement judgement, String comment,
+                                 ScreenTiming timing) {
         Inspection i = inspectionRepository.findDetailById(inspectionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INSPECTION_NOT_FOUND));
 
@@ -82,7 +86,7 @@ public class InspectionConfirmService {
             throw new LostRace();
         }
         WorkerConfirmation saved = confirmationRepository.saveAndFlush(
-                new WorkerConfirmation(i, userRepository.getReferenceById(worker.userId()), judgement, comment));
+                new WorkerConfirmation(i, userRepository.getReferenceById(worker.userId()), judgement, comment, timing));
         log.info("작업자 확인 {} {} {} by={}", i.getInspectionNo(), i.getId(), judgement, worker.loginId());
         return new ConfirmResponse(i.getId(), i.getInspectionNo(), i.getPredictedQuality(), i.getRecommendedAction(),
                 judgement, JudgedBy.WORKER, worker.loginId(), Times.toOffset(saved.getConfirmedAt()));

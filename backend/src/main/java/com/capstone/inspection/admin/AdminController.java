@@ -9,6 +9,7 @@ import com.capstone.inspection.common.api.ApiResponse;
 import com.capstone.inspection.common.time.Times;
 import com.capstone.inspection.inspection.DisplayState;
 import com.capstone.inspection.inspection.InspectionExportService;
+import com.capstone.inspection.inspection.ReviewMismatch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -84,14 +85,15 @@ public class AdminController {
         return ApiResponse.of(policyService.deactivate(id));
     }
 
-    @Operation(summary = "검사 기록 CSV 내보내기", description = "검사 이력과 같은 조건(partCode·displayState·from·to), "
+    @Operation(summary = "검사 기록 CSV 내보내기", description = "검사 이력과 같은 조건(partCode·displayState·mismatch·from·to), "
             + "접수 시각 오름차순, 최대 " + InspectionExportService.MAX_ROWS + "건. 엑셀용 UTF-8 BOM. 이미지·AI 응답 원문은 제외")
     @GetMapping("/inspections/export")
     public ResponseEntity<byte[]> exportInspections(@RequestParam(required = false) String partCode,
                                                     @RequestParam(required = false) DisplayState displayState,
+                                                    @RequestParam(required = false) ReviewMismatch mismatch,
                                                     @RequestParam(required = false) String from,
                                                     @RequestParam(required = false) String to) {
-        byte[] csv = exportService.exportCsv(partCode, displayState, Times.parseParam("from", from),
+        byte[] csv = exportService.exportCsv(partCode, displayState, mismatch, Times.parseParam("from", from),
                 Times.parseParam("to", to));
         String filename = "inspections_" + LocalDateTime.now(Times.ZONE).format(FILE_TIME) + ".csv";
         return ResponseEntity.ok()

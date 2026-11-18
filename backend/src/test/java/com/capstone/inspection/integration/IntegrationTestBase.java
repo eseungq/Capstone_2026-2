@@ -48,7 +48,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest(properties = {
         "app.ai.model-check-ttl-seconds=0",
         "app.ai.model-check-failure-ttl-seconds=0",
-        "app.storage.local-root=build/test-storage"
+        "app.storage.local-root=build/test-storage",
+        "app.recheck.sweep-enabled=false" // 주기 재처리가 테스트 데이터 정리와 겹치지 않게. 필요한 테스트가 직접 호출
 })
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
@@ -222,6 +223,24 @@ abstract class IntegrationTestBase {
             Thread.sleep(50);
         }
         throw new AssertionError("분석이 끝나지 않음: " + inspectionId);
+    }
+
+    // AUTO_PASS 표본 추출 결정은 COMPLETED 저장 뒤 별도 단계라, 분석이 끝난 직후에는 아직 기록 전일 수 있음 (계약 6.11)
+    //   재확인 기능을 켠 테스트에서 AUTO_PASS면 결정 행이 생길 때까지 기다림
+    protected JsonNode submitAndWaitForRecheckDecision() throws Exception {
+        JsonNode detail = submitAndWait();
+        if (!"AUTO_PASS".equals(detail.path("displayState").asText())) {
+            return detail;
+        }
+        String id = detail.path("inspectionId").asText();
+        Instant deadline = Instant.now().plus(ANALYSIS_WAIT);
+        while (Instant.now().isBefore(deadline)) {
+            if (jdbc.queryForObject("select count(*) from auto_pass_recheck where inspection_id = ?", Long.class, id) > 0) {
+                return json(call(get("/api/v1/inspections/{id}", id), worker())).path("data");
+            }
+            Thread.sleep(50);
+        }
+        throw new AssertionError("표본 추출 결정이 기록되지 않음: " + id);
     }
 
     protected static String unique(String prefix) {
