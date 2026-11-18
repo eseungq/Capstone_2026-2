@@ -34,6 +34,8 @@ import java.util.function.Predicate;
 //   - AUTO_PASS 중 불량 비율 추정 [합의 11/18 김도현]: Σ (구간 AUTO_PASS 건수 ÷ 전체 AUTO_PASS 건수) × (구간 FAIL ÷ 구간 완료)
 //     AUTO_PASS가 0건인 구간은 빼고, AUTO_PASS가 있는데 완료가 0건인 구간이 있으면 추정하지 않음 (null)
 //   - 가상 비교: drawValue < 비교 비율인 건이 그 비율로 뽑혔을 건. 비교 비율이 실제 비율 이하일 때만 계산 가능
+//   - partial: 재확인 대기(가상 비교는 미확인)나 결정 누락이 남으면 true. 먼저 뽑힌 건만 완료된 상태일 수 있어
+//     추정이 치우칠 수 있으므로 화면에 안내 [합의 11/18 김도현]
 final class RecheckSummary {
 
     private static final double RATE_TOLERANCE = 1e-9;
@@ -71,6 +73,14 @@ final class RecheckSummary {
 
         Double failRate() {
             return completed() == 0 ? null : fail / (double) completed();
+        }
+
+        Double completionRate() {
+            return sampled == 0 ? null : completed() / (double) sampled;
+        }
+
+        boolean partial() {
+            return sampled > completed() || autoPass > decided;
         }
     }
 
@@ -136,13 +146,13 @@ final class RecheckSummary {
                 rule == null ? null : rule.nearRate(), rule == null ? null : rule.midRate(),
                 rule == null ? null : rule.lowRate(),
                 total.autoPass(), total.decided(), total.autoPass() - total.decided(), total.sampled(),
-                total.sampled() - total.completed(), total.pass(), total.fail(), strata, estimate(actual.values()),
-                compare(rule, byStratum, compareRule));
+                total.sampled() - total.completed(), total.pass(), total.fail(), total.completionRate(),
+                total.partial(), strata, estimate(actual.values()), compare(rule, byStratum, compareRule));
     }
 
     private static StratumSummary stratumSummary(RecheckStratum stratum, Counts c) {
         return new StratumSummary(stratum, c.autoPass(), c.decided(), c.autoPass() - c.decided(), c.sampled(),
-                c.completed(), c.sampled() - c.completed(), c.pass(), c.fail(), c.failRate());
+                c.completed(), c.sampled() - c.completed(), c.completionRate(), c.pass(), c.fail(), c.failRate());
     }
 
     // applied: 실제 적용 규칙 (V8 결정이면 null → 비교 불가)
@@ -156,7 +166,7 @@ final class RecheckSummary {
                         || compareRule.rateOf(e.getKey()) <= applied.rateOf(e.getKey()) + RATE_TOLERANCE);
         if (!computable) {
             return new Compare(compareRule.nearRate(), compareRule.midRate(), compareRule.lowRate(), false,
-                    null, null, null, null, null);
+                    null, null, null, null, null, null);
         }
         Map<RecheckStratum, Counts> counts = countEach(byStratum, s -> {
             double rate = compareRule.rateOf(s);
@@ -164,7 +174,7 @@ final class RecheckSummary {
         });
         Counts total = sum(counts.values());
         return new Compare(compareRule.nearRate(), compareRule.midRate(), compareRule.lowRate(), true,
-                total.sampled(), total.sampled() - total.completed(), total.pass(), total.fail(),
+                total.sampled(), total.sampled() - total.completed(), total.pass(), total.fail(), total.partial(),
                 estimate(counts.values()));
     }
 

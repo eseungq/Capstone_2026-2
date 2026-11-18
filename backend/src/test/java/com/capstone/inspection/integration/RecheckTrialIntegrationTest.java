@@ -190,6 +190,8 @@ class RecheckTrialIntegrationTest extends IntegrationTestBase {
         assertThat(near.path("undecidedCount").asLong()).isEqualTo(1);
         assertThat(near.path("completedCount").asLong()).isEqualTo(1);
         assertThat(near.path("failRateAmongCompleted").asDouble()).isEqualTo(1.0);
+        assertThat(near.path("completionRate").asDouble()).isEqualTo(1.0);
+        assertThat(rule.path("partial").asBoolean()).isTrue(); // 결정 누락 1건이 남음
         assertThat(rule.at("/strata/2/autoPassCount").asLong()).isEqualTo(1); // LOW
         // LOW에 AUTO_PASS가 있는데 완료 0건 → 전체 추정은 비움 (대기·미선정을 정상으로 세지 않음)
         assertThat(rule.path("estimatedDefectRateInAutoPass").isNull()).isTrue();
