@@ -142,7 +142,8 @@ export default function InspectionImageLiveScreen() {
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()}>
+        <Pressable accessibilityRole="button" onPress={() => router.back()}
+          style={({ pressed }) => [styles.backTouch, pressed && styles.backTouchPressed]}>
           <Text style={styles.back}>‹ 뒤로</Text>
         </Pressable>
         <Text style={styles.title}>{imageKind === 'original' ? '원본 사진 확대' : 'AI 판단 근거 확대'}</Text>
@@ -152,7 +153,8 @@ export default function InspectionImageLiveScreen() {
         {(['original', 'gradcam'] as const).map((value) => (
           <Pressable key={value} accessibilityRole="button"
             accessibilityState={{ selected: imageKind === value }}
-            style={[styles.tab, imageKind === value && styles.tabActive]}
+            style={({ pressed }) => [styles.tab, imageKind === value && styles.tabActive,
+              pressed && (imageKind === value ? styles.tabActivePressed : styles.tabPressed)]}
             onPress={() => selectKind(value)}>
             <Text style={[styles.tabText, imageKind === value && styles.tabTextActive]}>
               {value === 'original' ? '원본 사진' : 'AI 판단 근거'}
@@ -168,7 +170,7 @@ export default function InspectionImageLiveScreen() {
         {!loading && error && <View style={styles.empty}>
           <Text style={styles.emptyTitle}>사진을 조회하지 못했습니다</Text>
           <Text style={styles.emptyText}>{error}</Text>
-          <Pressable style={styles.retryButton} accessibilityRole="button"
+          <Pressable style={({ pressed }) => [styles.retryButton, pressed && styles.retryButtonPressed]} accessibilityRole="button"
             disabled={refreshing} onPress={() => void load(false, true)}>
             <Text style={styles.retryText}>다시 조회</Text>
           </Pressable>
@@ -179,7 +181,7 @@ export default function InspectionImageLiveScreen() {
             <Text style={styles.emptyText}>
               {isFailed ? '새 주소를 조회했지만 이미지를 표시할 수 없습니다.' : missingImageText(current, imageKind)}
             </Text>
-            <Pressable style={styles.retryButton} accessibilityRole="button"
+            <Pressable style={({ pressed }) => [styles.retryButton, pressed && styles.retryButtonPressed]} accessibilityRole="button"
               disabled={refreshing} onPress={() => void load(false, true)}>
               <Text style={styles.retryText}>{refreshing ? '조회 중…' : '이미지 다시 조회'}</Text>
             </Pressable>
@@ -216,14 +218,14 @@ export default function InspectionImageLiveScreen() {
         <View style={styles.controls}>
           <Text style={styles.hint}>두 손가락으로 확대 · 이동</Text>
           <View style={styles.controlRow}>
-            <Pressable accessibilityRole="button" style={styles.controlButton}
+            <Pressable accessibilityRole="button" style={({ pressed }) => [styles.controlButton, pressed && styles.controlButtonPressed]}
               onPress={() => setZoom((v) => Math.max(1, v - 0.5))}>
               <Text style={styles.controlText}>− 축소</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" style={styles.controlButton} onPress={() => setZoom(1)}>
+            <Pressable accessibilityRole="button" style={({ pressed }) => [styles.controlButton, pressed && styles.controlButtonPressed]} onPress={() => setZoom(1)}>
               <Text style={styles.controlText}>원래 크기</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" style={styles.controlButton}
+            <Pressable accessibilityRole="button" style={({ pressed }) => [styles.controlButton, pressed && styles.controlButtonPressed]}
               onPress={() => setZoom((v) => Math.min(4, v + 0.5))}>
               <Text style={styles.controlText}>＋ 확대</Text>
             </Pressable>
@@ -241,11 +243,15 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#111827' },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 18, gap: 8 },
   back: { color: '#E5E7EB', fontSize: 14 },
+  backTouch: { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, marginLeft: -8 },
+  backTouchPressed: { backgroundColor: '#334155' },
   title: { color: '#FFFFFF', fontSize: 22, fontWeight: '700' },
   subtitle: { color: '#A8B4C8', fontSize: 12 },
   tabs: { flexDirection: 'row', gap: 8, marginHorizontal: 20, marginBottom: 12 },
   tab: { flex: 1, paddingVertical: 12, minHeight: 44, backgroundColor: '#243044', borderRadius: 10, alignItems: 'center' },
   tabActive: { backgroundColor: '#2054D8' },
+  tabPressed: { backgroundColor: '#34465D' },
+  tabActivePressed: { backgroundColor: '#193EAA' },
   tabText: { color: '#C5D0E0', fontWeight: '700', fontSize: 13 },
   tabTextActive: { color: '#FFFFFF' },
   viewer: { flex: 1, backgroundColor: '#1F2937', marginHorizontal: 20, borderRadius: 12, overflow: 'hidden' },
@@ -258,11 +264,13 @@ const styles = StyleSheet.create({
   emptyTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', textAlign: 'center' },
   emptyText: { color: '#CBD5E1', fontSize: 12, textAlign: 'center', lineHeight: 19 },
   retryButton: { backgroundColor: '#2054D8', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 9, minHeight: 44, justifyContent: 'center' },
+  retryButtonPressed: { backgroundColor: '#193EAA' },
   retryText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   controls: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, gap: 12 },
   hint: { color: '#CBD5E1', textAlign: 'center', fontSize: 12 },
   controlRow: { flexDirection: 'row', gap: 8 },
   controlButton: { flex: 1, backgroundColor: '#243044', borderRadius: 9, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  controlButtonPressed: { backgroundColor: '#34465D' },
   controlText: { color: '#FFFFFF', fontWeight: '600', fontSize: 12 },
   bottomNotice: { color: '#CBD5E1', fontSize: 11, lineHeight: 17, textAlign: 'center', paddingHorizontal: 20, paddingBottom: 12 },
 });
