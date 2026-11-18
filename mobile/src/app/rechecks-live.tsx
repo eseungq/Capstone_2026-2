@@ -96,6 +96,13 @@ export default function RechecksLiveScreen() {
             원래 AUTO_PASS의 PASS · SYSTEM 판정은 유지됩니다. REVIEW 업무 대기열과 재확인 대기열은 별도입니다.
           </Text>
         </View>
+        {role === 'ADMIN' && (
+          <Pressable accessibilityRole="button"
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+            onPress={() => router.push('/recheck-summary-live')}>
+            <Text style={styles.link}>관리자 공동시험 요약 · AUTO_PASS 추정 불량률 보기 ›</Text>
+          </Pressable>
+        )}
         <Text style={styles.sectionTitle}>조회 유형</Text>
         <View style={styles.row}>
           {([
