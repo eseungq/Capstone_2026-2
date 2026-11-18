@@ -2,7 +2,7 @@
 
 담당: 이승규 · 기준 문서: [백엔드 API 계약 v4](../docs/백엔드_API계약_v4.md)
 
-현재 구현 범위 (11/10)
+현재 구현 범위 (11/18)
 - 인증: 로그인·토큰 재발급·로그아웃, 역할(WORKER·ADMIN·DEVICE)별 접근 제어, 로그인 5회 실패 잠금
 - 사진 접수(비동기): `POST /api/v1/inspections` → 202, 스레드 풀(1개, 11/04 실측으로 2→1)에서 AI 호출·응답 검증·정책 적용
 - 검사 상세: `GET /api/v1/inspections/{id}` (AI·정책·판정·이미지 블록, 만료되는 이미지 주소)
@@ -13,12 +13,12 @@
 - 수동 판정 전환: `POST /api/v1/inspections/{id}/manual` (WORKER, 모든 FAILED, AI 상태 확인 안 함) → 새 검사(`source=MANUAL`, `AI_UNAVAILABLE`)를 기존 confirm으로 판정. FAILED 1건당 재검사·수동 전환 중 1건 (V6, 계약 6.10)
 - 부품 목록: `GET /api/v1/parts` (모델 사용 가능·정책 적용 여부)
 - 모델 로드 확인: 접수·재검사·부품 목록·모니터링 공통 (아래 "실제 AI 연결")
-- 관리자: `GET /api/v1/admin/models`, 정책 조회·등록·기준치 조정(새 버전)·적용·중지, 계정 잠금 해제 `POST /api/v1/admin/users/{loginId}/unlock`
+- 관리자: `GET /api/v1/admin/models`, 정책 조회·등록·기준치 조정(새 버전)·적용·중지, 계정 잠금 해제 `POST /api/v1/admin/users/{loginId}/unlock`, 검사 기록 CSV 내보내기 `GET /api/v1/admin/inspections/export` (이력과 같은 필터, 최대 10,000건, 계약 6.1)
 - 알림: 기기 토큰 등록·해제, Expo 푸시 발송 (`app.push.enabled` 기본 false면 로그만). 티켓까지만 확인하고 receipt 조회는 없음
 - Mock AI 서버 (`mock-ai/`, Python)
 - 점검 스크립트 (`scripts/`, 아래 표)
 
-아직 없음: AI 무응답 시 수동 판정 (방식 결정 중, [결정안](../docs/수동판정_결정안.md)). 통계 API는 합의본상 범위 제외 (앱 통계 화면은 시연용 Mock)
+아직 없음: 앱 푸시 토큰 등록·수신(앱 쪽 미구현, 백엔드 발송은 구현). 통계 API는 합의본상 범위 제외 (앱 통계 화면은 시연용 Mock)
 
 실제 AI 연결 시험: 11/04 DGX(e02)와 16개 항목 통과(B6만 보류), 동시 접수 측정 포함 ([통합 점검표](../docs/통합_점검표.md))
 
@@ -31,7 +31,7 @@
 ```bash
 docker compose up -d                 # MySQL 8.4 (DB/계정/비밀번호: inspection)
 ./gradlew build                      # 컴파일 + 단위·통합 테스트 (통합은 Docker 필요, 없으면 건너뜀)
-./gradlew bootRun                    # Flyway가 V1~V5와 개발용 시드(db/seed-dev) 적용
+./gradlew bootRun                    # Flyway가 V1~V7과 개발용 시드(db/seed-dev) 적용
 
 # 다른 터미널에서 Mock AI
 cd mock-ai
@@ -46,6 +46,27 @@ uvicorn main:app --port 8090
 - 이미 V1·V2만 적용된 DB에서도 그대로 실행하면 V3 이후가 추가 적용된다
 - V5(무결성 제약)는 기존 행이 제약을 어기면 적용 중간에 실패한다. 오래된 개발 DB라면 먼저 김남균 `V5_precheck.sql`로 위반 0건을 확인하고, 위반이 있으면 `docker compose down -v`로 초기화
 
+<!-- AUTO-GENERATED: application.yml의 ${...} 자리와 자주 바꾸는 app.* 값. application.yml을 고친 뒤 다시 생성 -->
+환경 변수 (`src/main/resources/application.yml` 기준)
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `DB_HOST` | `localhost` | MySQL 주소 |
+| `DB_PORT` | `3306` | MySQL 포트 (기존 컨테이너가 3307이면 지정) |
+| `DB_NAME` | `inspection` | DB 이름 |
+| `DB_USER` | `inspection` | DB 계정 |
+| `DB_PASSWORD` | `inspection` | DB 비밀번호 (개발용) |
+| `PUBLIC_BASE_URL` | `http://localhost:8080` | 이미지 주소의 앞부분. AI 서버·앱이 접근할 수 있는 주소여야 함 |
+| `JWT_SECRET` | 개발용 고정 문자열 | 토큰 서명 키 (32바이트 이상). 운영에서는 반드시 지정 |
+| `APP_AI_BASEURL` | `http://localhost:8090` | 기본 AI 서버 (`app.ai.base-url`, 개발은 Mock AI) |
+| `APP_AI_PARTBASEURLS_<부품코드>` | 없음 | 부품별 AI 서버 (`app.ai.part-base-urls`). 예: `APP_AI_PARTBASEURLS_FRAME` |
+| `APP_AI_READTIMEOUTMS` | `20000` | 분석 실행 타임아웃 (`app.ai.read-timeout-ms`) |
+| `APP_AI_MODELCHECKENABLED` | `true` | `/internal/v1/models` 로드 확인 (`app.ai.model-check-enabled`) |
+| `APP_PUSH_ENABLED` | `false` | Expo 푸시 실제 발송 (`app.push.enabled`, false면 로그만) |
+
+다른 `app.*` 값도 Spring 규칙(점·하이픈을 빼고 대문자, 예: `APP_INSPECTION_ANALYSISPOOLSIZE`)으로 바꿀 수 있다.
+<!-- /AUTO-GENERATED -->
+
 ## 테스트 계정 (개발용, `src/main/resources/db/seed-dev`)
 
 | 계정 | 비밀번호 | 역할 |
@@ -57,7 +78,7 @@ uvicorn main:app --port 8090
 시드에는 Mock 모델 `mock-door-swin-t-v1`(보정기 `mock-cal-v1`, active)과 예시 정책 `example-door-p1`(passThreshold 0.05, 검증 범위 0.02~0.08, ready·active)도 들어 있다. 실제 검증 값이 아니다.
 실제 DOOR 모델 `door-swin-tiny-e20-8d042c7bfab2`(10/28)와 재학습 2회차 `door-swin-tiny-e02-28a2dd1cb40b-dev`(11/03, V5_2)도 보정기·정책 없이 **비활성**으로 등록되어 있다 (아래 "실제 AI 연결").
 도어 Mock 시연 정책 `example-door-demo-0092`(Mock 모델, 기본 기준치 0.0092, 조정 범위 0.0084~0.0092, ready·**비활성**)도 등록되어 있다 (V6_2, 11/12 AI 내부 평가, 아래 "시연 정책"). 먼저 넣은 `example-door-demo-0084`(V6_1)와 11/09 값 `example-door-demo-30`(V5_3, 외부 사진 사후 적용 참고값)은 비활성으로 남아 있다.
-실제 도어 e02에는 시연 보정기 `door-e02-temperature-30962f5cac45-demo`와 정책 `door-e02-demo-0092`(0.0092)·`door-e02-demo-0084`(0.0084), 조정 범위 0.0084~0.0092, 둘 다 ready·**비활성**이 등록되어 있다 (V7_1, 11/17 김도현). 8771이 이 보정기로 응답하기 전에는 정책과 호환되지 않아 계속 REVIEW. 공동 시험에서 0.84% 적용 → 정상 사진(보정 약 0.876%) REVIEW(`ABOVE_THRESHOLD`) → 0.92% 적용 → 같은 사진 새 접수 AUTO_PASS를 확인한다 (통합 테스트 "도어 e02 시연 11/17 (V7_1)").
+실제 도어 e02에는 시연 보정기 `door-e02-temperature-30962f5cac45-demo`와 정책 `door-e02-demo-0092`(0.0092)·`door-e02-demo-0084`(0.0084), 조정 범위 0.0084~0.0092, 둘 다 ready·**비활성**이 등록되어 있다 (V7_1, 11/17 김도현). AI 서버가 이 보정기 없이 응답하면(calibratorVersion null) 정책과 호환되지 않아 REVIEW. 11/17 보정기를 켠 e02 서버(8785)로 0.84% 적용 → 정상 사진(보정 0.8761%) REVIEW(`ABOVE_THRESHOLD`) → 0.92% 적용 → 같은 사진 새 접수 AUTO_PASS를 실서버에서 확인했다 (점검표 F13, INS-000128·129, 통합 테스트 "도어 e02 시연 11/17 (V7_1)").
 **운영 배포 시 `spring.flyway.locations`에서 `classpath:db/seed-dev`를 빼야 한다.**
 
 ## 동작 확인 (curl)
@@ -142,7 +163,7 @@ curl -s -X DELETE 'localhost:8080/api/v1/notifications/devices/ExponentPushToken
 
 ## 실제 AI 연결
 
-계약 v4 7장 규격의 실제 AI 서버로 바꾸는 방법. 모델 버전은 재학습 2회차 `door-swin-tiny-e02-28a2dd1cb40b-dev` (11/03, 이전 버전 e20은 비활성 유지. 보정기 미준비, 정책 없음 → 분석 성공 건은 모두 REVIEW가 정상: GOOD은 `NO_ACTIVE_POLICY`, DEFECT는 `DEFECT_PREDICTED`).
+계약 v4 7장 규격의 실제 AI 서버로 바꾸는 방법. 모델 버전은 재학습 2회차 `door-swin-tiny-e02-28a2dd1cb40b-dev` (11/03, 이전 버전 e20은 비활성 유지. 시연 보정기·정책은 V7_1로 등록, 정책을 적용하지 않으면 분석 성공 건은 모두 REVIEW가 정상: GOOD은 `NO_ACTIVE_POLICY`, DEFECT는 `DEFECT_PREDICTED`. 정책 적용 후 AUTO_PASS는 위 "테스트 계정"의 e02 시연 설명 참고).
 
 1. 활성 모델 전환. 검사항목당 active 모델은 1개(V5 제약)이므로 **끄는 문장을 먼저** 실행. Mock 모델의 예시 정책도 함께 중지 (그대로 두면 무결성 점검 I12에 걸림)
    ```sql
@@ -205,7 +226,7 @@ curl -s -X DELETE 'localhost:8080/api/v1/notifications/devices/ExponentPushToken
 
 ## 시연 정책 (도어 Mock 0.92% ↔ 0.84%)
 
-AI가 11/12 도어 e02 내부 평가를 다시 해 정한 시연 기준(기본 0.92%, 조정 하한 0.84%)을 보정기가 있는 Mock 모델로 재현한다. 내부 평가 1,159개 사진 그룹에서 0.92%는 정상 208/566·불량 0/593그룹, 0.84%는 정상 189/566·불량 0/593그룹이 자동 통과 (`metrics`에 기록). 독립 검증된 운영 정책이 아니다. 실제 e02는 보정기가 null이라 정책 적용이 `POLICY_NOT_READY`로 거절되어 실서버는 계속 REVIEW.
+AI가 11/12 도어 e02 내부 평가를 다시 해 정한 시연 기준(기본 0.92%, 조정 하한 0.84%)을 보정기가 있는 Mock 모델로 재현한다. 내부 평가 1,159개 사진 그룹에서 0.92%는 정상 208/566·불량 0/593그룹, 0.84%는 정상 189/566·불량 0/593그룹이 자동 통과 (`metrics`에 기록). 독립 검증된 운영 정책이 아니다. 실제 e02도 11/17부터 시연 보정기(V7_1)와 정책 `door-e02-demo-0092`·`-0084`로 같은 순서를 실서버에서 재현한다 (점검표 F13).
 
 1. Mock AI로 백엔드 실행 (`APP_AI_BASEURL=http://localhost:8090`), Mock 모델이 active인지 확인 (`GET /admin/models`)
 2. ADMIN: `example-door-p1` 중지 → `example-door-demo-0092` 적용 (`POST /admin/policies/{id}/deactivate`, `/activate`)
@@ -237,8 +258,10 @@ storage/             로컬 이미지 저장, 서명된 만료 주소, 이미지
 config/              AppProperties(app.*), Security, 분석 스레드 풀, Swagger
 common/              공통 응답·오류, traceId, 시각 변환
 domain/              엔티티·리포지토리
-resources/db/migration   V1 스키마, V2 부품, V3 인증, V4 모니터링·비동기·Grad-CAM, V5 무결성 제약(김남균)
-resources/db/seed-dev    개발용 계정·Mock 모델·예시 정책, 실제 DOOR 모델(비활성), 도어 시연 정책(비활성)
+resources/db/migration   V1 스키마, V2 부품, V3 인증, V4 모니터링·비동기·Grad-CAM, V5 무결성 제약(김남균),
+                         V6 수동 판정, V7 도어 검사항목 UNIFIED
+resources/db/seed-dev    개발용 계정·Mock 모델·예시 정책, 실제 DOOR 모델(비활성), 프레임·카울커버 모델과 시연 정책,
+                         도어 시연 정책(비활성), 도어 e02 시연 보정기·정책(V7_1, 비활성)
 mock-ai/             Mock AI 추론 서버 (FastAPI)
 scripts/             연결 점검·전체 흐름·측정·시연 데이터
 ```
