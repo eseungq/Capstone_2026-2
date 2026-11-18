@@ -508,6 +508,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - **라벨은 작업자 판정만**: 바뀌는 건마다 `WORKER_PASS`·`WORKER_FAIL`·`UNVERIFIED`. AUTO_PASS(PASS·SYSTEM)와 판정 전 REVIEW는 실제 라벨이 아니므로 `UNVERIFIED`
   - 기준 상향(`REVIEW_TO_AUTO_PASS`): 바뀌는 건은 지금 REVIEW라 작업자 판정이 있음 → `workerFail`이 후보에서 추가로 통과될 불량 (해당 기록에서 관측된 건수)
   - 기준 하향(`AUTO_PASS_TO_REVIEW`): 바뀌는 건은 지금 AUTO_PASS라 대부분 `UNVERIFIED`
+  - AUTO_PASS 표본 재확인(6.11) 결과는 아직 라벨에 넣지 않음. 재확인 FAIL인 건도 여기서는 `UNVERIFIED`. 표본이라 추출 비율 가중치를 함께 다뤄야 해서 다음 단계 [11/18]
 - 응답 `200`
   ```json
   { "data": {
@@ -571,7 +572,9 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 작업자 판정은 REVIEW 건에만 쌓여서 AUTO_PASS로 빠진 검사에서 무엇을 놓쳤는지 알 수 없다. `PASS · SYSTEM`은 실제 정상 라벨이 아니다. AUTO_PASS 건 일부를 정해진 규칙으로 뽑아 작업자가 다시 확인하고, 결과를 원래 시스템 판정과 **따로** 저장한다 (AI 정책 점검 11/18 4.3). 기준치·범위·보정기는 자동으로 바꾸지 않는다
 
 표본 추출 (백엔드 자동)
-- AUTO_PASS가 저장된 **뒤 별도 단계**에서 결정. 추출이 실패해도 AUTO_PASS 결과에는 영향 없음 (로그만)
+- AUTO_PASS가 저장된 **뒤 별도 단계**에서 결정. 추출이 실패해도 AUTO_PASS 결과에는 영향 없음
+- AUTO_PASS마다 결정을 1행 기록: 뽑힌 건 `sampled = true`, 뽑히지 않은 건도 `sampled = false`로 남김. 그래서 **미선정과 저장 실패를 구분**할 수 있음 (행이 없으면 결정 전·저장 실패)
+- 재처리: 결정 행이 없는 AUTO_PASS를 5분마다 다시 결정 (완료 후 1분~1일 사이 건, 1회 100건). 같은 검사는 항상 같은 결정이라 다시 해도 결과가 같고, 동시에 처리돼도 `inspection_id` UNIQUE로 1건만 남음. `app.recheck.sweep-enabled=false`면 재처리 안 함 [구현 11/18]
 - 구간: `r = calibratedDefectProbability ÷ 판정 당시 passThreshold` (0 ≤ r ≤ 1). 부품마다 기준치가 달라도 같은 규칙
 
   | stratum | 조건 | 기본 비율 (`app.recheck.*`, TBD-16) |
@@ -583,7 +586,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 - 낮은 점수 구간도 일부 뽑음 (기준 근처만 보면 전체 통과 건을 대표하지 못함)
 - 추출 여부는 검사 ID의 SHA-256으로 정한 0~1 값이 비율보다 작은지로 결정. 같은 검사는 항상 같은 결과라 재현 가능하고, 사람이 고른 건이 섞이지 않음
 - 뽑을 때 쓴 비율(`samplingRate`)을 함께 저장. 집계할 때 가중치(1/samplingRate)로 씀
-- 설정을 바꾸면 이후 AUTO_PASS부터 적용. 과거 건은 다시 뽑지 않음. `app.recheck.enabled=false`면 뽑지 않음
+- 설정을 바꾸면 이후 AUTO_PASS부터 적용. 이미 결정된 건은 다시 뽑지 않음. `app.recheck.enabled=false`면 결정·재처리 모두 하지 않음 (다시 켜면 최근 1일 안의 결정 없는 건은 재처리 대상)
 - 문제가 보여 사람이 임의로 고른 건은 표본에 넣지 않음 (필요하면 다음 단계에서 별도 구분)
 
 목록 `GET /rechecks`
@@ -785,7 +788,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | `worker_confirmation` | `comment` 추가. 그 외 그대로 |
 | `recalculation_run`·`recalculation_result` | 제외 [합의 10/15, TBD-15 해소] |
 | **신규** `device_token` | id, user_id, token(UNIQUE), platform, created_at, last_seen_at |
-| **신규** `auto_pass_recheck` (V8) [제안 11/18] | id, inspection_id(UNIQUE), stratum(NEAR/MID/LOW), sampling_rate(0 < rate ≤ 1), sampled_at, result(PASS/FAIL, null), comment, rechecked_by, rechecked_at. CHECK: 결과·확인자·확인 시각은 셋 다 있거나 셋 다 없음. 테이블 간 규칙(대상이 AUTO_PASS·SYSTEM, 재확인이 있어도 `inspection.final_judgement`는 PASS)은 점검 SQL로 확인 (김남균 협의) |
+| **신규** `auto_pass_recheck` (V8) [제안 11/18] | AUTO_PASS마다 추출 결정 1행. id, inspection_id(UNIQUE), sampled(뽑힘 여부), stratum(NEAR/MID/LOW), sampling_rate(0 ≤ rate ≤ 1, 뽑힌 건은 0 초과), sampled_at(결정 시각), result(PASS/FAIL, null), comment, rechecked_by, rechecked_at. CHECK: 뽑히지 않은 건은 result 없음, 결과·확인자·확인 시각은 셋 다 있거나 셋 다 없음. 테이블 간 규칙(대상이 AUTO_PASS·SYSTEM, 재확인이 있어도 `inspection.final_judgement`는 PASS)은 점검 SQL로 확인 (김남균 협의) |
 
 적용 현황 [합의 10/28]
 - Flyway V1~V5 적용. V3 인증, V4 모니터링·비동기·Grad-CAM·정책 버전(위 표), **V5 무결성 제약**(김남균 작성, 이승규 수정: `gradcam_status`에 `NO_ACTIVATION` 추가, FAILED면 `predicted_quality` NULL)

@@ -67,6 +67,7 @@ app:
     near-rate: 1.0                    # 구간별 추출 비율
     mid-rate: 0.3
     low-rate: 0.1
+    sweep-enabled: true               # 추출 결정이 저장되지 않은 AUTO_PASS를 5분마다 다시 처리 (최근 1일)
   push:
     enabled: false                    # false면 발송하지 않고 로그만 (계약 8장)
     expo-url: https://exp.host/--/api/v2/push/send

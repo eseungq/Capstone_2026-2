@@ -103,7 +103,7 @@ public class InspectionQueryService {
                 i.getLineCode(), i.getStatus(), DisplayState.of(i), Times.toOffset(i.getReceivedAt()),
                 Times.toOffset(i.getCompletedAt()), i.getSource(), retryOf, manualOf, followUp, ai, policy,
                 judgement, images(i), error,
-                recheckRepository.findByInspectionIdWithUser(i.getId()).map(RecheckBlock::of).orElse(null));
+                recheckRepository.findSampledByInspectionIdWithUser(i.getId()).map(RecheckBlock::of).orElse(null));
     }
 
     // 검사 이력 (계약 v4 6.6). 작업자도 전체 검사 조회. 기간은 receivedAt 기준 from ≤ receivedAt < to

@@ -65,7 +65,7 @@ public class RecheckService {
     private RecheckResponse save(AuthUser worker, String inspectionId, Judgement result, String comment) {
         Inspection i = inspectionRepository.findById(inspectionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INSPECTION_NOT_FOUND));
-        AutoPassRecheck r = recheckRepository.findByInspectionIdWithUser(inspectionId)
+        AutoPassRecheck r = recheckRepository.findSampledByInspectionIdWithUser(inspectionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_RECHECKABLE)); // 표본이 아님
         if (r.getResult() != null) {
             return replayed(i, r, result);
@@ -76,12 +76,12 @@ public class RecheckService {
             return null;
         }
         log.info("표본 재확인 {} {} {} by={}", i.getInspectionNo(), i.getId(), result, worker.loginId());
-        return response(i, recheckRepository.findByInspectionIdWithUser(inspectionId).orElseThrow());
+        return response(i, recheckRepository.findSampledByInspectionIdWithUser(inspectionId).orElseThrow());
     }
 
     private RecheckResponse replay(String inspectionId, Judgement result) {
         Inspection i = inspectionRepository.findById(inspectionId).orElseThrow();
-        return replayed(i, recheckRepository.findByInspectionIdWithUser(inspectionId).orElseThrow(), result);
+        return replayed(i, recheckRepository.findSampledByInspectionIdWithUser(inspectionId).orElseThrow(), result);
     }
 
     private static RecheckResponse replayed(Inspection i, AutoPassRecheck r, Judgement result) {

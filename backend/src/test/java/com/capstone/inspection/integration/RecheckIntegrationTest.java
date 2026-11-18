@@ -1,8 +1,10 @@
 package com.capstone.inspection.integration;
 
+import com.capstone.inspection.inspection.RecheckSweeper;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -16,6 +18,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 //   예시 정책 example-door-p1 기준치 0.05: 0.045 → NEAR(r 0.9), 0.01 → LOW(r 0.2)
 @TestPropertySource(properties = {"app.recheck.near-rate=1.0", "app.recheck.mid-rate=1.0", "app.recheck.low-rate=0"})
 class RecheckIntegrationTest extends IntegrationTestBase {
+
+    @Autowired
+    private RecheckSweeper sweeper;
 
     private String submitGood(double calibrated) throws Exception {
         ai = r -> response(r, "GOOD", 0.1, calibrated);
@@ -85,8 +90,38 @@ class RecheckIntegrationTest extends IntegrationTestBase {
         assertThat(detail(review).path("recheck").isNull()).isTrue();
         assertThat(errorCode(recheck(low, "PASS", worker()))).isEqualTo("NOT_RECHECKABLE");
         assertThat(errorCode(recheck(review, "PASS", worker()))).isEqualTo("NOT_RECHECKABLE");
-        assertThat(jdbc.queryForObject("select count(*) from auto_pass_recheck where inspection_id in (?, ?)",
-                Long.class, low, review)).isZero();
+        // LOW는 뽑히지 않았다는 결정이 남고(재처리 대상과 구분), REVIEW는 결정 자체가 없음
+        assertThat(sampledFlag(low)).isFalse();
+        assertThat(jdbc.queryForObject("select count(*) from auto_pass_recheck where inspection_id = ?",
+                Long.class, review)).isZero();
+        assertThat(listed("PENDING", low)).isFalse();
+    }
+
+    @Test
+    @DisplayName("추출 결정 저장이 빠진 AUTO_PASS는 재처리로 같은 결정이 다시 남고, 결정이 있는 건·1일 지난 건은 건드리지 않음")
+    void sweepRestoresMissingDecisions() throws Exception {
+        String near = submitGood(0.045);
+        String low = submitGood(0.01);
+        String old = submitGood(0.045);
+        // 저장 실패 흉내: 결정 행을 지우고, 분석 직후 대기(SETTLE)가 지난 것처럼 완료 시각을 당김 (DB 시간대와 무관하게 기존 값 기준)
+        jdbc.update("delete from auto_pass_recheck where inspection_id in (?, ?, ?)", near, low, old);
+        jdbc.update("update inspection set completed_at = completed_at - interval 5 minute where id in (?, ?)", near, low);
+        jdbc.update("update inspection set completed_at = completed_at - interval 2 day where id = ?", old);
+
+        assertThat(sweeper.sweep()).isEqualTo(2);
+        assertThat(sampledFlag(near)).isTrue();
+        assertThat(sampledFlag(low)).isFalse();
+        assertThat(jdbc.queryForObject("select count(*) from auto_pass_recheck where inspection_id = ?",
+                Long.class, old)).isZero();
+        assertThat(listed("PENDING", near)).isTrue();
+
+        // 한 번 결정되면 다시 처리하지 않음
+        assertThat(sweeper.sweep()).isZero();
+    }
+
+    private boolean sampledFlag(String inspectionId) {
+        return jdbc.queryForObject("select sampled from auto_pass_recheck where inspection_id = ?", Boolean.class,
+                inspectionId);
     }
 
     @Test

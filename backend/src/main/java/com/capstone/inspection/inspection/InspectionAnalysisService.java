@@ -61,7 +61,7 @@ public class InspectionAnalysisService {
         try {
             recheckSampler.sampleIfNeeded(inspectionId);
         } catch (RuntimeException e) {
-            log.warn("표본 재확인 추출 실패 {}: {}", inspectionId, e.toString());
+            log.warn("표본 재확인 추출 실패 {} (결정 행이 없어 RecheckSweeper가 다시 처리): {}", inspectionId, e.toString());
         }
     }
 }

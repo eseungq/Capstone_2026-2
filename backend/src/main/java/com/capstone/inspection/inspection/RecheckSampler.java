@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 // AUTO_PASS가 확정된 뒤 표본 재확인 대상으로 뽑을지 결정 (계약 6.11)
 //   판정 저장과 별도 트랜잭션이라 여기서 실패해도 AUTO_PASS 결과에는 영향 없음 (호출 쪽에서 예외를 삼키고 로그만)
+//   실패한 건은 결정 행이 없으므로 RecheckSweeper가 다시 호출. 같은 검사는 항상 같은 결정이라 다시 해도 결과 같음
 @Component
 @RequiredArgsConstructor
 public class RecheckSampler {
@@ -39,11 +40,11 @@ public class RecheckSampler {
         }
         RecheckRules.Decision d = RecheckRules.decide(i.getId(), i.getCalibratedDefectProbability(),
                 i.getPassThresholdApplied(), config);
-        if (!d.sampled()) {
-            return;
-        }
         double rate = Math.round(d.rate() * 1_000_000) / 1_000_000.0; // DB DECIMAL(7,6)
-        recheckRepository.save(new AutoPassRecheck(i, d.stratum(), rate));
-        log.info("표본 재확인 대상 {} {} stratum={} rate={}", i.getInspectionNo(), i.getId(), d.stratum(), rate);
+        // 뽑히지 않은 결정도 남김: 행이 없는 AUTO_PASS는 저장 실패로 보고 RecheckSweeper가 다시 처리
+        recheckRepository.save(new AutoPassRecheck(i, d.sampled(), d.stratum(), rate));
+        if (d.sampled()) {
+            log.info("표본 재확인 대상 {} {} stratum={} rate={}", i.getInspectionNo(), i.getId(), d.stratum(), rate);
+        }
     }
 }
