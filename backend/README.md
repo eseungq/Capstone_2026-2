@@ -255,7 +255,7 @@ scripts/             연결 점검·전체 흐름·측정·시연 데이터
 | `app.policy.min-sample-count` | TBD-03 |
 | `app.push.enabled`, `expo-url` | TBD-14 |
 | `app.inspection.analysis-pool-size` | 11/04 실측으로 1 (실제 AI가 한 건씩 처리). 처리량이 더 필요하면 재측정 |
-| 검사항목 코드 `SCRATCH` (V2 시드) | TBD-04 |
+| 검사항목 코드 `UNIFIED` (세 부품 공통, 도어는 V7에서 `SCRATCH` → `UNIFIED`) | TBD-04 확정 11/17 |
 
 ## 문제 해결
 
