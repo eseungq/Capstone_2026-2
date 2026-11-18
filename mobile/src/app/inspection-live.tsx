@@ -64,34 +64,24 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 function ImagePanel({
-  title,
-  url,
-  missingText,
-  caption,
-  onLoadError,
+  title, url, missingText, caption, onLoadError, onOpen, compact = false,
 }: {
-  title: string;
-  url: string | null;
-  missingText: string;
-  caption?: string;
-  onLoadError: (url: string) => void;
+  title: string; url: string | null; missingText: string; caption?: string;
+  onLoadError: (url: string) => void; onOpen: () => void; compact?: boolean;
 }) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, compact && styles.imageCard]}>
       <Text style={styles.cardTitle}>{title}</Text>
       {url ? (
-        <>
-          <Image
-            source={{ uri: url }}
-            style={styles.inspectionImage}
-            resizeMode="contain"
-            onError={() => onLoadError(url)}
-          />
-          {caption && <Text style={styles.muted}>{caption}</Text>}
-        </>
-      ) : (
-        <Text style={styles.muted}>{missingText}</Text>
-      )}
+        <Pressable accessibilityRole="button" accessibilityLabel={title + ' 크게 보기'}
+          onPress={onOpen} style={({ pressed }) => [styles.photoTouch, pressed && styles.photoTouchPressed]}>
+          <Image source={{ uri: url }} resizeMode="contain"
+            style={[styles.inspectionImage, compact && styles.compactImage]}
+            onError={() => onLoadError(url)} />
+          <Text style={styles.imageOpenText}>사진을 눌러 확대 ›</Text>
+        </Pressable>
+      ) : <Text style={styles.muted}>{missingText}</Text>}
+      {caption && url && <Text style={styles.muted}>{caption}</Text>}
     </View>
   );
 }
@@ -398,7 +388,7 @@ export default function InspectionLiveScreen() {
   const followUpSubmitted = submitting !== null || retryResult !== null || manualResult !== null;
   const retryButton = canShowRetry ? (
     <Pressable
-      style={[styles.button, followUpSubmitted && styles.disabledButton]}
+      style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, followUpSubmitted && styles.disabledButton]}
       disabled={followUpSubmitted}
       onPress={requestRetry}
       accessibilityRole="button"
@@ -408,7 +398,8 @@ export default function InspectionLiveScreen() {
   ) : null;
   const manualButton = canShowManual ? (
     <Pressable
-      style={[modelAvailable === true ? styles.secondaryButton : styles.button,
+      style={({ pressed }) => [modelAvailable === true ? styles.secondaryButton : styles.button,
+        pressed && (modelAvailable === true ? styles.secondaryButtonPressed : styles.buttonPressed),
         followUpSubmitted && styles.disabledButton]}
       disabled={followUpSubmitted}
       onPress={requestManual}
@@ -432,11 +423,12 @@ export default function InspectionLiveScreen() {
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} accessibilityRole="button">
-          <Text style={styles.back}>‹ 모니터링으로 돌아가기</Text>
+        <Pressable onPress={() => router.back()} accessibilityRole="button"
+          style={({ pressed }) => [styles.backTouch, pressed && styles.backTouchPressed]}>
+          <Text style={styles.back}>‹ 뒤로</Text>
         </Pressable>
-        <Text style={styles.title}>실제 서버 검사 상세</Text>
-        <Text style={styles.muted}>SERVER · 검사 UUID로 조회 · 권한별 판정/재검사/수동 전환</Text>
+        <Text style={styles.title}>검사 상세{visibleDetail ? ' · ' + (visibleDetail.displayState === 'REVIEW_PENDING' ? 'REVIEW' : visibleDetail.displayState === 'REVIEW_DONE' ? '판정 완료' : visibleDetail.displayState) : ''}</Text>
+        <Text style={styles.muted}>{visibleDetail ? visibleDetail.partCode + ' · ' + visibleDetail.inspectionNo : '검사 결과 조회'}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
@@ -465,7 +457,7 @@ export default function InspectionLiveScreen() {
         )}
 
         {!loading && !visibleDetail && (
-          <Pressable style={styles.button} onPress={() => void load(true)}>
+          <Pressable style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]} onPress={() => void load(true)}>
             <Text style={styles.buttonText}>다시 조회</Text>
           </Pressable>
         )}
@@ -473,12 +465,11 @@ export default function InspectionLiveScreen() {
         {visibleDetail && (
           <>
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>{visibleDetail.inspectionNo}</Text>
-              <Field label="부품" value={visibleDetail.partCode} />
-              <Field label="검사 생성 경로" value={visibleDetail.source ?? '미제공'} />
-              <Field label="상태" value={`${visibleDetail.displayStateLabel} (${visibleDetail.displayState})`} />
+              <Text style={styles.cardTitle}>검사 상태</Text>
+              <Field label="부품 · 검사번호" value={visibleDetail.partCode + ' · ' + visibleDetail.inspectionNo} />
+              <Field label="상태" value={visibleDetail.displayStateLabel} />
               <Field label="접수 시각" value={formatTime(visibleDetail.receivedAt)} />
-              <Field label="검사 UUID" value={visibleDetail.inspectionId} />
+              {visibleDetail.source === 'MANUAL' && <Field label="검사 유형" value="수동 판정" />}
             </View>
 
             {isManualInspection && (
@@ -493,7 +484,7 @@ export default function InspectionLiveScreen() {
                     <Field label="원본 AI 오류 코드" value={visibleDetail.manualOf.errorCode} />
                     <Text style={styles.muted}>{visibleDetail.manualOf.errorMessage}</Text>
                     <Pressable
-                      style={styles.secondaryButton}
+                      style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed]}
                       onPress={() => router.push({
                         pathname: '/inspection-live',
                         params: { inspectionId: visibleDetail.manualOf!.inspectionId },
@@ -514,7 +505,7 @@ export default function InspectionLiveScreen() {
                 </Text>
                 <Field label="후속 검사 유형" value={visibleDetail.followUp.source === 'MANUAL' ? '수동 판정' : '재검사'} />
                 <Pressable
-                  style={styles.secondaryButton}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed]}
                   onPress={() => router.push({
                     pathname: '/inspection-live',
                     params: { inspectionId: visibleDetail.followUp!.inspectionId },
@@ -532,21 +523,34 @@ export default function InspectionLiveScreen() {
               </View>
             )}
 
-            <ImagePanel
-              title="원본 사진"
-              url={visibleDetail.originalImageUrl}
-              missingText="원본 이미지 주소가 제공되지 않았습니다."
-              onLoadError={handleImageError}
-            />
-
-            {!isManualInspection && (
-              <ImagePanel
-                title="AI 판단 근거"
-                url={visibleDetail.gradcamImageUrl}
-                missingText={gradcamMissing}
-                caption="AI가 반응한 영역입니다. 원본 사진과 함께 확인해 주세요."
+            {(isManualInspection || visibleDetail.displayState === 'FAILED') ? (
+              <ImagePanel title="원본 사진" url={visibleDetail.originalImageUrl}
+                missingText="원본 이미지가 제공되지 않았습니다."
                 onLoadError={handleImageError}
+                onOpen={() => router.push({
+                  pathname: '/inspection-image-live',
+                  params: { inspectionId: id, kind: 'original' },
+                })}
               />
+            ) : (
+              <View style={styles.imageRow}>
+                <ImagePanel title="원본 사진" url={visibleDetail.originalImageUrl}
+                  missingText="원본 이미지가 제공되지 않았습니다." compact
+                  onLoadError={handleImageError}
+                  onOpen={() => router.push({
+                    pathname: '/inspection-image-live',
+                    params: { inspectionId: id, kind: 'original' },
+                  })}
+                />
+                <ImagePanel title="AI 판단 근거" url={visibleDetail.gradcamImageUrl}
+                  missingText={gradcamMissing} compact
+                  onLoadError={handleImageError}
+                  onOpen={() => router.push({
+                    pathname: '/inspection-image-live',
+                    params: { inspectionId: id, kind: 'gradcam' },
+                  })}
+                />
+              </View>
             )}
 
             <View style={styles.card}>
@@ -562,7 +566,6 @@ export default function InspectionLiveScreen() {
                       ? '미준비 / 미제공'
                       : `${(visibleDetail.calibratedDefectProbability * 100).toFixed(2)}%`}
                   />
-                  <Field label="AI 모델" value={visibleDetail.modelVersion ?? '미제공'} />
                   <Field label="REVIEW 사유" value={visibleDetail.reviewReasonText ?? '해당 없음'} />
                 </>
               )}
@@ -574,10 +577,8 @@ export default function InspectionLiveScreen() {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>실제 서버 판정 · 재검사 · 수동 전환</Text>
-              <Text style={styles.muted}>
-                서버가 최종 권한과 상태를 검증합니다. 제출 후 자동으로 재전송하지 않습니다.
-              </Text>
+              <Text style={styles.cardTitle}>작업자 판정 · 후속 처리</Text>
+              <Text style={styles.muted}>요청 전 내용을 확인해 주세요. 중복 제출은 하지 않습니다.</Text>
               {roleLoading && <Text style={styles.muted}>로그인 역할 확인 중…</Text>}
               {!roleLoading && role !== 'WORKER' && role !== 'ADMIN' && (
                 <Text style={styles.errorText}>WORKER 또는 ADMIN 실제 서버 계정으로 로그인해 주세요.</Text>
@@ -600,7 +601,7 @@ export default function InspectionLiveScreen() {
                   />
                   <View style={styles.buttonRow}>
                     <Pressable
-                      style={[styles.button, styles.buttonFlex, submitting && styles.disabledButton]}
+                      style={({ pressed }) => [styles.button, styles.buttonFlex, pressed && styles.buttonPressed, submitting && styles.disabledButton]}
                       disabled={submitting !== null}
                       onPress={() => requestConfirm('PASS')}
                       accessibilityRole="button"
@@ -608,7 +609,7 @@ export default function InspectionLiveScreen() {
                       <Text style={styles.buttonText}>PASS 확정</Text>
                     </Pressable>
                     <Pressable
-                      style={[styles.button, styles.buttonFlex, styles.failButton, submitting && styles.disabledButton]}
+                      style={({ pressed }) => [styles.button, styles.buttonFlex, styles.failButton, pressed && styles.failButtonPressed, submitting && styles.disabledButton]}
                       disabled={submitting !== null}
                       onPress={() => requestConfirm('FAIL')}
                       accessibilityRole="button"
@@ -651,7 +652,7 @@ export default function InspectionLiveScreen() {
               )}
               {manualResult && (
                 <Pressable
-                  style={styles.secondaryButton}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed]}
                   onPress={() => router.push({
                     pathname: '/inspection-live',
                     params: { inspectionId: manualResult.inspectionId },
@@ -663,7 +664,7 @@ export default function InspectionLiveScreen() {
               )}
               {retryResult && (
                 <Pressable
-                  style={styles.secondaryButton}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed]}
                   onPress={() => router.push({
                     pathname: '/inspection-live',
                     params: { inspectionId: retryResult.inspectionId },
@@ -676,24 +677,16 @@ export default function InspectionLiveScreen() {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>이미지 접근 주소</Text>
-              <Field label="서명 URL 만료 시각" value={formatTime(visibleDetail.imageUrlExpiresAt)} />
-              <Text style={styles.muted}>
-                화면이 활성 상태일 때 만료 30초 전 새 주소를 조회합니다.
-                백그라운드에서는 자동 조회를 중단하며, 복귀하면 만료 여부를 다시 확인합니다.
-                이미지 로딩 실패 시에도 새 주소를 다시 조회합니다.
-              </Text>
-              <Pressable
-                style={[styles.button, refreshing && styles.disabledButton]}
+              <Text style={styles.cardTitle}>사진이 보이지 않나요?</Text>
+              <Text style={styles.muted}>사진 주소가 만료되었거나 로드되지 않으면 다시 조회할 수 있습니다.</Text>
+              <Pressable accessibilityRole="button"
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed, refreshing && styles.disabledButton]}
                 disabled={refreshing}
                 onPress={() => {
                   lastAutoRefreshedExpiry.current = visibleDetail.imageUrlExpiresAt;
                   void load(false);
-                }}
-              >
-                <Text style={styles.buttonText}>
-                  {refreshing ? '조회 중…' : '상세 · 이미지 URL 다시 조회'}
-                </Text>
+                }}>
+                <Text style={styles.secondaryButtonText}>{refreshing ? '조회 중…' : '사진 다시 조회'}</Text>
               </Pressable>
             </View>
             <Text style={styles.muted}>
@@ -711,6 +704,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F5F7FB' },
   header: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, gap: 8 },
   back: { color: '#2054D8', fontSize: 13, fontWeight: '600' },
+  backTouch: { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, marginLeft: -8 },
+  backTouchPressed: { backgroundColor: '#E9EFFC' },
   title: { color: '#111827', fontSize: 23, fontWeight: '700' },
   body: { paddingHorizontal: 20, paddingBottom: 35, gap: 12 },
   card: { backgroundColor: '#FFF', borderRadius: 14, borderWidth: 1, borderColor: '#E4E7EC', padding: 16, gap: 10 },
@@ -720,16 +715,25 @@ const styles = StyleSheet.create({
   value: { color: '#111827', fontSize: 14, fontWeight: '500' },
   muted: { color: '#64748B', fontSize: 12, lineHeight: 18 },
   inspectionImage: { height: 265, width: '100%', backgroundColor: '#EEF2F8', borderRadius: 10 },
+  imageRow: { flexDirection: 'row', gap: 8, alignItems: 'stretch' },
+  imageCard: { flex: 1, minWidth: 0, padding: 10 },
+  compactImage: { height: 137 },
+  imageOpenText: { color: '#2054D8', fontSize: 11, marginTop: 7, fontWeight: '600' },
+  photoTouch: { borderRadius: 10, overflow: 'hidden' },
+  photoTouchPressed: { opacity: 0.84, backgroundColor: '#EDF2FF' },
   button: { backgroundColor: '#2054D8', padding: 13, borderRadius: 10, alignItems: 'center' },
+  buttonPressed: { backgroundColor: '#193EAA' },
   buttonText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
   disabledButton: { opacity: 0.5 },
   buttonRow: { flexDirection: 'row', gap: 8 },
   buttonFlex: { flex: 1 },
   failButton: { backgroundColor: '#B42318' },
+  failButtonPressed: { backgroundColor: '#8E1D16' },
   commentInput: { minHeight: 70, backgroundColor: '#F5F7FB', borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 10, padding: 12, color: '#111827', textAlignVertical: 'top' },
   submitStatus: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   successText: { color: '#067647', fontSize: 13, lineHeight: 20 },
   secondaryButton: { borderWidth: 1, borderColor: '#2054D8', borderRadius: 10, padding: 12 },
+  secondaryButtonPressed: { backgroundColor: '#E9EFFC' },
   secondaryButtonText: { color: '#2054D8', fontSize: 13, fontWeight: '700' },
   errorCard: { backgroundColor: '#FFF0ED' },
   staleCard: { backgroundColor: '#FFF3E5', borderRadius: 12, padding: 12 },

@@ -1,6 +1,7 @@
+import Pressable from '../components/TouchPressable';
 import React, { useState } from 'react';
 import {
-  Pressable,
+  
   ScrollView,
   StyleSheet,
   Text,
