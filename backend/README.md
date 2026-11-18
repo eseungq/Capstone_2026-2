@@ -2,23 +2,23 @@
 
 담당: 이승규 · 기준 문서: [백엔드 API 계약 v4](../docs/백엔드_API계약_v4.md)
 
-현재 구현 범위 (11/18)
+현재 구현 범위 (11/10)
 - 인증: 로그인·토큰 재발급·로그아웃, 역할(WORKER·ADMIN·DEVICE)별 접근 제어, 로그인 5회 실패 잠금
 - 사진 접수(비동기): `POST /api/v1/inspections` → 202, 스레드 풀(1개, 11/04 실측으로 2→1)에서 AI 호출·응답 검증·정책 적용
 - 검사 상세: `GET /api/v1/inspections/{id}` (AI·정책·판정·이미지 블록, 만료되는 이미지 주소)
-- 검사 이력: `GET /api/v1/inspections` (부품·displayState·AI-작업자 불일치(`mismatch`)·기간 필터, 페이지)
+- 검사 이력: `GET /api/v1/inspections` (부품·displayState·기간 필터, 페이지)
 - 모니터링: `GET /api/v1/monitoring/parts` (부품별 요약), `GET /api/v1/monitoring/queue` (확인 필요 목록, 커서)
 - 작업자 확인: `POST /api/v1/inspections/{id}/confirm` (WORKER만)
 - 재검사: `POST /api/v1/inspections/{id}/retry` (FAILED만, 새 검사 생성)
 - 수동 판정 전환: `POST /api/v1/inspections/{id}/manual` (WORKER, 모든 FAILED, AI 상태 확인 안 함) → 새 검사(`source=MANUAL`, `AI_UNAVAILABLE`)를 기존 confirm으로 판정. FAILED 1건당 재검사·수동 전환 중 1건 (V6, 계약 6.10)
 - 부품 목록: `GET /api/v1/parts` (모델 사용 가능·정책 적용 여부)
 - 모델 로드 확인: 접수·재검사·부품 목록·모니터링 공통 (아래 "실제 AI 연결")
-- 관리자: `GET /api/v1/admin/models`, 정책 조회·등록·기준치 조정(새 버전)·적용·중지, 계정 잠금 해제 `POST /api/v1/admin/users/{loginId}/unlock`, 검사 기록 CSV `GET /api/v1/admin/inspections/export` (이력과 같은 필터, 최대 10,000건)
+- 관리자: `GET /api/v1/admin/models`, 정책 조회·등록·기준치 조정(새 버전)·적용·중지, 계정 잠금 해제 `POST /api/v1/admin/users/{loginId}/unlock`
 - 알림: 기기 토큰 등록·해제, Expo 푸시 발송 (`app.push.enabled` 기본 false면 로그만). 티켓까지만 확인하고 receipt 조회는 없음
 - Mock AI 서버 (`mock-ai/`, Python)
 - 점검 스크립트 (`scripts/`, 아래 표)
 
-아직 없음: 통계 API는 합의본상 범위 제외 (앱 통계 화면은 시연용 Mock)
+아직 없음: AI 무응답 시 수동 판정 (방식 결정 중, [결정안](../docs/수동판정_결정안.md)). 통계 API는 합의본상 범위 제외 (앱 통계 화면은 시연용 Mock)
 
 실제 AI 연결 시험: 11/04 DGX(e02)와 16개 항목 통과(B6만 보류), 동시 접수 측정 포함 ([통합 점검표](../docs/통합_점검표.md))
 
@@ -31,7 +31,7 @@
 ```bash
 docker compose up -d                 # MySQL 8.4 (DB/계정/비밀번호: inspection)
 ./gradlew build                      # 컴파일 + 단위·통합 테스트 (통합은 Docker 필요, 없으면 건너뜀)
-./gradlew bootRun                    # Flyway가 V1~V7과 개발용 시드(db/seed-dev) 적용
+./gradlew bootRun                    # Flyway가 V1~V5와 개발용 시드(db/seed-dev) 적용
 
 # 다른 터미널에서 Mock AI
 cd mock-ai
@@ -106,9 +106,6 @@ curl -s -X POST localhost:8080/api/v1/admin/policies/<policyId>/threshold -H "Au
   -H 'Content-Type: application/json' -d '{"passThreshold":0.03}'
 curl -s -X POST localhost:8080/api/v1/admin/policies/<policyId>/activate -H "Authorization: Bearer $AD"
 curl -s -X POST localhost:8080/api/v1/admin/policies/<policyId>/deactivate -H "Authorization: Bearer $AD"
-
-# 검사 기록 CSV (이력과 같은 필터). mismatch=ANY면 AI와 작업자 판정이 엇갈린 확인 완료 건만
-curl -s 'localhost:8080/api/v1/admin/inspections/export?partCode=DOOR&mismatch=ANY' -H "Authorization: Bearer $AD" -o inspections.csv
 
 # 기기 토큰 등록·해제 (WORKER·ADMIN). 해제 경로의 [ ]는 인코딩 필수
 curl -s -X POST localhost:8080/api/v1/notifications/devices -H "Authorization: Bearer $WK" \
@@ -235,16 +232,13 @@ admin/               관리자 모델 조회, 정책 등록·조정·적용·중
 notification/        기기 토큰, Expo 푸시 발송
 part/ monitoring/    부품 목록, 공정 모니터링
 inspection/          접수(InspectionIntakeService), 비동기 분석(AnalysisDispatcher → InspectionAnalysisService),
-                     정책 판정(PolicyEvaluator), 결과 저장(AnalysisResultWriter), 상세·이력 조회(InspectionQueryService·InspectionSpecs),
-                     CSV 내보내기(InspectionExportService), 재검사·수동 판정, 재시작 정리
+                     정책 판정(PolicyEvaluator), 결과 저장(AnalysisResultWriter), 상세 조회, 재시작 정리
 storage/             로컬 이미지 저장, 서명된 만료 주소, 이미지 제공 API
 config/              AppProperties(app.*), Security, 분석 스레드 풀, Swagger
 common/              공통 응답·오류, traceId, 시각 변환
 domain/              엔티티·리포지토리
-resources/db/migration   V1 스키마, V2 부품, V3 인증, V4 모니터링·비동기·Grad-CAM, V5 무결성 제약(김남균),
-                         V6 수동 판정, V7 도어 항목 코드 UNIFIED
-resources/db/seed-dev    개발용 계정·Mock 모델·예시 정책, 실제 DOOR 모델(비활성), 도어 시연 정책(비활성),
-                         프레임·카울커버 모델·정책, 도어 e02 시연 보정기·정책(V7_1)
+resources/db/migration   V1 스키마, V2 부품, V3 인증, V4 모니터링·비동기·Grad-CAM, V5 무결성 제약(김남균)
+resources/db/seed-dev    개발용 계정·Mock 모델·예시 정책, 실제 DOOR 모델(비활성), 도어 시연 정책(비활성)
 mock-ai/             Mock AI 추론 서버 (FastAPI)
 scripts/             연결 점검·전체 흐름·측정·시연 데이터
 ```
@@ -256,7 +250,7 @@ scripts/             연결 점검·전체 흐름·측정·시연 데이터
 | 설정 | TBD |
 |---|---|
 | `app.upload.*` 허용 형식·용량·최소 해상도 | TBD-08 |
-| `app.ai.base-url`, `part-base-urls`(부품별 AI 서버), `read-timeout-ms`, `retry-count` | TBD-01 |
+| `app.ai.base-url`, `read-timeout-ms`, `retry-count` | TBD-01 |
 | `app.storage.type`(local), `public-base-url` | TBD-01 |
 | `app.auth.login-lock-threshold` | TBD-10 |
 | `app.policy.min-sample-count` | TBD-03 |
