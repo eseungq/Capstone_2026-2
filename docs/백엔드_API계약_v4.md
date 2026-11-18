@@ -211,7 +211,7 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 | POST | `/admin/policies/{id}/activate` | 적용 시작 | ADMIN |
 | POST | `/admin/policies/{id}/deactivate` | 적용 중지 | ADMIN |
 | POST | `/admin/users/{loginId}/unlock` | 계정 잠금 해제 [구현 11/10] | ADMIN |
-| GET | `/admin/inspections/export` | 검사 기록 CSV (이력과 같은 partCode·displayState·from·to, 접수 시각 오름차순, 최대 10,000건, 엑셀용 UTF-8 BOM, 이미지·AI 원문 제외). 보고서용, 앱 미사용 [구현 11/18] | ADMIN |
+| GET | `/admin/inspections/export` | 검사 기록 CSV (이력과 같은 partCode·displayState·mismatch·from·to, 접수 시각 오름차순, 최대 10,000건, 엑셀용 UTF-8 BOM, 이미지·AI 원문 제외). 보고서용, 앱 미사용 [구현 11/18] | ADMIN |
 | POST | `/internal/v1/predict` | AI 추론 (7장) | 백엔드 → AI |
 | GET | `/internal/v1/models` | AI 서버의 로드 가능 모델 확인 | 백엔드 → AI |
 
@@ -417,11 +417,12 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 
 ### 6.6 검사 이력 `GET /inspections`
 
-쿼리: `partCode`, `displayState`, `from`, `to`, `page`(0부터), `size`(기본 20)
+쿼리: `partCode`, `displayState`, `mismatch`, `from`, `to`, `page`(0부터), `size`(기본 20)
 응답: 6.4 항목 형식 + `source`, `finalJudgement`, `judgedBy`, `confirmedAt` (`source`는 11/11 추가, `MANUAL`이면 "AI 분석 없이 작업자 판정" 표시)
 
 - 작업자도 모든 검사를 조회 가능 [제안]. 합의본 표현은 "공통 업무 범위에서 조회"
 - receivedAt 최신순(같으면 id), 기간은 `from ≤ receivedAt < to`, `size` 최대 100, 없는 `partCode`는 `400 INVALID_PART_CODE` [구현 10/19]
+- `mismatch`: AI 예측과 작업자 판정이 엇갈린 `REVIEW_DONE` 건만. `ANY`(둘 다)·`DEFECT_PASSED`(AI DEFECT → 작업자 PASS)·`GOOD_FAILED`(AI GOOD → 작업자 FAIL). 수동 판정은 AI 예측이 없어 제외, AUTO_PASS는 사람이 보지 않아 대상 아님. 추가 검토·재학습 후보 선별용이며 전체 오류율이 아님. 없는 값은 `400 INVALID_PARAMETER`, 빈 값은 필터 없음. `REVIEW_DONE` 외의 `displayState`와 함께 주면 빈 결과 [구현 11/18]
 
 ### 6.7 작업자 확인 `POST /inspections/{id}/confirm`
 

@@ -104,17 +104,19 @@ public class InspectionQueryService {
 
     // 검사 이력 (계약 v4 6.6). 작업자도 전체 검사 조회. 기간은 receivedAt 기준 from ≤ receivedAt < to
     public PageResponse<InspectionHistoryItem> search(String partCode, DisplayState displayState,
-                                                      LocalDateTime from, LocalDateTime to, int page, int size) {
+                                                      ReviewMismatch mismatch, LocalDateTime from, LocalDateTime to,
+                                                      int page, int size) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_PARAMETER, "page는 0 이상, size는 1~" + MAX_PAGE_SIZE + "이어야 합니다.");
         }
-        Specification<Inspection> spec = InspectionSpecs.fetchPart().and(filter(partCode, displayState, from, to));
+        Specification<Inspection> spec = InspectionSpecs.fetchPart().and(filter(partCode, displayState, mismatch, from, to));
         Page<Inspection> result = inspectionRepository.findAll(spec, PageRequest.of(page, size, HISTORY_SORT));
         return PageResponse.of(result, this::toHistoryItems);
     }
 
     // 이력·CSV 내보내기 공통 조건. 기간은 receivedAt 기준 from ≤ receivedAt < to
-    public Specification<Inspection> filter(String partCode, DisplayState displayState, LocalDateTime from, LocalDateTime to) {
+    public Specification<Inspection> filter(String partCode, DisplayState displayState, ReviewMismatch mismatch,
+                                            LocalDateTime from, LocalDateTime to) {
         if (from != null && to != null && !from.isBefore(to)) {
             throw new BusinessException(ErrorCode.INVALID_PARAMETER, "from은 to보다 앞선 시각이어야 합니다.");
         }
@@ -126,6 +128,9 @@ public class InspectionQueryService {
         }
         if (displayState != null) {
             spec = spec.and(InspectionSpecs.displayState(displayState));
+        }
+        if (mismatch != null) {
+            spec = spec.and(InspectionSpecs.reviewMismatch(mismatch));
         }
         if (from != null) {
             spec = spec.and(InspectionSpecs.receivedFrom(from));
