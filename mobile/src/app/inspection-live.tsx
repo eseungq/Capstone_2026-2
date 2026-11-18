@@ -701,7 +701,9 @@ export default function InspectionLiveScreen() {
                 {visibleDetail.recheck.comment && <Field label="재확인 메모" value={visibleDetail.recheck.comment} />}
                 {visibleDetail.recheck.result === 'FAIL' && (
                   <View style={styles.staleCard}>
-                    <Text style={styles.errorText}>재확인 불량 · 관리자의 추가 확인이 필요합니다.</Text>
+                    <Text style={styles.errorText}>{visibleDetail.recheck.acknowledgedAt
+                      ? '재확인 불량 · 관리자 확인함 (해결 완료 아님)'
+                      : '재확인 불량 · 관리자의 추가 확인이 필요합니다.'}</Text>
                     <Text style={styles.muted}>원래 AUTO_PASS 상태와 PASS · SYSTEM 판정은 유지됩니다.</Text>
                   </View>
                 )}
@@ -825,7 +827,9 @@ export default function InspectionLiveScreen() {
                 <>{manualButton}{retryButton}</>
               )}
               {!visibleDetail.canOfferConfirm && !visibleDetail.canOfferRetry && !visibleDetail.canOfferManual && !visibleDetail.followUp && (
-                <Text style={styles.muted}>현재 서버 상태에서는 제출 가능한 판정 또는 후속 검사 요청이 없습니다.</Text>
+                <Text style={styles.muted}>{visibleDetail.recheck?.result === null
+                    ? '일반 REVIEW 판정이나 FAILED 후속 요청은 없습니다. 표본 재확인은 위 카드에서 제출해 주세요.'
+                    : '현재 서버 상태에서는 제출 가능한 일반 판정 또는 후속 검사 요청이 없습니다.'}</Text>
               )}
               {!roleLoading && role === 'ADMIN' && visibleDetail.canOfferManual && (
                 <Text style={styles.muted}>수동 판정으로 전환하려면 WORKER 계정으로 로그인해 주세요.</Text>
