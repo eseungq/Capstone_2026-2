@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 // 계약 6.11 AUTO_PASS 표본 재확인. 결과가 정해지도록 NEAR·MID는 항상, LOW는 뽑지 않게 설정
 //   예시 정책 example-door-p1 기준치 0.05: 0.045 → NEAR(r 0.9), 0.01 → LOW(r 0.2)
-@TestPropertySource(properties = {"app.recheck.near-rate=1.0", "app.recheck.mid-rate=1.0", "app.recheck.low-rate=0"})
+@TestPropertySource(properties = {"app.recheck.enabled=true", "app.recheck.near-rate=1.0", "app.recheck.mid-rate=1.0", "app.recheck.low-rate=0"})
 class RecheckIntegrationTest extends IntegrationTestBase {
 
     @Autowired

@@ -61,7 +61,7 @@ app:
   policy:
     min-sample-count: 0               # ready 판정의 최소 표본 수 (TBD-03 임시, AI 평가 후 조정)
   recheck:                            # AUTO_PASS 표본 재확인 (계약 6.11, TBD-16 김도현 확인 전 임시값)
-    enabled: true
+    enabled: false                    # 기본 꺼 둠. 켜 둔 동안 아래 값을 바꾸지 말 것 (재처리는 실행 시점 값을 쓰므로 누락 건만 새 값으로 결정됨)
     near-ratio: 0.8                   # 보정 확률 ÷ 기준치 ≥ 0.8 → NEAR
     mid-ratio: 0.4                    # ≥ 0.4 → MID, 나머지 LOW
     near-rate: 1.0                    # 구간별 추출 비율

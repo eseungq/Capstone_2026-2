@@ -15,7 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 // AUTO_PASS가 확정된 뒤 표본 재확인 대상으로 뽑을지 결정 (계약 6.11)
 //   판정 저장과 별도 트랜잭션이라 여기서 실패해도 AUTO_PASS 결과에는 영향 없음 (호출 쪽에서 예외를 삼키고 로그만)
-//   실패한 건은 결정 행이 없으므로 RecheckSweeper가 다시 호출. 같은 검사는 항상 같은 결정이라 다시 해도 결과 같음
+//   실패한 건은 결정 행이 없으므로 RecheckSweeper가 다시 호출. 결정은 호출 시점의 app.recheck 값으로 하므로
+//   설정이 같을 때만 처음 결정과 같음 (켜 둔 동안 설정을 바꾸지 않는 전제, 계약 6.11)
 @Component
 @RequiredArgsConstructor
 public class RecheckSampler {

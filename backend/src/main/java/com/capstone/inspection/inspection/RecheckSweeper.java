@@ -17,7 +17,9 @@ import java.util.List;
 //   분석 직후 추출(RecheckSampler)이 실패하면 결정 행이 없음 → 주기적으로 찾아 다시 결정
 //   - 방금 끝난 건은 분석 스레드가 아직 추출 중일 수 있어 SETTLE만큼 지난 건부터
 //   - 기능을 켜기 전 오래된 AUTO_PASS까지 한꺼번에 뽑지 않도록 LOOKBACK 안의 건만
-//   - 같은 검사가 동시에 처리돼도 inspection_id UNIQUE로 1건만 남고 결정도 같음
+//   - 같은 검사가 동시에 처리돼도 inspection_id UNIQUE로 1건만 남음
+//   - 결정은 실행 시점의 app.recheck 값으로 함. 검사 당시 설정을 저장하지 않으므로 켜 둔 동안 설정을 바꾸면
+//     누락 건만 새 값으로 결정됨 → 설정을 바꿀 때는 기능을 끄고 바꾼 뒤 다시 켬 (계약 6.11)
 @Component
 @RequiredArgsConstructor
 public class RecheckSweeper {
