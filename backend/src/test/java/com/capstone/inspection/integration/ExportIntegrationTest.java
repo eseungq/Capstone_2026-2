@@ -88,7 +88,9 @@ class ExportIntegrationTest extends IntegrationTestBase {
         Map<String, String> review = rowOf(csv, no(reviewId));
         assertThat(review).containsEntry("displayState", "REVIEW_DONE").containsEntry("reviewReason", "ABOVE_THRESHOLD")
                 .containsEntry("finalJudgement", "FAIL").containsEntry("workerLoginId", "worker01");
-        assertThat(review.get("confirmedAt")).endsWith("+09:00");
+        // 초까지 고정 형식 (초 0 생략·소수점 이하 없음)
+        assertThat(review.get("confirmedAt")).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+09:00");
+        assertThat(review.get("receivedAt")).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+09:00");
     }
 
     @Test

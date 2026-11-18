@@ -69,8 +69,8 @@ public class InspectionController {
             @RequestParam(required = false) String to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.of(queryService.search(partCode, displayState, Times.parseParam("from", from), Times.parseParam("to", to),
-                page, size));
+        return ApiResponse.of(queryService.search(partCode, displayState, Times.parseParam("from", from),
+                Times.parseParam("to", to), page, size));
     }
 
     @Operation(summary = "검사 상세", description = "WORKER·ADMIN. 분석 중이면 displayState=ANALYZING. 이미지 주소는 만료되므로 만료 후 다시 조회")

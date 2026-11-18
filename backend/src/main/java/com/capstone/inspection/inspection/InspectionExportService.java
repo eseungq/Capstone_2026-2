@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,6 +34,8 @@ public class InspectionExportService {
 
     public static final int MAX_ROWS = 10_000;
     private static final Sort EXPORT_SORT = Sort.by(Sort.Order.asc("receivedAt"), Sort.Order.asc("id"));
+    // 초가 0이어도 생략하지 않고 소수점 이하는 버림 (엑셀에서 같은 열의 형식이 섞이지 않게)
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ssXXX");
     private static final byte[] BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
     private static final List<String> HEADER = List.of("inspectionNo", "partCode", "lineCode", "source",
             "originInspectionNo", "displayState", "status", "receivedAt", "completedAt", "modelVersion",
@@ -112,7 +115,7 @@ public class InspectionExportService {
     }
 
     private static String time(LocalDateTime value) {
-        return value == null ? null : Times.toOffset(value).toString();
+        return value == null ? null : Times.toOffset(value).format(TIME_FORMAT);
     }
 
     // 0.008761이 8.761E-3으로 나오지 않게

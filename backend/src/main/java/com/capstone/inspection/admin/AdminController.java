@@ -96,7 +96,8 @@ public class AdminController {
         String filename = "inspections_" + LocalDateTime.now(Times.ZONE).format(FILE_TIME) + ".csv";
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(filename).build().toString())
                 .body(csv);
     }
 
