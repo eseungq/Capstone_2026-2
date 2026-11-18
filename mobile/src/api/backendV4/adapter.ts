@@ -2,6 +2,7 @@ import type {
   ApiV4DataEnvelope, DisplayStateV4, GradcamStatusV4,
   InspectionDetailV4, InspectionViewV4, ProcessingStatusV4, ReviewReasonV4,
 } from './types';
+import { decodeRecheckBlockV4 } from './recheckCoreV4';
 
 export class ContractV4Error extends Error {
   constructor(message: string) {
@@ -123,6 +124,18 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
     throw new ContractV4Error('judgement 블록 값이 유효하지 않습니다.');
   }
 
+  // 재확인 FAIL이어도 원래 시스템 PASS는 유지되어야 합니다.
+  let recheck: InspectionDetailV4['recheck'] = null;
+  try {
+    recheck = decodeRecheckBlockV4(d.recheck);
+  } catch (cause) {
+    throw new ContractV4Error(cause instanceof Error ? cause.message : 'recheck 블록 형식 오류');
+  }
+  if (recheck && (d.displayState !== 'AUTO_PASS' ||
+      !obj(j) || j.finalJudgement !== 'PASS' || j.judgedBy !== 'SYSTEM')) {
+    throw new ContractV4Error('재확인은 AUTO_PASS · PASS · SYSTEM 검사에만 표시할 수 있습니다.');
+  }
+
   const i = d.images;
   let images: InspectionDetailV4['images'] = null;
   if (i != null) {
@@ -199,6 +212,7 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
     ai: a == null ? null : a as unknown as InspectionDetailV4['ai'],
     policy: p == null ? null : p as unknown as InspectionDetailV4['policy'],
     judgement: j == null ? null : j as unknown as InspectionDetailV4['judgement'],
+    recheck,
     images,
     error: e == null ? null : e as unknown as InspectionDetailV4['error'],
   };
@@ -224,6 +238,7 @@ export function mapInspectionDetailV4(detail: InspectionDetailV4): InspectionVie
     errorMessage: detail.error?.message ?? null,
     finalJudgement: detail.judgement?.finalJudgement ?? null,
     judgedBy: detail.judgement?.judgedBy ?? null,
+    recheck: detail.recheck ?? null,
     confirmedBy: detail.judgement?.confirmedBy ?? null,
     confirmedAt: detail.judgement?.confirmedAt ?? null,
     originalImageUrl: detail.images?.original?.url ?? null,
