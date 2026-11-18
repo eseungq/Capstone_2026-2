@@ -235,7 +235,7 @@ export default function RecheckSummaryLiveScreen() {
         {!loading && summary && (
           <>
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>전체 조회 건수 (서로 다른 조건 합산 통계 아님)</Text>
+              <Text style={styles.sectionTitle}>전체 기록 건수 (조건별 불량률은 합산하지 않음)</Text>
               <View style={styles.metrics}>
                 <MetricPair title="AUTO_PASS" value={countText(summary.autoPassCount)}/>
                 <MetricPair title="추출 결정" value={countText(summary.decidedCount)}/>
