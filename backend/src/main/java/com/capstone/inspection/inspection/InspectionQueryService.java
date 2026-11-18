@@ -108,10 +108,17 @@ public class InspectionQueryService {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_PARAMETER, "page는 0 이상, size는 1~" + MAX_PAGE_SIZE + "이어야 합니다.");
         }
+        Specification<Inspection> spec = InspectionSpecs.fetchPart().and(filter(partCode, displayState, from, to));
+        Page<Inspection> result = inspectionRepository.findAll(spec, PageRequest.of(page, size, HISTORY_SORT));
+        return PageResponse.of(result, this::toHistoryItems);
+    }
+
+    // 이력·CSV 내보내기 공통 조건. 기간은 receivedAt 기준 from ≤ receivedAt < to
+    public Specification<Inspection> filter(String partCode, DisplayState displayState, LocalDateTime from, LocalDateTime to) {
         if (from != null && to != null && !from.isBefore(to)) {
             throw new BusinessException(ErrorCode.INVALID_PARAMETER, "from은 to보다 앞선 시각이어야 합니다.");
         }
-        Specification<Inspection> spec = InspectionSpecs.fetchPart();
+        Specification<Inspection> spec = (root, query, cb) -> null;
         if (partCode != null && !partCode.isBlank()) {
             Part part = partRepository.findByPartCode(partCode.trim())
                     .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_PART_CODE));
@@ -126,8 +133,7 @@ public class InspectionQueryService {
         if (to != null) {
             spec = spec.and(InspectionSpecs.receivedBefore(to));
         }
-        Page<Inspection> result = inspectionRepository.findAll(spec, PageRequest.of(page, size, HISTORY_SORT));
-        return PageResponse.of(result, this::toHistoryItems);
+        return spec;
     }
 
     private List<InspectionHistoryItem> toHistoryItems(List<Inspection> inspections) {

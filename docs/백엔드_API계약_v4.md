@@ -211,6 +211,7 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 | POST | `/admin/policies/{id}/activate` | 적용 시작 | ADMIN |
 | POST | `/admin/policies/{id}/deactivate` | 적용 중지 | ADMIN |
 | POST | `/admin/users/{loginId}/unlock` | 계정 잠금 해제 [구현 11/10] | ADMIN |
+| GET | `/admin/inspections/export` | 검사 기록 CSV (이력과 같은 partCode·displayState·from·to, 접수 시각 오름차순, 최대 10,000건, 엑셀용 UTF-8 BOM, 이미지·AI 원문 제외). 보고서용, 앱 미사용 [구현 11/18] | ADMIN |
 | POST | `/internal/v1/predict` | AI 추론 (7장) | 백엔드 → AI |
 | GET | `/internal/v1/models` | AI 서버의 로드 가능 모델 확인 | 백엔드 → AI |
 

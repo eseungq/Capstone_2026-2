@@ -4,6 +4,7 @@ import com.capstone.inspection.domain.inspection.Inspection;
 import com.capstone.inspection.domain.inspection.InspectionStatus;
 import com.capstone.inspection.domain.inspection.RecommendedAction;
 import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -22,6 +23,17 @@ public final class InspectionSpecs {
         return (root, query, cb) -> {
             if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
                 root.fetch("part");
+            }
+            return null;
+        };
+    }
+
+    // CSV 내보내기: 모델·정책까지 함께 조회 (정책은 없을 수 있어 LEFT)
+    public static Specification<Inspection> fetchModelAndPolicy() {
+        return (root, query, cb) -> {
+            if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
+                root.fetch("model");
+                root.fetch("policy", JoinType.LEFT);
             }
             return null;
         };

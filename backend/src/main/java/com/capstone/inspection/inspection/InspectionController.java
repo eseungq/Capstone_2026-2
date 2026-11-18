@@ -3,8 +3,6 @@ package com.capstone.inspection.inspection;
 import com.capstone.inspection.auth.security.AuthUser;
 import com.capstone.inspection.common.api.ApiResponse;
 import com.capstone.inspection.common.api.PageResponse;
-import com.capstone.inspection.common.error.BusinessException;
-import com.capstone.inspection.common.error.ErrorCode;
 import com.capstone.inspection.common.time.Times;
 import com.capstone.inspection.inspection.dto.ConfirmRequest;
 import com.capstone.inspection.inspection.dto.ConfirmResponse;
@@ -32,9 +30,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeParseException;
 
 @Tag(name = "검사", description = "사진 접수(비동기)·검사 이력·상세·작업자 확인·재검사")
 @RestController
@@ -59,7 +54,7 @@ public class InspectionController {
             @RequestParam(required = false) String capturedAt,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) throws IOException {
         InspectionIntakeService.Receipt receipt = intakeService.receive(user, partCode, image.getBytes(), lineCode,
-                parseTime("capturedAt", capturedAt), idempotencyKey);
+                Times.parseParam("capturedAt", capturedAt), idempotencyKey);
         HttpStatus status = receipt.replayed() ? HttpStatus.OK : HttpStatus.ACCEPTED;
         return ResponseEntity.status(status).body(ApiResponse.of(InspectionReceiptResponse.of(receipt.inspection())));
     }
@@ -74,8 +69,8 @@ public class InspectionController {
             @RequestParam(required = false) String to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.of(queryService.search(partCode, displayState, parseTime("from", from), parseTime("to", to),
-                page, size));
+        return ApiResponse.of(queryService.search(partCode, displayState, Times.parseParam("from", from),
+                Times.parseParam("to", to), page, size));
     }
 
     @Operation(summary = "검사 상세", description = "WORKER·ADMIN. 분석 중이면 displayState=ANALYZING. 이미지 주소는 만료되므로 만료 후 다시 조회")
@@ -112,17 +107,5 @@ public class InspectionController {
         InspectionManualService.Result r = manualService.convert(user, inspectionId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.of(ManualConversionResponse.of(r.manual(), r.failed())));
-    }
-
-    // 시각 파라미터: 오프셋 포함 ISO-8601 (예: 2026-10-16T09:00:00+09:00)
-    private static LocalDateTime parseTime(String name, String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return Times.toLocal(OffsetDateTime.parse(value.trim()));
-        } catch (DateTimeParseException e) {
-            throw new BusinessException(ErrorCode.INVALID_PARAMETER, name + "은(는) 2026-10-16T09:00:00+09:00 형식이어야 합니다.");
-        }
     }
 }
