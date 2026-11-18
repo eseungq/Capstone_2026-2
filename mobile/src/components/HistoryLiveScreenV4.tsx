@@ -1,8 +1,9 @@
+import Pressable from './TouchPressable';
 import React, { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
-  Pressable,
+  
   ScrollView,
   StyleSheet,
   Text,

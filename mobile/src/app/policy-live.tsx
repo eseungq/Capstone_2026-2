@@ -1,7 +1,8 @@
+import Pressable from '../components/TouchPressable';
 import React, { useCallback, useRef, useState } from 'react';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import {
-  ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Alert,  ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 

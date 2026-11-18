@@ -1,8 +1,9 @@
+import Pressable from '../components/TouchPressable';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import {
   Alert,
-  Pressable,
+  
   ScrollView,
   StyleSheet,
   Text,

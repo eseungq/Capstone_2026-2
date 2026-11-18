@@ -1,3 +1,4 @@
+import Pressable from '../components/TouchPressable';
 
 import { authV4 } from '../api/backendV4/authRuntime';
 
@@ -7,7 +8,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
+  
   ScrollView,
   StyleSheet,
   Text,
