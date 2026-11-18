@@ -678,10 +678,11 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 - **대기(`pendingCount`)는 정상·불량 어느 쪽으로도 세지 않음**. `failRateAmongCompleted = fail ÷ (pass + fail)`, 완료 건이 없으면 null
 - `estimatedDefectRateInAutoPass` [합의 11/18 김도현]: 구간별 `failRateAmongCompleted`에 **구간 AUTO_PASS 건수 ÷ 전체 AUTO_PASS 건수**를 곱해 합산 (추출 비율 100·30·10%는 뽑는 비율이고 가중치가 아님). AUTO_PASS가 0건인 구간은 빼고, AUTO_PASS가 있는데 완료가 0건인 구간이 있으면 null
 - `completionRate` [합의 11/18 김도현]: `completedCount ÷ sampledCount` (구간별·규칙 전체). 뽑힌 건이 없으면 null
-- `partial` [합의 11/18 김도현]: 재확인 대기(`pendingCount` > 0)나 결정 누락(`undecidedCount` > 0)이 남으면 true. 목록이 뽑힌 순서라 먼저 뽑힌 건만 완료된 상태일 수 있어 추정이 치우칠 수 있음. 가상 비교의 `partial`은 미확인(`unverifiedCount` > 0)이나 결정 누락이 남으면 true (계산 불가면 null)
+- `partial` [합의 11/18 김도현, 기준 확인 11/18]: 선정된 검사 중 재확인 대기(`pendingCount` > 0)가 1건 이상이거나 추출 결정 누락(`undecidedCount` > 0)이 1건 이상이면 true. 목록이 뽑힌 순서라 먼저 뽑힌 건만 완료된 상태일 수 있어 추정이 치우칠 수 있음. 가상 비교의 `partial`은 미확인(`unverifiedCount` > 0)이나 결정 누락이 남으면 true (계산 불가면 null)
 - **화면 표시** [합의 11/18 김도현]
   - `estimatedDefectRateInAutoPass`는 **"AUTO_PASS 추정 불량률"**로 표시 (전체 불량률·정책 누락률이 아님)
-  - 구간(NEAR·MID·LOW)마다 **"완료 {completedCount}/{sampledCount}건 ({completionRate})"**를 함께 표시
+  - 구간(NEAR·MID·LOW)마다 **"완료 {completedCount}/{sampledCount}건 ({completionRate})"**를 함께 표시. 선정 0건이면 `completionRate`가 null이므로 **"완료 0/0건 (—)"**
+  - AUTO_PASS가 있었지만 재확인 완료가 0건인 구간은 `failRateAmongCompleted`가 null → 그 구간 추정값은 빈칸 (전체 추정도 null)
   - `partial: true`면 **"일부만 완료되어 결과가 치우칠 수 있습니다"** 안내. 추정값이 null이면 "완료된 재확인이 없는 구간이 있어 추정하지 않음"
   - 가상 비교는 "가상 비교 (50·30·10%)"처럼 비율과 함께 표시하고 실제 수집 결과와 섞지 않음
 - `compare` (**가상 비교**, 화면에도 가상 비교로 표시): 같은 기록에서 `drawValue < 비교 비율`인 건만 다시 셈. 그중 실제 재확인 결과가 있는 건만 `passCount`·`failCount`, 결과가 없는 건은 `unverifiedCount`. 비교 비율이 실제 비율보다 큰 구간이 있거나 `UNRECORDED`면 `computable: false`, 숫자는 null
