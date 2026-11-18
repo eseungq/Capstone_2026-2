@@ -210,6 +210,7 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 | POST | `/admin/policies/{id}/threshold` | passThreshold 조정 → 새 버전 생성 | ADMIN |
 | POST | `/admin/policies/{id}/activate` | 적용 시작 | ADMIN |
 | POST | `/admin/policies/{id}/deactivate` | 적용 중지 | ADMIN |
+| GET | `/admin/policies/{id}/simulation` | 후보 기준치 비교 (같은 검사 기록에 현재·후보 기준치 대입, 조회만) [구현 11/18] | ADMIN |
 | POST | `/admin/users/{loginId}/unlock` | 계정 잠금 해제 [구현 11/10] | ADMIN |
 | GET | `/admin/inspections/export` | 검사 기록 CSV (이력과 같은 partCode·displayState·from·to, 접수 시각 오름차순, 최대 10,000건, 엑셀용 UTF-8 BOM, 이미지·AI 원문 제외). 보고서용, 앱 미사용 [구현 11/18] | ADMIN |
 | POST | `/internal/v1/predict` | AI 추론 (7장) | 백엔드 → AI |
@@ -490,6 +491,38 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - **activate** → `200` 정책 1건. ready, 모델 active, 정책·모델 보정기 일치를 모두 만족해야 함. 이미 적용 중이면 그대로 200(`activatedAt` 유지). 같은 모델의 다른 정책은 자동 중지 (V5: 모델당 active 1개, 보정기 무관). 동시 요청은 순서대로 처리되어 active는 1개만 남음
 - **deactivate** → `200` 정책 1건. 이미 중지 상태여도 200, `activatedAt`은 마지막 적용 시각으로 남음
 - **계정 잠금 해제** `POST /admin/users/{loginId}/unlock` → `200` `{ loginId, locked: false, failedLoginCount: 0 }`. 잠기지 않은 계정도 200(실패 횟수만 초기화), 없는 계정은 `404 USER_NOT_FOUND` [구현 11/10, TBD-10]
+
+### 6.9.1 후보 기준치 비교 `GET /admin/policies/{id}/simulation` [구현 11/18]
+
+기준치를 바꾸기 전에, 이미 쌓인 검사 기록에 현재 기준치와 후보 기준치를 대입해 **판정이 바뀌는 건**과 그 건의 작업자 판정을 보여 줌. 정책·검사 기록은 바꾸지 않음
+
+- 쿼리: `candidateThreshold`(필수, 0~1, 소수 6자리로 반올림), `from`·`to`(선택, `from ≤ receivedAt < to`). 기간이 없으면 전체 기간이라 기록이 많아지면 기간 지정 권장
+- 대상: 정책과 **같은 모델·같은 보정기 버전**으로 분석이 완료된 검사 (보정기가 다르면 확률 눈금이 달라 비교하지 않음). 판정 당시 이 정책이 적용됐는지와는 무관. 수동 판정 건은 보정기 버전이 없어 제외
+- `current`도 과거에 실제로 내려진 판정이 아니라 **현재 정책 기준치로 다시 계산한 값**. 다른 기준치로 판정된 기록이 섞여 있으면 실제 AUTO_PASS 건수와 다를 수 있음 (실제 판정은 검사 이력·CSV로 확인)
+- 판정 규칙은 4장과 같음: DEFECT 예측은 기준치와 무관하게 REVIEW(`defectPredictedCount`), GOOD은 보정 확률 ≤ 기준치면 AUTO_PASS
+- **라벨은 작업자 판정만**: 바뀌는 건마다 `WORKER_PASS`·`WORKER_FAIL`·`UNVERIFIED`. AUTO_PASS(PASS·SYSTEM)와 판정 전 REVIEW는 실제 라벨이 아니므로 `UNVERIFIED`
+  - 기준 상향(`REVIEW_TO_AUTO_PASS`): 바뀌는 건은 지금 REVIEW라 작업자 판정이 있음 → `workerFail`이 후보에서 추가로 통과될 불량 (해당 기록에서 관측된 건수)
+  - 기준 하향(`AUTO_PASS_TO_REVIEW`): 바뀌는 건은 지금 AUTO_PASS라 대부분 `UNVERIFIED`
+- 응답 `200`
+  ```json
+  { "data": {
+      "policyId": "...", "policyVersion": "cowl-e08-demo-0163", "partCode": "COWL_COVER",
+      "modelVersion": "...", "calibratorVersion": "...",
+      "currentThreshold": 0.0163, "candidateThreshold": 0.0231,
+      "validatedMin": 0.01, "validatedMax": 0.0163, "candidateWithinValidatedRange": false,
+      "evaluatedCount": 40, "defectPredictedCount": 12,
+      "current":   { "autoPassCount": 5, "reviewCount": 35 },
+      "candidate": { "autoPassCount": 9, "reviewCount": 31 },
+      "change": { "direction": "REVIEW_TO_AUTO_PASS", "count": 4,
+                  "workerPass": 3, "workerFail": 1, "unverified": 0,
+                  "items": [ { "inspectionId": "...", "inspectionNo": "INS-000131",
+                               "calibratedDefectProbability": 0.0228, "label": "WORKER_FAIL", "receivedAt": "..." } ],
+                  "itemsTruncated": false } } }
+  ```
+- `items`: 바뀌는 건을 보정 확률 높은 순으로 최대 100건 (사진을 볼 순서). 건수는 `count`가 전체
+- `candidateWithinValidatedRange`: AI가 검증한 범위 안인지. 범위 밖 후보도 비교는 가능하지만 적용(threshold 조정)은 6.9 규칙대로 거절
+- 해석 주의: 건수는 이 기록에서 관측한 값이며 표본이 적으면 불확실성이 큼. 작업량은 확인 건수로만 표시하고 소요 시간은 따로 재야 함
+- 오류: `404 POLICY_NOT_FOUND`, `candidateThreshold` 범위 밖·없음, `from`이 `to`보다 늦음, 또는 기준치·보정기 버전이 없는 정책은 `400 INVALID_PARAMETER`, ADMIN 외 `403 ACCESS_DENIED`
 
 ### 6.10 수동 판정 전환 `POST /inspections/{id}/manual` [구현 11/11, 합의 11/11 김도현·홍승인]
 
