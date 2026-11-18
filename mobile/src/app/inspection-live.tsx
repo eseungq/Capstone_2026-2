@@ -427,7 +427,7 @@ export default function InspectionLiveScreen() {
           style={({ pressed }) => [styles.backTouch, pressed && styles.backTouchPressed]}>
           <Text style={styles.back}>‹ 뒤로</Text>
         </Pressable>
-        <Text style={styles.title}>검사 상세{visibleDetail ? ' · ' + (visibleDetail.displayState === 'REVIEW_PENDING' ? 'REVIEW' : visibleDetail.displayState === 'REVIEW_DONE' ? '판정 완료' : visibleDetail.displayState) : ''}</Text>
+        <Text style={styles.title}>검사 상세{visibleDetail ? ' · ' + visibleDetail.displayStateLabel : ''}</Text>
         <Text style={styles.muted}>{visibleDetail ? visibleDetail.partCode + ' · ' + visibleDetail.inspectionNo : '검사 결과 조회'}</Text>
       </View>
 
