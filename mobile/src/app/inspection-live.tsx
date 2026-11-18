@@ -683,6 +683,92 @@ export default function InspectionLiveScreen() {
               {visibleDetail.errorMessage && <Text style={styles.errorText}>{visibleDetail.errorMessage}</Text>}
             </View>
 
+
+            {visibleDetail.recheck && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>AUTO_PASS 표본 재확인</Text>
+                <Text style={styles.muted}>
+                  원래 검사 판정: PASS · SYSTEM (변경하지 않음). 재확인 결과는 별도 기록입니다.
+                </Text>
+                <Field label="표본 구간" value={visibleDetail.recheck.stratum} />
+                <Field label="표본 추출 비율" value={(visibleDetail.recheck.samplingRate * 100).toFixed(0) + '%'} />
+                <Field label="규칙 버전" value={visibleDetail.recheck.ruleVersion ?? '구버전 기록 / 미제공'} />
+                <Field label="시험 이름" value={visibleDetail.recheck.trialName ?? '미지정'} />
+                <Field label="선정 시각" value={formatTime(visibleDetail.recheck.sampledAt)} />
+                <Field label="재확인 결과" value={visibleDetail.recheck.result ?? '작업자 재확인 대기'} />
+                <Field label="재확인자" value={visibleDetail.recheck.recheckedBy ?? '미완료'} />
+                <Field label="재확인 시각" value={formatTime(visibleDetail.recheck.recheckedAt)} />
+                {visibleDetail.recheck.comment && <Field label="재확인 메모" value={visibleDetail.recheck.comment} />}
+                {visibleDetail.recheck.result === 'FAIL' && (
+                  <View style={styles.staleCard}>
+                    <Text style={styles.errorText}>재확인 불량 · 관리자의 추가 확인이 필요합니다.</Text>
+                    <Text style={styles.muted}>원래 AUTO_PASS 상태와 PASS · SYSTEM 판정은 유지됩니다.</Text>
+                  </View>
+                )}
+                {visibleDetail.recheck.result === 'FAIL' && (
+                  <Field label="관리자 확인" value={
+                    visibleDetail.recheck.acknowledgedAt ? '확인함 (해결 완료 아님)' : '미확인'
+                  } />
+                )}
+                {visibleDetail.recheck.acknowledgedAt && (
+                  <>
+                    <Field label="확인한 관리자" value={visibleDetail.recheck.acknowledgedBy ?? '미제공'} />
+                    <Field label="확인 시각" value={formatTime(visibleDetail.recheck.acknowledgedAt)} />
+                    {visibleDetail.recheck.acknowledgeNote && (
+                      <Field label="확인 메모" value={visibleDetail.recheck.acknowledgeNote} />
+                    )}
+                  </>
+                )}
+                {!roleLoading && role === 'WORKER' && visibleDetail.recheck.result === null && (
+                  <>
+                    <Text style={styles.label}>재확인 메모 (선택, 200자 이내)</Text>
+                    <TextInput style={styles.commentInput} maxLength={200} multiline
+                      placeholder="재확인 결과에 대한 설명을 남겨주세요."
+                      placeholderTextColor="#64748B"
+                      value={recheckComment} onChangeText={setRecheckComment} editable={!submitting} />
+                    <View style={styles.buttonRow}>
+                      <Pressable accessibilityRole="button"
+                        disabled={submitting !== null}
+                        style={({ pressed }) => [styles.button, styles.buttonFlex,
+                          pressed && styles.buttonPressed, submitting && styles.disabledButton]}
+                        onPress={() => requestRecheck('PASS')}>
+                        <Text style={styles.buttonText}>재확인 PASS</Text>
+                      </Pressable>
+                      <Pressable accessibilityRole="button"
+                        disabled={submitting !== null}
+                        style={({ pressed }) => [styles.button, styles.buttonFlex, styles.failButton,
+                          pressed && styles.failButtonPressed, submitting && styles.disabledButton]}
+                        onPress={() => requestRecheck('FAIL')}>
+                        <Text style={styles.buttonText}>재확인 FAIL</Text>
+                      </Pressable>
+                    </View>
+                  </>
+                )}
+                {!roleLoading && role === 'ADMIN' && visibleDetail.recheck.result === null && (
+                  <Text style={styles.muted}>재확인 PASS/FAIL 제출은 WORKER 전용입니다.</Text>
+                )}
+                {!roleLoading && role === 'ADMIN' && visibleDetail.recheck.result === 'FAIL' &&
+                  visibleDetail.recheck.acknowledgedAt === null && (
+                  <>
+                    <Text style={styles.label}>관리자 확인 메모 (선택, 200자 이내)</Text>
+                    <TextInput style={styles.commentInput} maxLength={200} multiline
+                      placeholder="예: 라인 담당자에게 전달"
+                      placeholderTextColor="#64748B"
+                      value={acknowledgeNote} onChangeText={setAcknowledgeNote} editable={!submitting} />
+                    <Pressable accessibilityRole="button" disabled={submitting !== null}
+                      style={({ pressed }) => [styles.button, pressed && styles.buttonPressed,
+                        submitting && styles.disabledButton]}
+                      onPress={requestAcknowledge}>
+                      <Text style={styles.buttonText}>확인함 기록 (해결 완료 아님)</Text>
+                    </Pressable>
+                  </>
+                )}
+                {submitting === 'recheck' || submitting === 'acknowledge' ? (
+                  <Text style={styles.muted}>서버 기록 처리 중… 중복 제출하지 마세요.</Text>
+                ) : null}
+              </View>
+            )}
+
             <View style={styles.card}>
               <Text style={styles.cardTitle}>작업자 판정 · 후속 처리</Text>
               <Text style={styles.muted}>요청 전 내용을 확인해 주세요. 중복 제출은 하지 않습니다.</Text>

@@ -129,6 +129,18 @@ export default function SettingsScreen() {
           </Text>
         </Card>
 
+        {mode === 'live' && (
+          <Pressable
+            style={[styles.button, styles.secondary]}
+            onPress={() => router.push('/rechecks-live')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.buttonText}>
+              AUTO_PASS 표본 재확인 · {isAdmin ? '관리자 결과 확인' : '작업자 확인'}
+            </Text>
+          </Pressable>
+        )}
+
         {isAdmin && (
           <Pressable style={[styles.button, styles.primary]} 
 onPress={() => {
