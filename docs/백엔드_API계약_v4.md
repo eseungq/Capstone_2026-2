@@ -660,13 +660,14 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
         "nearRatio": 0.8, "midRatio": 0.4, "nearRate": 1.0, "midRate": 0.3, "lowRate": 0.1,
         "autoPassCount": 119, "decidedCount": 116, "undecidedCount": 3,
         "sampledCount": 40, "pendingCount": 6, "passCount": 32, "failCount": 2,
+        "completionRate": 0.85, "partial": true,
         "strata": [ { "stratum": "NEAR", "autoPassCount": 21, "decidedCount": 20, "undecidedCount": 1,
-                      "sampledCount": 20, "completedCount": 18, "pendingCount": 2,
+                      "sampledCount": 20, "completedCount": 18, "pendingCount": 2, "completionRate": 0.9,
                       "passCount": 17, "failCount": 1, "failRateAmongCompleted": 0.0556 } ],
         "estimatedDefectRateInAutoPass": 0.021,
         "compare": { "nearRate": 0.5, "midRate": 0.3, "lowRate": 0.1, "computable": true,
                      "sampledCount": 30, "unverifiedCount": 4, "passCount": 25, "failCount": 1,
-                     "estimatedDefectRateInAutoPass": 0.018 } } ],
+                     "partial": true, "estimatedDefectRateInAutoPass": 0.018 } } ],
       "waits": { "review": { "count": 35, "pendingCount": 4, "averageMs": 41000, "medianMs": 26000 },
                  "recheck": { "count": 34, "pendingCount": 6, "averageMs": 380000, "medianMs": 120000 } },
       "dwell": { "review": { "count": 30, "averageMs": 15000, "medianMs": 11000, "averageOpenCount": 1.2 },
@@ -676,6 +677,13 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 - `undecidedWithoutRuleCount`: 판정 당시 규칙도 결정도 없는 AUTO_PASS (기능 꺼짐 등). 어느 규칙에도 넣지 않음
 - **대기(`pendingCount`)는 정상·불량 어느 쪽으로도 세지 않음**. `failRateAmongCompleted = fail ÷ (pass + fail)`, 완료 건이 없으면 null
 - `estimatedDefectRateInAutoPass` [합의 11/18 김도현]: 구간별 `failRateAmongCompleted`에 **구간 AUTO_PASS 건수 ÷ 전체 AUTO_PASS 건수**를 곱해 합산 (추출 비율 100·30·10%는 뽑는 비율이고 가중치가 아님). AUTO_PASS가 0건인 구간은 빼고, AUTO_PASS가 있는데 완료가 0건인 구간이 있으면 null
+- `completionRate` [합의 11/18 김도현]: `completedCount ÷ sampledCount` (구간별·규칙 전체). 뽑힌 건이 없으면 null
+- `partial` [합의 11/18 김도현]: 재확인 대기(`pendingCount` > 0)나 결정 누락(`undecidedCount` > 0)이 남으면 true. 목록이 뽑힌 순서라 먼저 뽑힌 건만 완료된 상태일 수 있어 추정이 치우칠 수 있음. 가상 비교의 `partial`은 미확인(`unverifiedCount` > 0)이나 결정 누락이 남으면 true (계산 불가면 null)
+- **화면 표시** [합의 11/18 김도현]
+  - `estimatedDefectRateInAutoPass`는 **"AUTO_PASS 추정 불량률"**로 표시 (전체 불량률·정책 누락률이 아님)
+  - 구간(NEAR·MID·LOW)마다 **"완료 {completedCount}/{sampledCount}건 ({completionRate})"**를 함께 표시
+  - `partial: true`면 **"일부만 완료되어 결과가 치우칠 수 있습니다"** 안내. 추정값이 null이면 "완료된 재확인이 없는 구간이 있어 추정하지 않음"
+  - 가상 비교는 "가상 비교 (50·30·10%)"처럼 비율과 함께 표시하고 실제 수집 결과와 섞지 않음
 - `compare` (**가상 비교**, 화면에도 가상 비교로 표시): 같은 기록에서 `drawValue < 비교 비율`인 건만 다시 셈. 그중 실제 재확인 결과가 있는 건만 `passCount`·`failCount`, 결과가 없는 건은 `unverifiedCount`. 비교 비율이 실제 비율보다 큰 구간이 있거나 `UNRECORDED`면 `computable: false`, 숫자는 null
 - `waits.review`: 기간 안의 REVIEW 건 `completedAt → 작업자 confirmedAt`, `waits.recheck`: `sampledAt → recheckedAt`. 둘 다 **완료된 건만** 평균·중앙값을 내고, 아직 대기 중인 건은 `pendingCount`로 따로 셈
 - `dwell`: 화면 체류 시간을 보낸 제출 건만 (미제출 이탈은 기록 없음)
