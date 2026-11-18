@@ -44,7 +44,8 @@
     "test:admin-policy": "node --test ./scripts/test-admin-policy-v4.cjs",
     "test:monitor-alerts": "node --test ./scripts/test-monitor-alerts-v4.cjs",
     "test:logout": "node --test ./scripts/test-logout-v4.cjs",
-    "test:monitor-thumbnails": "node --test ./scripts/test-monitor-thumbnails-v4.cjs"
+    "test:monitor-thumbnails": "node --test ./scripts/test-monitor-thumbnails-v4.cjs",
+    "test:integration": "node --test ./scripts/test-door-demo-v4.cjs ./scripts/test-admin-policy-v4.cjs ./scripts/test-monitor-alerts-v4.cjs ./scripts/test-monitor-thumbnails-v4.cjs ./scripts/test-logout-v4.cjs"
   },
   "private": true
 }
