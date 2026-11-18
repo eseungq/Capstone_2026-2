@@ -11,6 +11,7 @@ import com.capstone.inspection.domain.inspection.Inspection;
 import com.capstone.inspection.domain.inspection.InspectionRepository;
 import com.capstone.inspection.domain.inspection.InspectionStatus;
 import com.capstone.inspection.domain.inspection.PredictedQuality;
+import com.capstone.inspection.domain.inspection.RecommendedAction;
 import com.capstone.inspection.domain.model.AutomationPolicyRepository;
 import com.capstone.inspection.inspection.ImageInspector.ImageInfo;
 import com.capstone.inspection.storage.StorageService;
@@ -39,6 +40,7 @@ public class AnalysisResultWriter {
     private final AutomationPolicyRepository policyRepository;
     private final StorageService storageService;
     private final AiJson aiJson;
+    private final RecheckRuleRegistry recheckRules;
 
     // AI 요청에 필요한 값
     public record Started(String inspectionId, String partCode, String modelVersion, String modelId,
@@ -87,6 +89,9 @@ public class AnalysisResultWriter {
         PolicyEvaluator.Decision d = PolicyEvaluator.evaluate(quality, r.calibratedDefectProbability(),
                 r.calibratorVersion(), policyRepository.findReadyActiveByModelId(started.modelId()));
         i.complete(d.action(), d.reviewReason(), d.policy(), d.passThreshold(), gradcamStatus);
+        if (d.action() == RecommendedAction.AUTO_PASS) {
+            i.applyRecheckRule(recheckRules.currentRuleReference()); // 꺼져 있으면 null (계약 6.11)
+        }
         log.info("분석 완료 {} {} quality={} action={} reason={} gradcam={}", i.getInspectionNo(), i.getId(),
                 quality, d.action(), d.reviewReason(), gradcamStatus);
         return new Outcome(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(), i.getStatus(),

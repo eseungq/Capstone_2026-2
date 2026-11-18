@@ -116,7 +116,7 @@
 - 불량(DEFECT) 예측은 보정 확률과 관계없이 항상 REVIEW. 자동 FAIL은 없음 [합의 10/15]
 - 작업자 판정은 AI 결과·정책 결과를 덮어쓰지 않고 별도로 저장 [확정·승계]
 - 수동 판정 건(`source=MANUAL`)은 COMPLETED·REVIEW(`AI_UNAVAILABLE`)로 생성되어 위 표의 `REVIEW_PENDING` → `REVIEW_DONE`을 그대로 따름. AI 결과·정책 값은 없음 (6.10) [구현 11/11]
-- AUTO_PASS 건이 표본 재확인(6.11)으로 뽑히고 재확인 결과가 FAIL이어도 `displayState`·`finalJudgement`·`judgedBy`는 **바뀌지 않음**. 재확인 결과는 상세의 `recheck` 블록에만 표시 [제안 11/18]
+- AUTO_PASS 건이 표본 재확인(6.11)으로 뽑히고 재확인 결과가 FAIL이어도 `displayState`·`finalJudgement`·`judgedBy`는 **바뀌지 않음**. 재확인 결과는 상세의 `recheck` 블록에 표시하고 원래 판정과 함께 보여 줌 [제안 11/18]
 
 ### 3.3 상태 전이
 
@@ -203,8 +203,8 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 | POST | `/inspections/{id}/confirm` | REVIEW 최종 판정 | **WORKER** |
 | POST | `/inspections/{id}/retry` | FAILED 재검사 (새 검사 생성) | WORKER, ADMIN |
 | POST | `/inspections/{id}/manual` | FAILED를 AI 없이 작업자 판정으로 전환 (새 검사 생성) [구현 11/11] | **WORKER** |
-| GET | `/rechecks` | AUTO_PASS 표본 재확인 목록 (대기·완료) [제안·구현 11/18] | WORKER, ADMIN |
-| POST | `/inspections/{id}/recheck` | AUTO_PASS 표본 재확인 결과 기록 (시스템 판정은 그대로) [제안·구현 11/18] | **WORKER** |
+| GET | `/rechecks` | AUTO_PASS 표본 재확인 목록 (대기·완료, 결과·확인함 필터) [제안·구현 11/18] | WORKER, ADMIN |
+| POST | `/inspections/{id}/recheck` | AUTO_PASS 표본 재확인 결과 기록 (시스템 판정은 그대로, 화면 체류 시간 선택) [제안·구현 11/18] | **WORKER** |
 | POST | `/notifications/devices` | 푸시 기기 토큰 등록 | WORKER, ADMIN |
 | DELETE | `/notifications/devices/{token}` | 기기 토큰 해제 | WORKER, ADMIN |
 | GET | `/admin/models` | 모델 버전·로드 가능 여부 조회 | ADMIN |
@@ -214,6 +214,8 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 | POST | `/admin/policies/{id}/activate` | 적용 시작 | ADMIN |
 | POST | `/admin/policies/{id}/deactivate` | 적용 중지 | ADMIN |
 | GET | `/admin/policies/{id}/simulation` | 후보 기준치 비교 (같은 검사 기록에 현재·후보 기준치 대입, 조회만) [구현 11/18] | ADMIN |
+| POST | `/admin/rechecks/{inspectionId}/acknowledge` | 재확인 FAIL 건 관리자 확인함 (해결 완료 아님) [구현 11/18] | ADMIN |
+| GET | `/admin/rechecks/summary` | 재확인 요약 (규칙별 구간 집계·누락·대기·비교 비율·대기 시간·체류 시간) [구현 11/18] | ADMIN |
 | POST | `/admin/users/{loginId}/unlock` | 계정 잠금 해제 [구현 11/10] | ADMIN |
 | GET | `/admin/inspections/export` | 검사 기록 CSV (이력과 같은 partCode·displayState·mismatch·from·to, 접수 시각 오름차순, 최대 10,000건, 엑셀용 UTF-8 BOM, 이미지·AI 원문 제외). 보고서용, 앱 미사용 [구현 11/18] | ADMIN |
 | POST | `/internal/v1/predict` | AI 추론 (7장) | 백엔드 → AI |
@@ -419,7 +421,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - `manualOf` [구현 11/11]: `MANUAL`일 때만 `{ inspectionId, inspectionNo, errorCode, errorMessage }` (원래 FAILED와 AI 실패 사유). 이때 `ai`는 null, `policy`는 `{ automationPolicyReady: false, policyVersion: null, passThreshold: null, recommendedAction: "REVIEW", reviewReason: "AI_UNAVAILABLE" }`, `images.gradcam`·`gradcamStatus`는 null
 - `followUp` [구현 11/11]: FAILED 건에 재검사·수동 전환 검사가 이미 있으면 `{ inspectionId, inspectionNo, source }` (`RETRY`/`MANUAL`). 앱은 버튼을 숨기고 그 검사로 이동
 - 앱은 passThreshold를 해석해 상태를 바꾸지 않고 백엔드가 준 상태를 표시 [승계]
-- `recheck` [제안 11/18]: AUTO_PASS 표본 재확인(6.11)으로 뽑힌 건만 `{ stratum, samplingRate, sampledAt, result, comment, recheckedBy, recheckedAt }`, 아니면 null. `judgement` 블록(시스템 PASS)과 따로 표시
+- `recheck` [제안 11/18]: AUTO_PASS 표본 재확인(6.11)으로 뽑힌 건만 `{ stratum, samplingRate, ruleVersion, trialName, sampledAt, result, comment, recheckedBy, recheckedAt, acknowledgedBy, acknowledgedAt, acknowledgeNote }`, 아니면 null. 재확인 FAIL이어도 `judgement` 블록(시스템 PASS)은 그대로이므로 **두 블록을 함께** 표시. `acknowledgedAt`이 있으면 "확인함"(해결 완료 아님)
 
 ### 6.6 검사 이력 `GET /inspections`
 
@@ -433,7 +435,8 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 ### 6.7 작업자 확인 `POST /inspections/{id}/confirm`
 
 ```json
-{ "finalJudgement": "FAIL", "comment": "도장 스크래치 확인" }
+{ "finalJudgement": "FAIL", "comment": "도장 스크래치 확인",
+  "screenDwellMs": 24300, "firstOpenedAt": "2026-11-19T10:01:02+09:00", "openCount": 1 }
 ```
 
 - `displayState = REVIEW_PENDING`인 건만 가능
@@ -442,6 +445,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - 오류: `409 NOT_REVIEWABLE` (AUTO_PASS·FAILED·분석 중), `403 ACCESS_DENIED` (ADMIN·DEVICE 호출)
 - `comment`는 선택, 최대 200자 [제안]
 - 재전송 비교는 `finalJudgement`만 (comment는 비교하지 않음), 공백 comment는 null로 저장 [구현 10/19]
+- `screenDwellMs`·`firstOpenedAt`·`openCount` [구현 11/18]: 화면 체류 시간 (선택, 셋 다 보내거나 생략). 규칙은 6.11 "화면 체류 시간"과 같음. 재전송이면 처음 값 유지. 값 오류는 `400 INVALID_PARAMETER`
 
 ### 6.8 재검사 `POST /inspections/{id}/retry`
 
@@ -509,7 +513,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - **라벨은 작업자 판정만**: 바뀌는 건마다 `WORKER_PASS`·`WORKER_FAIL`·`UNVERIFIED`. AUTO_PASS(PASS·SYSTEM)와 판정 전 REVIEW는 실제 라벨이 아니므로 `UNVERIFIED`
   - 기준 상향(`REVIEW_TO_AUTO_PASS`): 바뀌는 건은 지금 REVIEW라 작업자 판정이 있음 → `workerFail`이 후보에서 추가로 통과될 불량 (해당 기록에서 관측된 건수)
   - 기준 하향(`AUTO_PASS_TO_REVIEW`): 바뀌는 건은 지금 AUTO_PASS라 대부분 `UNVERIFIED`
-  - AUTO_PASS 표본 재확인(6.11) 결과는 아직 라벨에 넣지 않음. 재확인 FAIL인 건도 여기서는 `UNVERIFIED`. 표본이라 추출 비율 가중치를 함께 다뤄야 해서 다음 단계 [11/18]
+  - 작업자 판정이 없고 AUTO_PASS 표본 재확인(6.11)이 끝난 건은 `RECHECK_PASS`·`RECHECK_FAIL` (`recheckPass`·`recheckFail`). 기준 하향에서 바뀌는 건 중 **표본으로 뽑혀 재확인된 건만**이라 건수를 그대로 전체 불량 수로 보면 안 됨 (가중 추정은 6.11 요약) [구현 11/18]
 - 응답 `200`
   ```json
   { "data": {
@@ -518,17 +522,19 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
       "currentThreshold": 0.0163, "candidateThreshold": 0.0231,
       "validatedMin": 0.01, "validatedMax": 0.0163, "candidateWithinValidatedRange": false,
       "evaluatedCount": 40, "defectPredictedCount": 12,
-      "current":   { "autoPassCount": 5, "reviewCount": 35 },
-      "candidate": { "autoPassCount": 9, "reviewCount": 31 },
+      "recheckRuleVersion": "v1-b40-80-p100-30-10",
+      "current":   { "autoPassCount": 5, "reviewCount": 35, "expectedRecheckCount": 3.4, "expectedCheckCount": 38.4 },
+      "candidate": { "autoPassCount": 9, "reviewCount": 31, "expectedRecheckCount": 6.3, "expectedCheckCount": 37.3 },
       "change": { "direction": "REVIEW_TO_AUTO_PASS", "count": 4,
-                  "workerPass": 3, "workerFail": 1, "unverified": 0,
+                  "workerPass": 3, "workerFail": 1, "recheckPass": 0, "recheckFail": 0, "unverified": 0,
                   "items": [ { "inspectionId": "...", "inspectionNo": "INS-000131",
                                "calibratedDefectProbability": 0.0228, "label": "WORKER_FAIL", "receivedAt": "..." } ],
                   "itemsTruncated": false } } }
   ```
 - `items`: 바뀌는 건을 보정 확률 높은 순으로 최대 100건 (사진을 볼 순서). 건수는 `count`가 전체
+- `expectedRecheckCount` [구현 11/18]: 그 기준치에서 AUTO_PASS가 되는 건마다 현재 `app.recheck.*` 구간 비율을 더한 **예상** 재확인 건수 (`recheckRuleVersion`, 예 `v1-b40-80-p100-30-10`). 기능이 꺼져 있어도 켰을 때 기준으로 계산. `expectedCheckCount = reviewCount + expectedRecheckCount` (REVIEW 확인과 재확인을 합친 예상 확인 건수). 두 업무의 소요 시간은 다를 수 있어 시간은 6.11 요약으로 따로 봄
 - `candidateWithinValidatedRange`: AI가 검증한 범위 안인지. 범위 밖 후보도 비교는 가능하지만 적용(threshold 조정)은 6.9 규칙대로 거절
-- 해석 주의: 건수는 이 기록에서 관측한 값이며 표본이 적으면 불확실성이 큼. 작업량은 확인 건수로만 표시하고 소요 시간은 따로 재야 함
+- 해석 주의: 건수는 이 기록에서 관측한 값이며 표본이 적으면 불확실성이 큼
 - 오류: `404 POLICY_NOT_FOUND`, `candidateThreshold` 범위 밖·없음, `from`이 `to`보다 늦음, 또는 기준치·보정기 버전이 없는 정책은 `400 INVALID_PARAMETER`, ADMIN 외 `403 ACCESS_DENIED`
 
 ### 6.10 수동 판정 전환 `POST /inspections/{id}/manual` [구현 11/11, 합의 11/11 김도현·홍승인]
@@ -568,14 +574,17 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 
 ---
 
-### 6.11 AUTO_PASS 표본 재확인 [제안·구현 11/18, TBD-16]
+### 6.11 AUTO_PASS 표본 재확인 [제안·구현 11/18, TBD-16·17]
 
 작업자 판정은 REVIEW 건에만 쌓여서 AUTO_PASS로 빠진 검사에서 무엇을 놓쳤는지 알 수 없다. `PASS · SYSTEM`은 실제 정상 라벨이 아니다. AUTO_PASS 건 일부를 정해진 규칙으로 뽑아 작업자가 다시 확인하고, 결과를 원래 시스템 판정과 **따로** 저장한다 (AI 정책 점검 11/18 4.3). 기준치·범위·보정기는 자동으로 바꾸지 않는다
 
+공동시험 [합의 11/18 김도현·홍승인]
+- 부품별 AUTO_PASS 기준치와 구간 경계(0.4·0.8)는 유지하고 **100·30·10%로 수집**. 같은 기록으로 50·30·10%였을 때도 비교 (요약 API의 `compare`)
+- REVIEW와 재확인을 합친 업무량, 대기 시간, 화면 체류 시간, 발견 불량을 함께 봄. 장기 적용 비율은 시험 후 결정 (TBD-16)
+
 표본 추출 (백엔드 자동)
 - AUTO_PASS가 저장된 **뒤 별도 단계**에서 결정. 추출이 실패해도 AUTO_PASS 결과에는 영향 없음
-- AUTO_PASS마다 결정을 1행 기록: 뽑힌 건 `sampled = true`, 뽑히지 않은 건도 `sampled = false`로 남김. 그래서 **미선정과 저장 실패를 구분**할 수 있음 (행이 없으면 결정 전·저장 실패)
-- 재처리: 결정 행이 없는 AUTO_PASS를 5분마다 다시 결정 (완료 후 1분~1일 사이 건, 1회 100건). 재처리는 **실행 시점의 `app.recheck.*`** 로 결정하므로 설정이 같을 때만 처음 결정과 같음 (검사 당시 설정은 저장하지 않음). 동시에 처리돼도 `inspection_id` UNIQUE로 1건만 남음. `app.recheck.sweep-enabled=false`면 재처리 안 함 [구현 11/18]
+- AUTO_PASS마다 결정을 1행 기록: 뽑힌 건 `sampled = true`, 뽑히지 않은 건도 `sampled = false`로 남김. 그래서 **미선정과 저장 실패를 구분**할 수 있음 (행이 없으면 결정 전·저장 실패·기능 꺼짐)
 - 구간: `r = calibratedDefectProbability ÷ 판정 당시 passThreshold` (0 ≤ r ≤ 1). 부품마다 기준치가 달라도 같은 규칙
 
   | stratum | 조건 | 기본 비율 (`app.recheck.*`, TBD-16) |
@@ -585,32 +594,98 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
   | `LOW` | r < 0.4 | 0.1 |
 
 - 낮은 점수 구간도 일부 뽑음 (기준 근처만 보면 전체 통과 건을 대표하지 못함)
-- 추출 여부는 검사 ID의 SHA-256으로 정한 0~1 값이 비율보다 작은지로 결정. 같은 검사·같은 설정이면 항상 같은 결과라 재현 가능하고, 사람이 고른 건이 섞이지 않음
-- 뽑을 때 쓴 비율(`samplingRate`)을 함께 저장. 집계할 때 가중치(1/samplingRate)로 씀
-- **기본 꺼 둠** (`app.recheck.enabled=false`). 꺼져 있으면 결정·재처리 모두 하지 않음. 켜면 최근 1일 안의 결정 없는 AUTO_PASS도 켠 시점 설정으로 결정
-- **켜 둔 동안 구간 경계·비율을 바꾸지 않음**. 이미 결정된 건은 다시 뽑지 않지만, 저장에 실패해 재처리되는 건은 새 값으로 결정돼 한 기간 안에 두 설정이 섞임. 바꿀 때는 끄고 → 값 변경 → 다시 켬. 시연은 값을 고정한 채 켜서 진행 [11/18]
-- 운영 중 설정을 바꿀 계획이면, 검사 당시 추출 규칙(규칙 버전 또는 값)을 함께 남겨 재처리에서도 그 규칙을 쓰도록 바꿔야 함 (다음 단계, TBD-16)
+- 추출 여부는 검사 ID의 SHA-256으로 정한 0~1 값(`drawValue`)이 비율보다 작은지로 결정. 같은 검사면 항상 같은 값이라 재현 가능하고, 사람이 고른 건이 섞이지 않음. 비율을 낮춘 경우(예: NEAR 50%)에 뽑혔을 건은 지금 비율에서 뽑힌 건에 항상 포함되므로 같은 기록에서 계산 가능 (높인 경우는 계산 불가)
+- **추출 규칙 기록** [합의·구현 11/18 김도현]: 규칙(구간 경계 2개·비율 3개·시험 이름)은 `recheck_rule`에 1행으로 남김
+  - `ruleVersion`: 값으로 자동 생성, 순서 고정 `v1-b{MID 경계%}-{NEAR 경계%}-p{NEAR%}-{MID%}-{LOW%}` (예 `v1-b40-80-p100-30-10`). 추출 해시나 경계 포함 규칙(r ≥ 경계)이 바뀌면 `v1`을 올림
+  - `trialName`(선택, `app.recheck.trial-name`, 60자): 같은 설정으로 여러 번 시험할 때 회차 구분 (예 `공동시험 1차`). 버전과 시험 이름이 같으면 같은 규칙
+  - **AUTO_PASS로 판정할 때 그때 규칙을 검사에 연결**(`inspection.recheck_rule_id`, 판정과 같은 트랜잭션). 기능이 꺼져 있었으면 연결 없음
+  - 결정 행에는 규칙, `r`, `drawValue`, 이 구간 비율(`samplingRate`)을 남김. 집계는 규칙(버전+시험 이름)별로 따로 함. V8로 기록된 결정은 규칙이 없어 `UNRECORDED`로 묶음
+- **기본 꺼 둠** (`app.recheck.enabled=false`). 꺼져 있으면 판정에 규칙을 연결하지 않고 재처리도 하지 않음
+- 재처리: 결정 행이 없는 AUTO_PASS를 5분마다 다시 결정 (완료 후 1분~1일 사이 건, 1회 100건). **지금 설정이 아니라 판정 때 검사에 연결된 규칙으로 결정**하므로 실행 중 설정이 바뀌어도 처음 결정과 같음. 연결된 규칙이 없는 건은 결정하지 않고 요약에서 결정 누락으로 셈 [합의·구현 11/18 김도현]. 동시에 처리돼도 `inspection_id` UNIQUE로 1건만 남음. `app.recheck.sweep-enabled=false`면 재처리 안 함
 - 문제가 보여 사람이 임의로 고른 건은 표본에 넣지 않음 (필요하면 다음 단계에서 별도 구분)
 
 목록 `GET /rechecks`
-- 쿼리: `status`(`PENDING` 기본 / `DONE`), `partCode`, `page`(0부터), `size`(기본 20, 최대 100). 없는 `partCode`는 `400 INVALID_PART_CODE`
-- 응답: `{ items: [ { inspectionId, inspectionNo, partCode, receivedAt, stratum, sampledAt, result, recheckedAt } ], page, size, totalElements, totalPages }`, 뽑힌 순서(먼저 뽑힌 건부터)
-- `/monitoring/queue`(REVIEW·FAILED)와 **섞지 않음**. 작업량을 REVIEW 확인과 재확인으로 따로 세기 위함 (두 업무 소요 시간이 다를 수 있음)
+- 쿼리: `status`(`PENDING` 기본 / `DONE`), `result`(`PASS`/`FAIL`, DONE에서만), `acknowledged`(`true`/`false`, DONE에서만), `partCode`, `page`(0부터), `size`(기본 20, 최대 100). 없는 `partCode`는 `400 INVALID_PART_CODE`, PENDING에 `result`·`acknowledged`를 주면 `400 INVALID_PARAMETER`
+- 확인 안 된 FAIL만: `status=DONE&result=FAIL&acknowledged=false`
+- 응답: `{ items: [ { inspectionId, inspectionNo, partCode, receivedAt, stratum, sampledAt, result, recheckedAt, acknowledgedBy, acknowledgedAt } ], page, size, totalElements, totalPages }`, 뽑힌 순서(먼저 뽑힌 건부터)
+- `/monitoring/queue`(REVIEW·FAILED)와 **섞지 않음**. 작업량을 REVIEW 확인과 재확인으로 따로 세기 위함
+- 권한 WORKER, ADMIN
 
 결과 `POST /inspections/{id}/recheck`
 ```json
-{ "result": "FAIL", "comment": "고정핀 들뜸" }
+{ "result": "FAIL", "comment": "고정핀 들뜸",
+  "screenDwellMs": 18250, "firstOpenedAt": "2026-11-19T10:02:11+09:00", "openCount": 2 }
 ```
 - 권한 **WORKER만** (6.7과 같음). 대상은 표본으로 뽑힌 AUTO_PASS 건
+- 화면 체류 시간 3개 필드는 6.7과 같은 규칙 (아래 "화면 체류 시간")
 - 응답 `200`: `{ inspectionId, inspectionNo, finalJudgement: "PASS", judgedBy: "SYSTEM", recheck: { ... } }` (원래 판정과 재확인 결과를 함께)
-- 같은 값 재전송 200(기존 결과), 다른 값 `409 ALREADY_RECHECKED`, 동시 제출 시 1건만 기록. `comment` 선택 200자, 공백은 null
-- 오류: `409 NOT_RECHECKABLE`(표본이 아님: 뽑히지 않은 AUTO_PASS·REVIEW·FAILED), `404 INSPECTION_NOT_FOUND`, WORKER 외 `403 ACCESS_DENIED`
-- 알림: 보내지 않음. 재확인 FAIL 후속 조치는 [TBD-17]
+- 같은 값 재전송 200(기존 결과, 체류 시간은 처음 값 유지), 다른 값 `409 ALREADY_RECHECKED`, 동시 제출 시 1건만 기록. `comment` 선택 200자, 공백은 null
+- 오류: `409 NOT_RECHECKABLE`(표본이 아님: 뽑히지 않은 AUTO_PASS·REVIEW·FAILED), `404 INSPECTION_NOT_FOUND`, 체류 시간 값 오류 `400 INVALID_PARAMETER`, WORKER 외 `403 ACCESS_DENIED`
+- 알림: 보내지 않음 (TBD-17)
+
+재확인 FAIL 후속 처리 [합의 11/18 홍승인·김도현, 1차]
+- 원래 판정 `PASS · SYSTEM`은 유지하고 재확인 결과는 따로 기록. 상세 화면에서 `judgement` 블록과 `recheck` 블록을 **함께** 표시
+- 앱: 재확인 완료 목록에서 FAIL을 붉은색으로 구분하고, 관리자에게 추가 확인이 필요하다는 안내 표시
+- 관리자 **확인함** `POST /admin/rechecks/{inspectionId}/acknowledge` (ADMIN)
+  ```json
+  { "note": "라인 담당자에게 전달" }
+  ```
+  - 재확인 결과가 **FAIL인 건만**. `note` 선택 200자, 본문 생략 가능
+  - "확인함"은 관리자가 FAIL을 봤다는 기록이며 **문제 해결 완료가 아님**. 해결 여부·조치 내용 기록은 다음 단계 (TBD-17)
+  - 응답 `200`: 재확인 응답과 같은 형식 (`recheck.acknowledgedBy`·`acknowledgedAt`·`acknowledgeNote` 채워짐)
+  - 이미 확인함이면 200(처음 기록 그대로, 메모도 바뀌지 않음), 동시 요청 시 1건만 기록
+  - 오류: `409 NOT_ACKNOWLEDGEABLE`(표본이 아니거나 재확인 전이거나 PASS), `404 INSPECTION_NOT_FOUND`, ADMIN 외 `403 ACCESS_DENIED`
+- 푸시 알림·자동 후속 조치는 없음 (TBD-17)
+
+화면 체류 시간 [합의 11/18 홍승인·김도현]
+- REVIEW 확인(6.7)과 재확인 제출에 같은 선택 필드 3개. 셋 다 보내거나 셋 다 생략 (일부만 보내면 `400 INVALID_PARAMETER`)
+  - `screenDwellMs`: 상세 화면이 실제로 앞에 보이고 앱이 활성인 시간의 합 (0 ~ 86,400,000). 백그라운드·다른 화면으로 가면 멈추고, 돌아오면 이어서 셈
+  - `firstOpenedAt`: 이 검사의 상세 화면을 처음 연 시각 (기기 시계, 오프셋 포함 ISO-8601)
+  - `openCount`: 처음 열 때 1, 나갔다가 다시 열 때마다 +1 (1 ~ 1,000). 서버 갱신·백그라운드 복귀는 세지 않음
+- 앱은 제출이 실패하면 측정값을 지우지 않고, 정상 제출된 경우에만 최종 기록됨
+- 제출하지 않고 나간 경우는 기록하지 않음 → 집계는 **제출된 건만**의 체류 시간 (요약에 명시)
+- 실제 작업 시간과 차이가 있을 수 있음 (화면을 띄워 둔 채 다른 일을 한 경우 등). 대기 시간은 서버 시각으로 따로 계산
+
+요약 `GET /admin/rechecks/summary` (ADMIN) [구현 11/18]
+- 쿼리: `partCode`, `from`·`to`(선택, `from ≤ receivedAt < to`), `compareNearRate`·`compareMidRate`·`compareLowRate`(선택, 셋 다 주거나 생략, 0~1)
+- 대상: 기간 안의 AUTO_PASS(`PASS · SYSTEM`, 보정 확률·기준치 있음). 기간이 없으면 전체를 읽어 계산하므로 시험 기간을 지정해 조회 권장 (6.9.1과 같음)
+- 판정 때 규칙 기록이 실패하면(DB 오류) AUTO_PASS는 그대로 두고 규칙 없이 남김 → `undecidedWithoutRuleCount`에 셈
+- 응답 `200`
+  ```json
+  { "data": {
+      "partCode": null, "from": null, "to": null,
+      "autoPassCount": 120, "decidedCount": 116, "undecidedCount": 4, "undecidedWithoutRuleCount": 1,
+      "rules": [ {
+        "ruleVersion": "v1-b40-80-p100-30-10", "trialName": "공동시험 1차",
+        "nearRatio": 0.8, "midRatio": 0.4, "nearRate": 1.0, "midRate": 0.3, "lowRate": 0.1,
+        "autoPassCount": 119, "decidedCount": 116, "undecidedCount": 3,
+        "sampledCount": 40, "pendingCount": 6, "passCount": 32, "failCount": 2,
+        "strata": [ { "stratum": "NEAR", "autoPassCount": 21, "decidedCount": 20, "undecidedCount": 1,
+                      "sampledCount": 20, "completedCount": 18, "pendingCount": 2,
+                      "passCount": 17, "failCount": 1, "failRateAmongCompleted": 0.0556 } ],
+        "estimatedDefectRateInAutoPass": 0.021,
+        "compare": { "nearRate": 0.5, "midRate": 0.3, "lowRate": 0.1, "computable": true,
+                     "sampledCount": 30, "unverifiedCount": 4, "passCount": 25, "failCount": 1,
+                     "estimatedDefectRateInAutoPass": 0.018 } } ],
+      "waits": { "review": { "count": 35, "pendingCount": 4, "averageMs": 41000, "medianMs": 26000 },
+                 "recheck": { "count": 34, "pendingCount": 6, "averageMs": 380000, "medianMs": 120000 } },
+      "dwell": { "review": { "count": 30, "averageMs": 15000, "medianMs": 11000, "averageOpenCount": 1.2 },
+                 "recheck": { "count": 28, "averageMs": 9000, "medianMs": 7000, "averageOpenCount": 1.1 } } } }
+  ```
+- 규칙별·구간별로 `autoPassCount`(그 규칙으로 판정된 AUTO_PASS) = `decidedCount` + `undecidedCount`(결정 누락). 결정 누락 건도 판정 당시 규칙으로 구간을 정해 그 구간에 셈
+- `undecidedWithoutRuleCount`: 판정 당시 규칙도 결정도 없는 AUTO_PASS (기능 꺼짐 등). 어느 규칙에도 넣지 않음
+- **대기(`pendingCount`)는 정상·불량 어느 쪽으로도 세지 않음**. `failRateAmongCompleted = fail ÷ (pass + fail)`, 완료 건이 없으면 null
+- `estimatedDefectRateInAutoPass` [합의 11/18 김도현]: 구간별 `failRateAmongCompleted`에 **구간 AUTO_PASS 건수 ÷ 전체 AUTO_PASS 건수**를 곱해 합산 (추출 비율 100·30·10%는 뽑는 비율이고 가중치가 아님). AUTO_PASS가 0건인 구간은 빼고, AUTO_PASS가 있는데 완료가 0건인 구간이 있으면 null
+- `compare` (**가상 비교**, 화면에도 가상 비교로 표시): 같은 기록에서 `drawValue < 비교 비율`인 건만 다시 셈. 그중 실제 재확인 결과가 있는 건만 `passCount`·`failCount`, 결과가 없는 건은 `unverifiedCount`. 비교 비율이 실제 비율보다 큰 구간이 있거나 `UNRECORDED`면 `computable: false`, 숫자는 null
+- `waits.review`: 기간 안의 REVIEW 건 `completedAt → 작업자 confirmedAt`, `waits.recheck`: `sampledAt → recheckedAt`. 둘 다 **완료된 건만** 평균·중앙값을 내고, 아직 대기 중인 건은 `pendingCount`로 따로 셈
+- `dwell`: 화면 체류 시간을 보낸 제출 건만 (미제출 이탈은 기록 없음)
+- 오류: 없는 `partCode` `400 INVALID_PART_CODE`, `from`이 `to`보다 늦음·비교 비율 일부만·범위 밖 `400 INVALID_PARAMETER`, ADMIN 외 `403 ACCESS_DENIED`
 
 해석
-- 재확인으로 직접 추정하는 것은 **AUTO_PASS 중 실제 불량 비율**(통과된 검사에 불량이 얼마나 섞였는지). 구간별 `FAIL ÷ 재확인 건수`에 그 구간 AUTO_PASS 건수 비중을 곱해 합산
+- 재확인으로 직접 추정하는 것은 **AUTO_PASS 중 실제 불량 비율**(통과된 검사에 불량이 얼마나 섞였는지)
 - **전체 실제 불량 중 AUTO_PASS로 빠진 비율**(정책의 불량 누락)은 REVIEW 작업자 판정까지 합쳐야 하므로 별도 (다음 단계)
-- 정책·모델·보정기 버전이 다른 검사는 합치지 않음 (검사마다 판정 당시 값이 저장됨, 4장). 집계 API는 다음 단계
+- 정책·모델·보정기 버전이나 추출 규칙이 다른 검사는 합치지 않음. 요약은 규칙별로 나누고, 정책·모델 구분이 필요하면 `partCode`·기간으로 나눠 조회
+- 건수가 적으면 불확실성이 큼. 신뢰구간 표시 방법은 TBD-16
 
 ## 7. AI 연동 규격 [합의 10/15]
 
@@ -792,6 +867,10 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | `recalculation_run`·`recalculation_result` | 제외 [합의 10/15, TBD-15 해소] |
 | **신규** `device_token` | id, user_id, token(UNIQUE), platform, created_at, last_seen_at |
 | **신규** `auto_pass_recheck` (V8) [제안 11/18] | AUTO_PASS마다 추출 결정 1행. id, inspection_id(UNIQUE), sampled(뽑힘 여부), stratum(NEAR/MID/LOW), sampling_rate(0 ≤ rate ≤ 1, 뽑힌 건은 0 초과), sampled_at(결정 시각), result(PASS/FAIL, null), comment, rechecked_by, rechecked_at. CHECK: 뽑히지 않은 건은 result 없음, 결과·확인자·확인 시각은 셋 다 있거나 셋 다 없음. 테이블 간 규칙(대상이 AUTO_PASS·SYSTEM, 재확인이 있어도 `inspection.final_judgement`는 PASS)은 점검 SQL로 확인 (김남균 협의) |
+| **신규** `recheck_rule` (V9) [구현 11/18] | 추출 규칙 1건 = 1행. id, rule_version, trial_name(선택), near_ratio·mid_ratio·near_rate·mid_rate·low_rate, created_at. (rule_version, 시험 이름) UNIQUE (NULL은 빈 문자열로 묶는 생성 컬럼 trial_key) |
+| `inspection` 추가 (V9) [구현 11/18] | recheck_rule_id(FK, NULL 허용): AUTO_PASS 판정 당시 규칙. AUTO_PASS일 때만 값 (CHECK). 재처리가 이 규칙을 씀 |
+| `auto_pass_recheck` 추가 (V9) [구현 11/18] | 결정 규칙: rule_id(FK), ratio(r), draw_value (V8 행은 NULL, 셋은 함께 있거나 함께 없음) · 확인함: acknowledged_by(FK users), acknowledged_at, acknowledge_note (재확인 FAIL에만, 확인자·시각 짝) · 화면 체류 시간: screen_dwell_ms, first_opened_at, open_count (셋 다 있거나 없음, 재확인 결과가 있을 때만) |
+| `worker_confirmation` 추가 (V9) [구현 11/18] | screen_dwell_ms, first_opened_at, open_count (선택, 셋 다 있거나 없음) |
 
 적용 현황 [합의 10/28]
 - Flyway V1~V5 적용. V3 인증, V4 모니터링·비동기·Grad-CAM·정책 버전(위 표), **V5 무결성 제약**(김남균 작성, 이승규 수정: `gradcam_status`에 `NO_ACTIVATION` 추가, FAILED면 `predicted_quality` NULL)
@@ -823,7 +902,8 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | 라인별 불량 빈도 | `line_code` | 값이 들어오기 시작한 시점 이후만 집계 가능 |
 | 시간대·기간별 추이 | `captured_at`, `received_at` | |
 | 정책 버전별 자동화율 | `policy_id`, `pass_threshold_applied` | 기준 변경 전후 비교 |
-| 작업자 확인 소요 시간 | `completed_at` → `confirmed_at` | |
+| 작업자 확인 대기 시간 | `completed_at` → `confirmed_at` | 6.11 요약 `waits.review` |
+| 화면 체류 시간 | `screen_dwell_ms`·`open_count` (V9) | 제출된 건만 [11/18] |
 
 - 불량 **유형별** 통계는 불가: 현재 AI가 정상·불량 2분류만 반환하므로 유형 정보가 없음
 
@@ -847,6 +927,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | 추가 | 409 | `ORIGINAL_IMAGE_MISSING` | 원본 사진 기록이 없어 수동 전환 불가 [구현 11/11] |
 | 추가 | 409 | `NOT_RECHECKABLE` | 표본 재확인 대상이 아닌 검사 [제안 11/18] |
 | 추가 | 409 | `ALREADY_RECHECKED` | 다른 결과로 이미 재확인된 검사 [제안 11/18] |
+| 추가 | 409 | `NOT_ACKNOWLEDGEABLE` | 재확인 FAIL이 아닌 건 관리자 확인함 [구현 11/18] |
 | 추가 | 400 | `INVALID_DEVICE_TOKEN` | 기기 토큰 형식 오류 |
 | 추가 | 502 | `AI_REQUEST_REJECTED` | AI 서버가 4xx로 요청을 거절 (검사는 FAILED, 재시도 안 함) |
 | 미사용 | 409 | `REQUEST_IN_PROGRESS` | 비동기 접수로 불필요 (6.2) [제안] |
@@ -883,7 +964,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | TBD-13 | 입력 프로그램 인증 | **해소** | DEVICE 역할 계정 로그인 → JWT | — |
 | TBD-14 | iOS 종료·백그라운드 푸시 포함 여부 | 일부 확정 | RN + Expo 확정. 앱 실행 중 폴링 필수, Android 푸시 권장, iOS 푸시는 Apple Developer 계정 여부에 따라 결정 (8.1). 11/05 기준 앱 푸시 토큰 등록 미구현, 실행 방식(Expo Go 또는 개발용 빌드) 결정 필요 11/10 기준 앱 푸시 미구현 → 시연은 앱 실행 중 폴링(5초)으로 진행 [제안 11/10] | 전체 |
 | TBD-15 | 과거 결과 재계산 설계 유지 여부 | **해소** | 제외 | — |
-| TBD-16 | 표본 재확인 구간 경계(0.4·0.8)·비율(1.0·0.3·0.1), 불확실성 표시 방법 | 제안 | 임시값으로 구현, 기본 꺼 둠. `app.recheck.*`는 끈 상태에서만 변경 (재처리가 실행 시점 값을 씀). 운영 중 변경하려면 검사 당시 규칙 저장이 필요 (6.11) | 김도현 |
-| TBD-17 | 재확인 FAIL 시 알림·후속 조치 | 미정 | 지금은 기록만 (6.11) | 홍승인·전체 |
+| TBD-16 | 표본 재확인 구간 경계(0.4·0.8)·비율(1.0·0.3·0.1), 불확실성 표시 방법 | 공동시험값 확정 (11/18) | **공동시험은 경계 0.4·0.8, 100·30·10%로 수집하고 50·30·10%를 같은 기록으로 비교** [합의 11/18 김도현]. 장기 적용값은 시험 후 결정. 규칙은 `v1-b40-80-p100-30-10` 형식으로 자동 생성하고 시험 이름은 선택, 판정 당시 규칙을 검사에 남겨 재처리도 그 규칙으로(V9). 전체 불량률은 구간 AUTO_PASS 건수 비중으로 가중 [합의 11/18 김도현]. 기본 꺼 둠. 신뢰구간 표시는 다음 단계 (6.11) | 김도현 |
+| TBD-17 | 재확인 FAIL 시 알림·후속 조치 | 1차 합의 (11/18) | 원래 PASS·SYSTEM 유지, 상세에서 두 결과 함께 표시, 완료 목록 붉은색 + 관리자 안내, 관리자 "확인함"(해결 완료 아님) [합의 11/18 홍승인·김도현]. 푸시·자동 조치·해결 상태 기록은 팀 논의 후 (6.11) | 홍승인·전체 |
 | — | Grad-CAM 0맵·상수맵 처리 | **해소** [합의 10/28] | `gradcamStatus = NO_ACTIVATION`, 이미지 없음, 분류·REVIEW 유지 (6.5, 7.2) | — |
 | — | `inferenceTimeMs` 측정 범위 | **해소** [합의 10/28] | AI handler 진입~응답 직렬화 직전, 모델 최초 로드 제외 (7.2) | — |
