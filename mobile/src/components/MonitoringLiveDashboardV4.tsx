@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     width: 96, height: 84, borderRadius: 9, backgroundColor: '#EEF2F8',
     overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
   },
-  thumbnailImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  thumbnailImage: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
   thumbnailImageLoading: { opacity: 0 },
   thumbnailEmpty: { color: '#64748B', fontSize: 10, paddingHorizontal: 5, textAlign: 'center' },
   rowInfo: { flex: 1, gap: 4, justifyContent: 'center' },
