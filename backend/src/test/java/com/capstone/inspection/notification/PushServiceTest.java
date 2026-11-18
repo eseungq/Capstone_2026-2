@@ -70,7 +70,7 @@ class PushServiceTest {
         AppProperties d = TestProps.defaults();
         AppProperties props = new AppProperties(d.upload(), d.ai(), d.storage(), d.auth(), d.inspection(),
                 d.monitoring(), d.policy(), new AppProperties.Push(true,
-                "http://127.0.0.1:" + server.getAddress().getPort() + "/send", 1000, 1000));
+                "http://127.0.0.1:" + server.getAddress().getPort() + "/send", 1000, 1000), d.recheck());
         return new PushService(repository, new ExpoPushClient(props, MAPPER),
                 new TransactionTemplate(Mockito.mock(PlatformTransactionManager.class)));
     }

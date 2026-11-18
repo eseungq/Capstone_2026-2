@@ -10,7 +10,8 @@ import java.util.Map;
 // 미확정(TBD) 값은 전부 여기로 모아 코드 수정 없이 바꿀 수 있게 함
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(Upload upload, Ai ai, Storage storage, Auth auth, Inspection inspection,
-                            Monitoring monitoring, Policy policy, Push push) {
+                            Monitoring monitoring, Policy policy, Push push,
+                            Recheck recheck) {
 
     // 업로드 제한 (TBD-08)
     public record Upload(List<String> allowedContentTypes, long maxBytes, int minWidth, int minHeight) {
@@ -78,5 +79,23 @@ public record AppProperties(Upload upload, Ai ai, Storage storage, Auth auth, In
 
     // Expo 푸시 발송 (계약 8장). enabled=false면 로그만 남김
     public record Push(boolean enabled, String expoUrl, int connectTimeoutMs, int readTimeoutMs) {
+    }
+
+    // AUTO_PASS 표본 재확인 (계약 6.11, TBD-16). 구간은 보정 확률 ÷ 적용 기준치 r로 나눔
+    //   r ≥ nearRatio → NEAR, r ≥ midRatio → MID, 나머지 LOW. 비율 0이면 그 구간은 뽑지 않음
+    public record Recheck(boolean enabled, double nearRatio, double midRatio, double nearRate, double midRate,
+                          double lowRate) {
+
+        // 잘못된 값이면 기동 시 실패 (그대로 두면 DB CHECK 위반으로 표본이 조용히 안 뽑힘)
+        public Recheck {
+            if (!(0 <= midRatio && midRatio <= nearRatio && nearRatio <= 1)) {
+                throw new IllegalArgumentException("app.recheck: 0 ≤ mid-ratio ≤ near-ratio ≤ 1 이어야 합니다.");
+            }
+            for (double rate : new double[]{nearRate, midRate, lowRate}) {
+                if (!(rate == 0 || (rate >= 0.000001 && rate <= 1))) {
+                    throw new IllegalArgumentException("app.recheck: 비율은 0 또는 0.000001~1 이어야 합니다.");
+                }
+            }
+        }
     }
 }

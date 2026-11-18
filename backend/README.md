@@ -11,6 +11,8 @@
 - 작업자 확인: `POST /api/v1/inspections/{id}/confirm` (WORKER만)
 - 재검사: `POST /api/v1/inspections/{id}/retry` (FAILED만, 새 검사 생성)
 - 수동 판정 전환: `POST /api/v1/inspections/{id}/manual` (WORKER, 모든 FAILED, AI 상태 확인 안 함) → 새 검사(`source=MANUAL`, `AI_UNAVAILABLE`)를 기존 confirm으로 판정. FAILED 1건당 재검사·수동 전환 중 1건 (V6, 계약 6.10)
+- 후보 기준치 비교: `GET /api/v1/admin/policies/{id}/simulation` (같은 모델·보정기 기록에 현재·후보 기준치 대입, 바뀌는 건의 작업자 PASS·FAIL·미확인, 조회만, 계약 6.9.1)
+- AUTO_PASS 표본 재확인: AUTO_PASS 뒤 보정 확률 구간별 비율로 표본 추출(V8 `auto_pass_recheck`), `GET /api/v1/rechecks`, `POST /api/v1/inspections/{id}/recheck` (WORKER, 시스템 판정은 그대로), 상세 `recheck` 블록 (계약 6.11 [제안]). **기본 꺼 둠**: `APP_RECHECK_ENABLED=true`로 켜고, 켜 둔 동안 `app.recheck.*` 값을 바꾸지 않음 (결정 누락 재처리가 실행 시점 값을 씀)
 - 부품 목록: `GET /api/v1/parts` (모델 사용 가능·정책 적용 여부)
 - 모델 로드 확인: 접수·재검사·부품 목록·모니터링 공통 (아래 "실제 AI 연결")
 - 관리자: `GET /api/v1/admin/models`, 정책 조회·등록·기준치 조정(새 버전)·적용·중지, 계정 잠금 해제 `POST /api/v1/admin/users/{loginId}/unlock`, 검사 기록 CSV 내보내기 `GET /api/v1/admin/inspections/export` (이력과 같은 필터, 최대 10,000건, 계약 6.1)
@@ -282,6 +284,7 @@ scripts/             연결 점검·전체 흐름·측정·시연 데이터
 | `app.auth.login-lock-threshold` | TBD-10 |
 | `app.policy.min-sample-count` | TBD-03 |
 | `app.push.enabled`, `expo-url` | TBD-14 |
+| `app.recheck.*` 사용 여부(기본 false)·구간 경계(0.8·0.4)·비율(1.0·0.3·0.1) | TBD-16 (김도현 확인 전 임시값). 바꿀 때는 끄고 바꾼 뒤 다시 켬 |
 | `app.inspection.analysis-pool-size` | 11/04 실측으로 1 (실제 AI가 한 건씩 처리). 처리량이 더 필요하면 재측정 |
 | 검사항목 코드 `UNIFIED` (세 부품 공통, 도어는 V7에서 `SCRATCH` → `UNIFIED`) | TBD-04 확정 11/17 |
 

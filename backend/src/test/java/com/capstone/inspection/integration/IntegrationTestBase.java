@@ -48,7 +48,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest(properties = {
         "app.ai.model-check-ttl-seconds=0",
         "app.ai.model-check-failure-ttl-seconds=0",
-        "app.storage.local-root=build/test-storage"
+        "app.storage.local-root=build/test-storage",
+        "app.recheck.sweep-enabled=false" // 주기 재처리가 테스트 데이터 정리와 겹치지 않게. 필요한 테스트가 직접 호출
 })
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
