@@ -60,7 +60,7 @@ class AiClientTest {
                 ai.retryCount(), ai.imageSizeCheckEnabled(), ai.maxResponseStringChars(), ai.modelCheckEnabled(),
                 ai.modelCheckTtlSeconds(), ai.modelCheckFailureTtlSeconds(), ai.modelCheckConnectTimeoutMs(),
                 ai.modelCheckReadTimeoutMs(), ai.partBaseUrls()),
-                d.storage(), d.auth(), d.inspection(), d.monitoring(), d.policy(), d.push());
+                d.storage(), d.auth(), d.inspection(), d.monitoring(), d.policy(), d.push(), d.recheck());
         return new AiClient(props, new AiJson(MAPPER, props));
     }
 

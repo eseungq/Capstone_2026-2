@@ -4,6 +4,7 @@ import com.capstone.inspection.common.api.PageResponse;
 import com.capstone.inspection.common.error.BusinessException;
 import com.capstone.inspection.common.error.ErrorCode;
 import com.capstone.inspection.common.time.Times;
+import com.capstone.inspection.domain.inspection.AutoPassRecheckRepository;
 import com.capstone.inspection.domain.inspection.ImageStorage;
 import com.capstone.inspection.domain.inspection.ImageStorageRepository;
 import com.capstone.inspection.domain.inspection.ImageType;
@@ -18,6 +19,7 @@ import com.capstone.inspection.domain.part.Part;
 import com.capstone.inspection.domain.part.PartRepository;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse;
 import com.capstone.inspection.inspection.dto.InspectionHistoryItem;
+import com.capstone.inspection.inspection.dto.RecheckBlock;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse.Ai;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse.FollowUp;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse.ManualOf;
@@ -56,6 +58,7 @@ public class InspectionQueryService {
     private final ImageStorageRepository imageRepository;
     private final WorkerConfirmationRepository confirmationRepository;
     private final ImageUrlSigner signer;
+    private final AutoPassRecheckRepository recheckRepository;
 
     public InspectionDetailResponse getDetail(String inspectionId) {
         Inspection i = inspectionRepository.findDetailById(inspectionId)
@@ -99,22 +102,25 @@ public class InspectionQueryService {
         return new InspectionDetailResponse(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(),
                 i.getLineCode(), i.getStatus(), DisplayState.of(i), Times.toOffset(i.getReceivedAt()),
                 Times.toOffset(i.getCompletedAt()), i.getSource(), retryOf, manualOf, followUp, ai, policy,
-                judgement, images(i), error);
+                judgement, images(i), error,
+                recheckRepository.findSampledByInspectionIdWithUser(i.getId()).map(RecheckBlock::of).orElse(null));
     }
 
     // 검사 이력 (계약 v4 6.6). 작업자도 전체 검사 조회. 기간은 receivedAt 기준 from ≤ receivedAt < to
     public PageResponse<InspectionHistoryItem> search(String partCode, DisplayState displayState,
-                                                      LocalDateTime from, LocalDateTime to, int page, int size) {
+                                                      ReviewMismatch mismatch, LocalDateTime from, LocalDateTime to,
+                                                      int page, int size) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_PARAMETER, "page는 0 이상, size는 1~" + MAX_PAGE_SIZE + "이어야 합니다.");
         }
-        Specification<Inspection> spec = InspectionSpecs.fetchPart().and(filter(partCode, displayState, from, to));
+        Specification<Inspection> spec = InspectionSpecs.fetchPart().and(filter(partCode, displayState, mismatch, from, to));
         Page<Inspection> result = inspectionRepository.findAll(spec, PageRequest.of(page, size, HISTORY_SORT));
         return PageResponse.of(result, this::toHistoryItems);
     }
 
     // 이력·CSV 내보내기 공통 조건. 기간은 receivedAt 기준 from ≤ receivedAt < to
-    public Specification<Inspection> filter(String partCode, DisplayState displayState, LocalDateTime from, LocalDateTime to) {
+    public Specification<Inspection> filter(String partCode, DisplayState displayState, ReviewMismatch mismatch,
+                                            LocalDateTime from, LocalDateTime to) {
         if (from != null && to != null && !from.isBefore(to)) {
             throw new BusinessException(ErrorCode.INVALID_PARAMETER, "from은 to보다 앞선 시각이어야 합니다.");
         }
@@ -126,6 +132,9 @@ public class InspectionQueryService {
         }
         if (displayState != null) {
             spec = spec.and(InspectionSpecs.displayState(displayState));
+        }
+        if (mismatch != null) {
+            spec = spec.and(InspectionSpecs.reviewMismatch(mismatch));
         }
         if (from != null) {
             spec = spec.and(InspectionSpecs.receivedFrom(from));

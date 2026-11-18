@@ -60,16 +60,18 @@ public class InspectionController {
     }
 
     @Operation(summary = "검사 이력", description = "WORKER·ADMIN. 전체 검사를 접수 시각 최신순으로 조회. "
-            + "from·to는 오프셋 포함 ISO-8601(receivedAt 기준, from ≤ receivedAt < to), page는 0부터, size 최대 100")
+            + "from·to는 오프셋 포함 ISO-8601(receivedAt 기준, from ≤ receivedAt < to), page는 0부터, size 최대 100. "
+            + "mismatch(ANY·DEFECT_PASSED·GOOD_FAILED)는 AI 예측과 작업자 판정이 엇갈린 REVIEW_DONE 건만 (수동 판정 제외)")
     @GetMapping
     public ApiResponse<PageResponse<InspectionHistoryItem>> search(
             @RequestParam(required = false) String partCode,
             @RequestParam(required = false) DisplayState displayState,
+            @RequestParam(required = false) ReviewMismatch mismatch,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.of(queryService.search(partCode, displayState, Times.parseParam("from", from),
+        return ApiResponse.of(queryService.search(partCode, displayState, mismatch, Times.parseParam("from", from),
                 Times.parseParam("to", to), page, size));
     }
 

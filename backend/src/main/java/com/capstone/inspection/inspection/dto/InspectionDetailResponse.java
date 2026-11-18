@@ -29,7 +29,8 @@ public record InspectionDetailResponse(String inspectionId,
                                        Policy policy,         // FAILED·분석 중이면 null
                                        JudgementBlock judgement,
                                        Images images,
-                                       Error error) {         // FAILED일 때만
+                                       Error error,           // FAILED일 때만
+                                       RecheckBlock recheck) { // AUTO_PASS 표본 재확인 (계약 6.11), 표본이 아니면 null
 
     public record ManualOf(String inspectionId, String inspectionNo, String errorCode, String errorMessage) {
     }

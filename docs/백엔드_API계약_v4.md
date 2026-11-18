@@ -1,6 +1,6 @@
-# 백엔드 API 계약 v4 (11/10 갱신 · 최종 확정 전)
+# 백엔드 API 계약 v4 (11/18 갱신 · 최종 확정 전)
 
-3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장) · 11/02 갱신 (구현 세부 반영: 6.1~6.4, 6.6~6.9, 7.4, 8장, 10장, 12장) · 11/04 갱신 (실제 AI 연결 확인: 7.3, 7.4, 12장 TBD-01) · 11/05 갱신 (통합 시험: 6.2 모델 확인 타임아웃, 8.4 앱 시험, 12장 TBD-01·14) · 11/09 갱신 (12장 TBD-01 실행 타임아웃 20초) · 11/10 갱신 (6.1·6.9 계정 잠금 해제, 9.1 통계, 10장 USER_NOT_FOUND, 12장 TBD-10·14) · 11/11 갱신 (6.3 recent inspectionNo, 12장 TBD-01 부품별 AI 서버, **수동 판정** 3장·4장·6.1·6.5·6.6·6.8·6.10·10장)
+3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장) · 11/02 갱신 (구현 세부 반영: 6.1~6.4, 6.6~6.9, 7.4, 8장, 10장, 12장) · 11/04 갱신 (실제 AI 연결 확인: 7.3, 7.4, 12장 TBD-01) · 11/05 갱신 (통합 시험: 6.2 모델 확인 타임아웃, 8.4 앱 시험, 12장 TBD-01·14) · 11/09 갱신 (12장 TBD-01 실행 타임아웃 20초) · 11/10 갱신 (6.1·6.9 계정 잠금 해제, 9.1 통계, 10장 USER_NOT_FOUND, 12장 TBD-10·14) · 11/11 갱신 (6.3 recent inspectionNo, 12장 TBD-01 부품별 AI 서버, **수동 판정** 3장·4장·6.1·6.5·6.6·6.8·6.10·10장) · 11/17 갱신 (TBD-04 확정 `UNIFIED`: 7장·9장·12장) · 11/18 갱신 (6.1 검사 기록 CSV 내보내기, 6.6 `mismatch` 필터)
 
 - 기준 1: 「자동차부품_공정모니터링_개발계획서_최종합의반영」(10/14 합의본)
 - 기준 2: 「요구사항명세서_패치검사_개정본3」(9/30)의 규칙 중 합의본과 충돌하지 않는 것은 그대로 승계
@@ -116,6 +116,7 @@
 - 불량(DEFECT) 예측은 보정 확률과 관계없이 항상 REVIEW. 자동 FAIL은 없음 [합의 10/15]
 - 작업자 판정은 AI 결과·정책 결과를 덮어쓰지 않고 별도로 저장 [확정·승계]
 - 수동 판정 건(`source=MANUAL`)은 COMPLETED·REVIEW(`AI_UNAVAILABLE`)로 생성되어 위 표의 `REVIEW_PENDING` → `REVIEW_DONE`을 그대로 따름. AI 결과·정책 값은 없음 (6.10) [구현 11/11]
+- AUTO_PASS 건이 표본 재확인(6.11)으로 뽑히고 재확인 결과가 FAIL이어도 `displayState`·`finalJudgement`·`judgedBy`는 **바뀌지 않음**. 재확인 결과는 상세의 `recheck` 블록에만 표시 [제안 11/18]
 
 ### 3.3 상태 전이
 
@@ -202,6 +203,8 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 | POST | `/inspections/{id}/confirm` | REVIEW 최종 판정 | **WORKER** |
 | POST | `/inspections/{id}/retry` | FAILED 재검사 (새 검사 생성) | WORKER, ADMIN |
 | POST | `/inspections/{id}/manual` | FAILED를 AI 없이 작업자 판정으로 전환 (새 검사 생성) [구현 11/11] | **WORKER** |
+| GET | `/rechecks` | AUTO_PASS 표본 재확인 목록 (대기·완료) [제안·구현 11/18] | WORKER, ADMIN |
+| POST | `/inspections/{id}/recheck` | AUTO_PASS 표본 재확인 결과 기록 (시스템 판정은 그대로) [제안·구현 11/18] | **WORKER** |
 | POST | `/notifications/devices` | 푸시 기기 토큰 등록 | WORKER, ADMIN |
 | DELETE | `/notifications/devices/{token}` | 기기 토큰 해제 | WORKER, ADMIN |
 | GET | `/admin/models` | 모델 버전·로드 가능 여부 조회 | ADMIN |
@@ -210,8 +213,9 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 | POST | `/admin/policies/{id}/threshold` | passThreshold 조정 → 새 버전 생성 | ADMIN |
 | POST | `/admin/policies/{id}/activate` | 적용 시작 | ADMIN |
 | POST | `/admin/policies/{id}/deactivate` | 적용 중지 | ADMIN |
+| GET | `/admin/policies/{id}/simulation` | 후보 기준치 비교 (같은 검사 기록에 현재·후보 기준치 대입, 조회만) [구현 11/18] | ADMIN |
 | POST | `/admin/users/{loginId}/unlock` | 계정 잠금 해제 [구현 11/10] | ADMIN |
-| GET | `/admin/inspections/export` | 검사 기록 CSV (이력과 같은 partCode·displayState·from·to, 접수 시각 오름차순, 최대 10,000건, 엑셀용 UTF-8 BOM, 이미지·AI 원문 제외). 보고서용, 앱 미사용 [구현 11/18] | ADMIN |
+| GET | `/admin/inspections/export` | 검사 기록 CSV (이력과 같은 partCode·displayState·mismatch·from·to, 접수 시각 오름차순, 최대 10,000건, 엑셀용 UTF-8 BOM, 이미지·AI 원문 제외). 보고서용, 앱 미사용 [구현 11/18] | ADMIN |
 | POST | `/internal/v1/predict` | AI 추론 (7장) | 백엔드 → AI |
 | GET | `/internal/v1/models` | AI 서버의 로드 가능 모델 확인 | 백엔드 → AI |
 
@@ -394,7 +398,8 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
       "gradcamStatus": "NOT_REQUIRED",
       "urlExpiresAt": "2026-10-15T14:13:21+09:00"
     },
-    "error": null
+    "error": null,
+    "recheck": null
   }
 }
 ```
@@ -414,14 +419,16 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - `manualOf` [구현 11/11]: `MANUAL`일 때만 `{ inspectionId, inspectionNo, errorCode, errorMessage }` (원래 FAILED와 AI 실패 사유). 이때 `ai`는 null, `policy`는 `{ automationPolicyReady: false, policyVersion: null, passThreshold: null, recommendedAction: "REVIEW", reviewReason: "AI_UNAVAILABLE" }`, `images.gradcam`·`gradcamStatus`는 null
 - `followUp` [구현 11/11]: FAILED 건에 재검사·수동 전환 검사가 이미 있으면 `{ inspectionId, inspectionNo, source }` (`RETRY`/`MANUAL`). 앱은 버튼을 숨기고 그 검사로 이동
 - 앱은 passThreshold를 해석해 상태를 바꾸지 않고 백엔드가 준 상태를 표시 [승계]
+- `recheck` [제안 11/18]: AUTO_PASS 표본 재확인(6.11)으로 뽑힌 건만 `{ stratum, samplingRate, sampledAt, result, comment, recheckedBy, recheckedAt }`, 아니면 null. `judgement` 블록(시스템 PASS)과 따로 표시
 
 ### 6.6 검사 이력 `GET /inspections`
 
-쿼리: `partCode`, `displayState`, `from`, `to`, `page`(0부터), `size`(기본 20)
+쿼리: `partCode`, `displayState`, `mismatch`, `from`, `to`, `page`(0부터), `size`(기본 20)
 응답: 6.4 항목 형식 + `source`, `finalJudgement`, `judgedBy`, `confirmedAt` (`source`는 11/11 추가, `MANUAL`이면 "AI 분석 없이 작업자 판정" 표시)
 
 - 작업자도 모든 검사를 조회 가능 [제안]. 합의본 표현은 "공통 업무 범위에서 조회"
 - receivedAt 최신순(같으면 id), 기간은 `from ≤ receivedAt < to`, `size` 최대 100, 없는 `partCode`는 `400 INVALID_PART_CODE` [구현 10/19]
+- `mismatch`: AI 예측과 작업자 판정이 엇갈린 `REVIEW_DONE` 건만. `ANY`(둘 다)·`DEFECT_PASSED`(AI DEFECT → 작업자 PASS)·`GOOD_FAILED`(AI GOOD → 작업자 FAIL). 수동 판정은 AI 예측이 없어 제외, AUTO_PASS는 사람이 보지 않아 대상 아님. 추가 검토·재학습 후보 선별용이며 전체 오류율이 아님. 없는 값은 `400 INVALID_PARAMETER`, 빈 값은 필터 없음. `REVIEW_DONE` 외의 `displayState`와 함께 주면 빈 결과 [구현 11/18]
 
 ### 6.7 작업자 확인 `POST /inspections/{id}/confirm`
 
@@ -491,6 +498,39 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - **deactivate** → `200` 정책 1건. 이미 중지 상태여도 200, `activatedAt`은 마지막 적용 시각으로 남음
 - **계정 잠금 해제** `POST /admin/users/{loginId}/unlock` → `200` `{ loginId, locked: false, failedLoginCount: 0 }`. 잠기지 않은 계정도 200(실패 횟수만 초기화), 없는 계정은 `404 USER_NOT_FOUND` [구현 11/10, TBD-10]
 
+### 6.9.1 후보 기준치 비교 `GET /admin/policies/{id}/simulation` [구현 11/18]
+
+기준치를 바꾸기 전에, 이미 쌓인 검사 기록에 현재 기준치와 후보 기준치를 대입해 **판정이 바뀌는 건**과 그 건의 작업자 판정을 보여 줌. 정책·검사 기록은 바꾸지 않음
+
+- 쿼리: `candidateThreshold`(필수, 0~1, 소수 6자리로 반올림), `from`·`to`(선택, `from ≤ receivedAt < to`). 기간이 없으면 전체 기간이라 기록이 많아지면 기간 지정 권장
+- 대상: 정책과 **같은 모델·같은 보정기 버전**으로 분석이 완료된 검사 (보정기가 다르면 확률 눈금이 달라 비교하지 않음). 판정 당시 이 정책이 적용됐는지와는 무관. 수동 판정 건은 보정기 버전이 없어 제외
+- `current`도 과거에 실제로 내려진 판정이 아니라 **현재 정책 기준치로 다시 계산한 값**. 다른 기준치로 판정된 기록이 섞여 있으면 실제 AUTO_PASS 건수와 다를 수 있음 (실제 판정은 검사 이력·CSV로 확인)
+- 판정 규칙은 4장과 같음: DEFECT 예측은 기준치와 무관하게 REVIEW(`defectPredictedCount`), GOOD은 보정 확률 ≤ 기준치면 AUTO_PASS
+- **라벨은 작업자 판정만**: 바뀌는 건마다 `WORKER_PASS`·`WORKER_FAIL`·`UNVERIFIED`. AUTO_PASS(PASS·SYSTEM)와 판정 전 REVIEW는 실제 라벨이 아니므로 `UNVERIFIED`
+  - 기준 상향(`REVIEW_TO_AUTO_PASS`): 바뀌는 건은 지금 REVIEW라 작업자 판정이 있음 → `workerFail`이 후보에서 추가로 통과될 불량 (해당 기록에서 관측된 건수)
+  - 기준 하향(`AUTO_PASS_TO_REVIEW`): 바뀌는 건은 지금 AUTO_PASS라 대부분 `UNVERIFIED`
+  - AUTO_PASS 표본 재확인(6.11) 결과는 아직 라벨에 넣지 않음. 재확인 FAIL인 건도 여기서는 `UNVERIFIED`. 표본이라 추출 비율 가중치를 함께 다뤄야 해서 다음 단계 [11/18]
+- 응답 `200`
+  ```json
+  { "data": {
+      "policyId": "...", "policyVersion": "cowl-e08-demo-0163", "partCode": "COWL_COVER",
+      "modelVersion": "...", "calibratorVersion": "...",
+      "currentThreshold": 0.0163, "candidateThreshold": 0.0231,
+      "validatedMin": 0.01, "validatedMax": 0.0163, "candidateWithinValidatedRange": false,
+      "evaluatedCount": 40, "defectPredictedCount": 12,
+      "current":   { "autoPassCount": 5, "reviewCount": 35 },
+      "candidate": { "autoPassCount": 9, "reviewCount": 31 },
+      "change": { "direction": "REVIEW_TO_AUTO_PASS", "count": 4,
+                  "workerPass": 3, "workerFail": 1, "unverified": 0,
+                  "items": [ { "inspectionId": "...", "inspectionNo": "INS-000131",
+                               "calibratedDefectProbability": 0.0228, "label": "WORKER_FAIL", "receivedAt": "..." } ],
+                  "itemsTruncated": false } } }
+  ```
+- `items`: 바뀌는 건을 보정 확률 높은 순으로 최대 100건 (사진을 볼 순서). 건수는 `count`가 전체
+- `candidateWithinValidatedRange`: AI가 검증한 범위 안인지. 범위 밖 후보도 비교는 가능하지만 적용(threshold 조정)은 6.9 규칙대로 거절
+- 해석 주의: 건수는 이 기록에서 관측한 값이며 표본이 적으면 불확실성이 큼. 작업량은 확인 건수로만 표시하고 소요 시간은 따로 재야 함
+- 오류: `404 POLICY_NOT_FOUND`, `candidateThreshold` 범위 밖·없음, `from`이 `to`보다 늦음, 또는 기준치·보정기 버전이 없는 정책은 `400 INVALID_PARAMETER`, ADMIN 외 `403 ACCESS_DENIED`
+
 ### 6.10 수동 판정 전환 `POST /inspections/{id}/manual` [구현 11/11, 합의 11/11 김도현·홍승인]
 
 AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 직접 판정하도록 새 검사로 전환 (교수님 피드백 "AI 무응답 시 수동 판정", `docs/수동판정_결정안.md` B안)
@@ -527,6 +567,50 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 - 한계: AI가 응답은 하지만 모델이 없다고 하면(`NOT_LOADABLE`) 접수 자체가 `422`라 검사 기록이 없어 수동 판정 불가. AI가 응답하지 않으면 접수 후 FAILED가 되므로 가능
 
 ---
+
+### 6.11 AUTO_PASS 표본 재확인 [제안·구현 11/18, TBD-16]
+
+작업자 판정은 REVIEW 건에만 쌓여서 AUTO_PASS로 빠진 검사에서 무엇을 놓쳤는지 알 수 없다. `PASS · SYSTEM`은 실제 정상 라벨이 아니다. AUTO_PASS 건 일부를 정해진 규칙으로 뽑아 작업자가 다시 확인하고, 결과를 원래 시스템 판정과 **따로** 저장한다 (AI 정책 점검 11/18 4.3). 기준치·범위·보정기는 자동으로 바꾸지 않는다
+
+표본 추출 (백엔드 자동)
+- AUTO_PASS가 저장된 **뒤 별도 단계**에서 결정. 추출이 실패해도 AUTO_PASS 결과에는 영향 없음
+- AUTO_PASS마다 결정을 1행 기록: 뽑힌 건 `sampled = true`, 뽑히지 않은 건도 `sampled = false`로 남김. 그래서 **미선정과 저장 실패를 구분**할 수 있음 (행이 없으면 결정 전·저장 실패)
+- 재처리: 결정 행이 없는 AUTO_PASS를 5분마다 다시 결정 (완료 후 1분~1일 사이 건, 1회 100건). 재처리는 **실행 시점의 `app.recheck.*`** 로 결정하므로 설정이 같을 때만 처음 결정과 같음 (검사 당시 설정은 저장하지 않음). 동시에 처리돼도 `inspection_id` UNIQUE로 1건만 남음. `app.recheck.sweep-enabled=false`면 재처리 안 함 [구현 11/18]
+- 구간: `r = calibratedDefectProbability ÷ 판정 당시 passThreshold` (0 ≤ r ≤ 1). 부품마다 기준치가 달라도 같은 규칙
+
+  | stratum | 조건 | 기본 비율 (`app.recheck.*`, TBD-16) |
+  |---|---|---|
+  | `NEAR` | r ≥ 0.8 | 1.0 |
+  | `MID` | 0.4 ≤ r < 0.8 | 0.3 |
+  | `LOW` | r < 0.4 | 0.1 |
+
+- 낮은 점수 구간도 일부 뽑음 (기준 근처만 보면 전체 통과 건을 대표하지 못함)
+- 추출 여부는 검사 ID의 SHA-256으로 정한 0~1 값이 비율보다 작은지로 결정. 같은 검사·같은 설정이면 항상 같은 결과라 재현 가능하고, 사람이 고른 건이 섞이지 않음
+- 뽑을 때 쓴 비율(`samplingRate`)을 함께 저장. 집계할 때 가중치(1/samplingRate)로 씀
+- **기본 꺼 둠** (`app.recheck.enabled=false`). 꺼져 있으면 결정·재처리 모두 하지 않음. 켜면 최근 1일 안의 결정 없는 AUTO_PASS도 켠 시점 설정으로 결정
+- **켜 둔 동안 구간 경계·비율을 바꾸지 않음**. 이미 결정된 건은 다시 뽑지 않지만, 저장에 실패해 재처리되는 건은 새 값으로 결정돼 한 기간 안에 두 설정이 섞임. 바꿀 때는 끄고 → 값 변경 → 다시 켬. 시연은 값을 고정한 채 켜서 진행 [11/18]
+- 운영 중 설정을 바꿀 계획이면, 검사 당시 추출 규칙(규칙 버전 또는 값)을 함께 남겨 재처리에서도 그 규칙을 쓰도록 바꿔야 함 (다음 단계, TBD-16)
+- 문제가 보여 사람이 임의로 고른 건은 표본에 넣지 않음 (필요하면 다음 단계에서 별도 구분)
+
+목록 `GET /rechecks`
+- 쿼리: `status`(`PENDING` 기본 / `DONE`), `partCode`, `page`(0부터), `size`(기본 20, 최대 100). 없는 `partCode`는 `400 INVALID_PART_CODE`
+- 응답: `{ items: [ { inspectionId, inspectionNo, partCode, receivedAt, stratum, sampledAt, result, recheckedAt } ], page, size, totalElements, totalPages }`, 뽑힌 순서(먼저 뽑힌 건부터)
+- `/monitoring/queue`(REVIEW·FAILED)와 **섞지 않음**. 작업량을 REVIEW 확인과 재확인으로 따로 세기 위함 (두 업무 소요 시간이 다를 수 있음)
+
+결과 `POST /inspections/{id}/recheck`
+```json
+{ "result": "FAIL", "comment": "고정핀 들뜸" }
+```
+- 권한 **WORKER만** (6.7과 같음). 대상은 표본으로 뽑힌 AUTO_PASS 건
+- 응답 `200`: `{ inspectionId, inspectionNo, finalJudgement: "PASS", judgedBy: "SYSTEM", recheck: { ... } }` (원래 판정과 재확인 결과를 함께)
+- 같은 값 재전송 200(기존 결과), 다른 값 `409 ALREADY_RECHECKED`, 동시 제출 시 1건만 기록. `comment` 선택 200자, 공백은 null
+- 오류: `409 NOT_RECHECKABLE`(표본이 아님: 뽑히지 않은 AUTO_PASS·REVIEW·FAILED), `404 INSPECTION_NOT_FOUND`, WORKER 외 `403 ACCESS_DENIED`
+- 알림: 보내지 않음. 재확인 FAIL 후속 조치는 [TBD-17]
+
+해석
+- 재확인으로 직접 추정하는 것은 **AUTO_PASS 중 실제 불량 비율**(통과된 검사에 불량이 얼마나 섞였는지). 구간별 `FAIL ÷ 재확인 건수`에 그 구간 AUTO_PASS 건수 비중을 곱해 합산
+- **전체 실제 불량 중 AUTO_PASS로 빠진 비율**(정책의 불량 누락)은 REVIEW 작업자 판정까지 합쳐야 하므로 별도 (다음 단계)
+- 정책·모델·보정기 버전이 다른 검사는 합치지 않음 (검사마다 판정 당시 값이 저장됨, 4장). 집계 API는 다음 단계
 
 ## 7. AI 연동 규격 [합의 10/15]
 
@@ -707,6 +791,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | `worker_confirmation` | `comment` 추가. 그 외 그대로 |
 | `recalculation_run`·`recalculation_result` | 제외 [합의 10/15, TBD-15 해소] |
 | **신규** `device_token` | id, user_id, token(UNIQUE), platform, created_at, last_seen_at |
+| **신규** `auto_pass_recheck` (V8) [제안 11/18] | AUTO_PASS마다 추출 결정 1행. id, inspection_id(UNIQUE), sampled(뽑힘 여부), stratum(NEAR/MID/LOW), sampling_rate(0 ≤ rate ≤ 1, 뽑힌 건은 0 초과), sampled_at(결정 시각), result(PASS/FAIL, null), comment, rechecked_by, rechecked_at. CHECK: 뽑히지 않은 건은 result 없음, 결과·확인자·확인 시각은 셋 다 있거나 셋 다 없음. 테이블 간 규칙(대상이 AUTO_PASS·SYSTEM, 재확인이 있어도 `inspection.final_judgement`는 PASS)은 점검 SQL로 확인 (김남균 협의) |
 
 적용 현황 [합의 10/28]
 - Flyway V1~V5 적용. V3 인증, V4 모니터링·비동기·Grad-CAM·정책 버전(위 표), **V5 무결성 제약**(김남균 작성, 이승규 수정: `gradcam_status`에 `NO_ACTIVATION` 추가, FAILED면 `predicted_quality` NULL)
@@ -760,6 +845,8 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | 추가 | 409 | `ALREADY_RETRIED` | 이미 재검사 또는 수동 전환한 FAILED 건 (11/11 문구 변경) |
 | 추가 | 409 | `NOT_MANUAL_CONVERTIBLE` | FAILED가 아닌 건 수동 전환 [구현 11/11] |
 | 추가 | 409 | `ORIGINAL_IMAGE_MISSING` | 원본 사진 기록이 없어 수동 전환 불가 [구현 11/11] |
+| 추가 | 409 | `NOT_RECHECKABLE` | 표본 재확인 대상이 아닌 검사 [제안 11/18] |
+| 추가 | 409 | `ALREADY_RECHECKED` | 다른 결과로 이미 재확인된 검사 [제안 11/18] |
 | 추가 | 400 | `INVALID_DEVICE_TOKEN` | 기기 토큰 형식 오류 |
 | 추가 | 502 | `AI_REQUEST_REJECTED` | AI 서버가 4xx로 요청을 거절 (검사는 FAILED, 재시도 안 함) |
 | 미사용 | 409 | `REQUEST_IN_PROGRESS` | 비동기 접수로 불필요 (6.2) [제안] |
@@ -796,5 +883,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | TBD-13 | 입력 프로그램 인증 | **해소** | DEVICE 역할 계정 로그인 → JWT | — |
 | TBD-14 | iOS 종료·백그라운드 푸시 포함 여부 | 일부 확정 | RN + Expo 확정. 앱 실행 중 폴링 필수, Android 푸시 권장, iOS 푸시는 Apple Developer 계정 여부에 따라 결정 (8.1). 11/05 기준 앱 푸시 토큰 등록 미구현, 실행 방식(Expo Go 또는 개발용 빌드) 결정 필요 11/10 기준 앱 푸시 미구현 → 시연은 앱 실행 중 폴링(5초)으로 진행 [제안 11/10] | 전체 |
 | TBD-15 | 과거 결과 재계산 설계 유지 여부 | **해소** | 제외 | — |
+| TBD-16 | 표본 재확인 구간 경계(0.4·0.8)·비율(1.0·0.3·0.1), 불확실성 표시 방법 | 제안 | 임시값으로 구현, 기본 꺼 둠. `app.recheck.*`는 끈 상태에서만 변경 (재처리가 실행 시점 값을 씀). 운영 중 변경하려면 검사 당시 규칙 저장이 필요 (6.11) | 김도현 |
+| TBD-17 | 재확인 FAIL 시 알림·후속 조치 | 미정 | 지금은 기록만 (6.11) | 홍승인·전체 |
 | — | Grad-CAM 0맵·상수맵 처리 | **해소** [합의 10/28] | `gradcamStatus = NO_ACTIVATION`, 이미지 없음, 분류·REVIEW 유지 (6.5, 7.2) | — |
 | — | `inferenceTimeMs` 측정 범위 | **해소** [합의 10/28] | AI handler 진입~응답 직렬화 직전, 모델 최초 로드 제외 (7.2) | — |
