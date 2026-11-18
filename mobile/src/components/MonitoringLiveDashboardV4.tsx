@@ -107,7 +107,7 @@ export default function MonitoringLiveDashboardV4({
               key={code}
               accessibilityRole="button"
               accessibilityState={{ selected: partCode === code }}
-              style={[styles.partButton, partCode === code && styles.partButtonActive]}
+              style={({ pressed }) => [styles.partButton, partCode === code && styles.partButtonActive, pressed && styles.pressed]}
               onPress={() => {
                 setPartCode(code);
                 setVisibleQueueCount(INITIAL_VISIBLE_QUEUE_COUNT);
@@ -165,7 +165,7 @@ export default function MonitoringLiveDashboardV4({
           </Text>
         ) : (
           <Pressable
-            style={styles.inspectionRow}
+            style={({ pressed }) => [styles.inspectionRow, pressed && styles.pressed]}
             accessibilityRole="button"
             accessibilityLabel={'최근 검사 ' + (recent.inspectionNo ?? '검사번호 미제공') + ' 상세 보기'}
             onPress={() => openInspection(recent.inspectionId)}
@@ -191,7 +191,7 @@ export default function MonitoringLiveDashboardV4({
             {vm.queue.slice(0, visibleQueueCount).map((item) => (
               <Pressable
                 key={item.inspectionId}
-                style={styles.inspectionRow}
+                style={({ pressed }) => [styles.inspectionRow, pressed && styles.pressed]}
                 accessibilityRole="button"
                 accessibilityLabel={(item.inspectionNo ?? '검사번호 미제공') + ' 상세 보기'}
                 onPress={() => openInspection(item.inspectionId)}
@@ -213,7 +213,7 @@ export default function MonitoringLiveDashboardV4({
             ))}
             {vm.queue.length > visibleQueueCount && (
               <Pressable
-                style={styles.moreButton}
+                style={({ pressed }) => [styles.moreButton, pressed && styles.pressed]}
                 accessibilityRole="button"
                 onPress={() => setVisibleQueueCount((count) => count + 20)}
               >
@@ -224,7 +224,7 @@ export default function MonitoringLiveDashboardV4({
             )}
             {visibleQueueCount > INITIAL_VISIBLE_QUEUE_COUNT && (
               <Pressable
-                style={styles.collapseButton}
+                style={({ pressed }) => [styles.collapseButton, pressed && styles.pressed]}
                 accessibilityRole="button"
                 onPress={() => setVisibleQueueCount(INITIAL_VISIBLE_QUEUE_COUNT)}
               >
@@ -241,6 +241,7 @@ export default function MonitoringLiveDashboardV4({
 const styles = StyleSheet.create({
   container: { gap: 12, paddingBottom: 16 },
   card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 14, padding: 16, gap: 10 },
+  pressed: { opacity: 0.76 },
   headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   title: { fontSize: 17, fontWeight: '700', color: '#111827', flexShrink: 1 },
   description: { fontSize: 12, color: '#64748B', lineHeight: 18 },
