@@ -10,6 +10,7 @@ import { buildMonitoringViewModelV4 } from '../api/backendV4/monitoringViewModel
 import { resolveMonitoringThumbnailUrlV4 } from '../api/backendV4/monitoringThumbnailUrlV4';
 
 const MONITORED_PARTS = ['DOOR', 'FRAME', 'COWL_COVER'] as const;
+const INITIAL_VISIBLE_QUEUE_COUNT = 3;
 type MonitoredPart = (typeof MONITORED_PARTS)[number];
 
 function statusLabel(displayState: string): string {
@@ -25,21 +26,39 @@ function statusLabel(displayState: string): string {
 
 function InspectionThumbnail({ url }: { url: string | null }) {
   const uri = resolveMonitoringThumbnailUrlV4(url, API_BASE_URL);
-  const [failedUri, setFailedUri] = useState<string | null>(null);
-  const canShowImage = uri !== null && uri !== failedUri;
+  const [imageLoad, setImageLoad] = useState<{
+    uri: string | null;
+    status: 'loading' | 'ready' | 'failed';
+  }>(() => ({ uri, status: uri ? 'loading' : 'failed' }));
+
+  // URL이 갱신되면 이전 URL의 로딩 성공/실패 상태를 새 이미지에 적용하지 않습니다.
+  const status = imageLoad.uri === uri
+    ? imageLoad.status
+    : uri ? 'loading' : 'failed';
+  const placeholder = uri === null
+    ? '사진 없음'
+    : status === 'failed'
+      ? '사진을 표시할 수 없음'
+      : '사진 불러오는 중';
 
   return (
-    <View style={styles.thumbnail} accessible accessibilityLabel={canShowImage ? '검사 사진 미리보기' : '사진 없음'}>
-      {canShowImage ? (
+    <View
+      style={styles.thumbnail}
+      accessible
+      accessibilityLabel={status === 'ready' && uri !== null ? '검사 사진 미리보기' : placeholder}
+    >
+      {uri !== null && status !== 'failed' && (
         <Image
           key={uri}
           source={{ uri }}
-          style={styles.thumbnailImage}
+          style={[styles.thumbnailImage, status !== 'ready' && styles.thumbnailImageLoading]}
           resizeMode="cover"
-          onError={() => setFailedUri(uri)}
+          onLoad={() => setImageLoad({ uri, status: 'ready' })}
+          onError={() => setImageLoad({ uri, status: 'failed' })}
         />
-      ) : (
-        <Text style={styles.thumbnailEmpty}>사진 없음</Text>
+      )}
+      {(uri === null || status !== 'ready') && (
+        <Text style={styles.thumbnailEmpty}>{placeholder}</Text>
       )}
     </View>
   );
@@ -67,7 +86,7 @@ export default function MonitoringLiveDashboardV4({
   }, [controller, onNewAlerts]);
 
   const [partCode, setPartCode] = useState<MonitoredPart>('DOOR');
-  const [visibleQueueCount, setVisibleQueueCount] = useState(20);
+  const [visibleQueueCount, setVisibleQueueCount] = useState(INITIAL_VISIBLE_QUEUE_COUNT);
   const vm = buildMonitoringViewModelV4(snapshot, partCode);
   const recent = vm.part?.recent[0] ?? null;
 
@@ -79,22 +98,9 @@ export default function MonitoringLiveDashboardV4({
     <View style={styles.container}>
       <View style={styles.card}>
         <View style={styles.headingRow}>
-          <Text style={styles.title}>공정 모니터링</Text>
+          <Text style={styles.title}>공정 선택</Text>
           <Text style={[styles.connection, vm.isStale && styles.connectionStale]}>{connectionLabel}</Text>
         </View>
-        {!vm.hasSuccessfulRead && (
-          <Text style={styles.description}>실제 서버에서 공정 현황을 불러오는 중입니다.</Text>
-        )}
-        {snapshot.error && (
-          <Text style={styles.warning}>서버 연결에 문제가 있습니다. 잠시 후 다시 확인해 주세요.</Text>
-        )}
-        {vm.isStale && vm.hasSuccessfulRead && (
-          <Text style={styles.warning}>마지막으로 조회한 정보입니다. 현재 상태와 다를 수 있습니다.</Text>
-        )}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.title}>공정 선택</Text>
         <View style={styles.partSelector}>
           {MONITORED_PARTS.map((code) => (
             <Pressable
@@ -104,15 +110,28 @@ export default function MonitoringLiveDashboardV4({
               style={[styles.partButton, partCode === code && styles.partButtonActive]}
               onPress={() => {
                 setPartCode(code);
-                setVisibleQueueCount(20);
+                setVisibleQueueCount(INITIAL_VISIBLE_QUEUE_COUNT);
               }}
             >
-              <Text style={[styles.partButtonText, partCode === code && styles.partButtonTextActive]}>
+              <Text
+                style={[styles.partButtonText, partCode === code && styles.partButtonTextActive]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
+              >
                 {code}
               </Text>
             </Pressable>
           ))}
         </View>
+        {!vm.hasSuccessfulRead && !snapshot.error && (
+          <Text style={styles.description}>실제 서버에서 공정 현황을 불러오는 중입니다.</Text>
+        )}
+        {snapshot.error ? (
+          <Text style={styles.warning}>서버 연결에 문제가 있습니다. 잠시 후 다시 확인해 주세요.</Text>
+        ) : vm.isStale && vm.hasSuccessfulRead ? (
+          <Text style={styles.warning}>마지막으로 조회한 정보입니다. 현재 상태와 다를 수 있습니다.</Text>
+        ) : null}
       </View>
 
       <View style={styles.card}>
@@ -203,13 +222,13 @@ export default function MonitoringLiveDashboardV4({
                 </Text>
               </Pressable>
             )}
-            {visibleQueueCount > 20 && (
+            {visibleQueueCount > INITIAL_VISIBLE_QUEUE_COUNT && (
               <Pressable
                 style={styles.collapseButton}
                 accessibilityRole="button"
-                onPress={() => setVisibleQueueCount(20)}
+                onPress={() => setVisibleQueueCount(INITIAL_VISIBLE_QUEUE_COUNT)}
               >
-                <Text style={styles.collapseText}>처음 20건만 보기</Text>
+                <Text style={styles.collapseText}>처음 3건만 보기</Text>
               </Pressable>
             )}
           </>
@@ -228,14 +247,14 @@ const styles = StyleSheet.create({
   warning: { color: '#A74B12', fontSize: 12, lineHeight: 18 },
   connection: { color: '#008454', fontSize: 12, fontWeight: '700' },
   connectionStale: { color: '#A74B12' },
-  partSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  partSelector: { flexDirection: 'row', gap: 6 },
   partButton: {
-    flexGrow: 1, flexBasis: '40%', minWidth: 120, minHeight: 44,
-    paddingVertical: 12, borderWidth: 1, borderColor: '#CBD5E1',
+    flex: 1, minWidth: 0, minHeight: 44,
+    paddingHorizontal: 2, paddingVertical: 12, borderWidth: 1, borderColor: '#CBD5E1',
     borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC',
   },
   partButtonActive: { borderColor: '#2054D8', backgroundColor: '#2054D8' },
-  partButtonText: { fontSize: 14, fontWeight: '700', color: '#475569' },
+  partButtonText: { fontSize: 11, fontWeight: '700', color: '#475569', textAlign: 'center' },
   partButtonTextActive: { color: '#FFFFFF' },
   metricRow: { flexDirection: 'row', gap: 10 },
   metric: { flex: 1, backgroundColor: '#F5F7FB', padding: 12, borderRadius: 10, gap: 6 },
@@ -249,8 +268,9 @@ const styles = StyleSheet.create({
     width: 96, height: 84, borderRadius: 9, backgroundColor: '#EEF2F8',
     overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
   },
-  thumbnailImage: { width: '100%', height: '100%' },
-  thumbnailEmpty: { color: '#64748B', fontSize: 11 },
+  thumbnailImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  thumbnailImageLoading: { opacity: 0 },
+  thumbnailEmpty: { color: '#64748B', fontSize: 10, paddingHorizontal: 5, textAlign: 'center' },
   rowInfo: { flex: 1, gap: 4, justifyContent: 'center' },
   itemTitle: { color: '#111827', fontSize: 13, fontWeight: '700' },
   itemStatus: { color: '#475569', fontSize: 12, fontWeight: '600' },
