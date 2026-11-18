@@ -100,6 +100,8 @@ class RecheckIntegrationTest extends IntegrationTestBase {
     @Test
     @DisplayName("추출 결정 저장이 빠진 AUTO_PASS는 재처리로 같은 결정이 다시 남고, 결정이 있는 건·1일 지난 건은 건드리지 않음")
     void sweepRestoresMissingDecisions() throws Exception {
+        // 다른 테스트(기능을 끈 기본 설정)가 남긴 결정 없는 AUTO_PASS를 먼저 비움. 켜면 이런 건도 결정 대상 (계약 6.11)
+        sweeper.sweep();
         String near = submitGood(0.045);
         String low = submitGood(0.01);
         String old = submitGood(0.045);
