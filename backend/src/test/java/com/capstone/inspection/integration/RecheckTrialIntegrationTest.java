@@ -36,7 +36,7 @@ class RecheckTrialIntegrationTest extends IntegrationTestBase {
 
     private String submitGood(double calibrated) throws Exception {
         ai = r -> response(r, "GOOD", 0.1, calibrated);
-        return submitAndWait().path("inspectionId").asText();
+        return submitAndWaitForRecheckDecision().path("inspectionId").asText();
     }
 
     private static Map<String, Object> timing(long dwellMs, int openCount) {
