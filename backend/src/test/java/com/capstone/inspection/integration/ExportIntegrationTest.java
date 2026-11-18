@@ -24,8 +24,9 @@ class ExportIntegrationTest extends IntegrationTestBase {
 
     private static final String EXPORT = "/api/v1/admin/inspections/export";
 
+    // 이 테스트에서 만든 검사만 대상이 되도록 접수 직전 시각부터 조회 (앞 테스트의 재검사·수동 판정 건 제외)
     private String since() {
-        return OffsetDateTime.now(Times.ZONE).minusSeconds(1).toString();
+        return OffsetDateTime.now(Times.ZONE).toString();
     }
 
     private String no(String inspectionId) {
@@ -81,6 +82,8 @@ class ExportIntegrationTest extends IntegrationTestBase {
 
         String csv = body(result);
         assertThat(csv.substring(1)).startsWith("inspectionNo,partCode,");
+        // 일반 검사만 있는 결과 (원본 검사 조회 없음)에서도 200
+        assertThat(csv).doesNotContain(",RETRY,", ",MANUAL,");
         Map<String, String> pass = rowOf(csv, autoPass);
         assertThat(pass).containsEntry("displayState", "AUTO_PASS").containsEntry("finalJudgement", "PASS")
                 .containsEntry("judgedBy", "SYSTEM").containsEntry("policyVersion", "example-door-p1")

@@ -71,7 +71,9 @@ public class InspectionExportService {
         StringBuilder csv = new StringBuilder();
         appendRow(csv, HEADER);
         for (Inspection i : inspections) {
-            appendRow(csv, row(i, confirmations.get(i.getId()), originNos.get(i.getRetryOfInspectionId())));
+            // 일반 검사는 원본 ID가 null (Map.of()는 get(null)에서 NPE)
+            String originNo = i.getRetryOfInspectionId() == null ? null : originNos.get(i.getRetryOfInspectionId());
+            appendRow(csv, row(i, confirmations.get(i.getId()), originNo));
         }
         byte[] body = csv.toString().getBytes(StandardCharsets.UTF_8);
         byte[] result = Arrays.copyOf(BOM, BOM.length + body.length);
