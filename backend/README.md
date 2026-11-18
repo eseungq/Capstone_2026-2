@@ -34,7 +34,7 @@
 ```bash
 docker compose up -d                 # MySQL 8.4 (DB/계정/비밀번호: inspection)
 ./gradlew build                      # 컴파일 + 단위·통합 테스트 (통합은 Docker 필요, 없으면 건너뜀)
-./gradlew bootRun                    # Flyway가 V1~V7과 개발용 시드(db/seed-dev) 적용
+./gradlew bootRun                    # Flyway가 V1~V9와 개발용 시드(db/seed-dev) 적용
 
 # 다른 터미널에서 Mock AI
 cd mock-ai
@@ -66,6 +66,7 @@ uvicorn main:app --port 8090
 | `APP_AI_READTIMEOUTMS` | `20000` | 분석 실행 타임아웃 (`app.ai.read-timeout-ms`) |
 | `APP_AI_MODELCHECKENABLED` | `true` | `/internal/v1/models` 로드 확인 (`app.ai.model-check-enabled`) |
 | `APP_PUSH_ENABLED` | `false` | Expo 푸시 실제 발송 (`app.push.enabled`, false면 로그만) |
+| `APP_RECHECK_ENABLED` | `false` | AUTO_PASS 표본 재확인 (`app.recheck.enabled`, 계약 6.11). 켜면 판정마다 그때 규칙을 검사에 남김 |
 | `APP_RECHECK_TRIAL_NAME` | 없음 | 표본 재확인 시험 회차 이름 (`app.recheck.trial-name`, 선택, 예: 공동시험 1차) |
 
 다른 `app.*` 값도 Spring 규칙(점·하이픈을 빼고 대문자, 예: `APP_INSPECTION_ANALYSISPOOLSIZE`)으로 바꿀 수 있다.
@@ -134,6 +135,17 @@ curl -s -X POST localhost:8080/api/v1/admin/policies/<policyId>/deactivate -H "A
 
 # 검사 기록 CSV (이력과 같은 필터). mismatch=ANY면 AI와 작업자 판정이 엇갈린 확인 완료 건만 (#32)
 curl -s 'localhost:8080/api/v1/admin/inspections/export?partCode=DOOR&mismatch=ANY' -H "Authorization: Bearer $AD" -o inspections.csv
+
+# 후보 기준치 비교 (조회만, 계약 6.9.1). 예상 재확인 건수·재확인 라벨 포함
+curl -s 'localhost:8080/api/v1/admin/policies/<policyId>/simulation?candidateThreshold=0.08' -H "Authorization: Bearer $AD"
+
+# 표본 재확인 (계약 6.11, APP_RECHECK_ENABLED=true일 때). 목록·제출(WORKER, 화면 체류 시간 선택)·확인함(ADMIN, FAIL만)·요약
+curl -s 'localhost:8080/api/v1/rechecks?status=DONE&result=FAIL&acknowledged=false' -H "Authorization: Bearer $AD"
+curl -s -X POST localhost:8080/api/v1/inspections/<inspectionId>/recheck -H "Authorization: Bearer $WK" \
+  -H 'Content-Type: application/json' -d '{"result":"FAIL","comment":"고정핀 들뜸","screenDwellMs":18250,"firstOpenedAt":"2026-11-19T10:02:11+09:00","openCount":2}'
+curl -s -X POST localhost:8080/api/v1/admin/rechecks/<inspectionId>/acknowledge -H "Authorization: Bearer $AD" \
+  -H 'Content-Type: application/json' -d '{"note":"라인 담당자에게 전달"}'
+curl -s 'localhost:8080/api/v1/admin/rechecks/summary?from=2026-11-19T00:00:00%2B09:00&compareNearRate=0.5&compareMidRate=0.3&compareLowRate=0.1' -H "Authorization: Bearer $AD"
 
 # 기기 토큰 등록·해제 (WORKER·ADMIN). 해제 경로의 [ ]는 인코딩 필수
 curl -s -X POST localhost:8080/api/v1/notifications/devices -H "Authorization: Bearer $WK" \
@@ -256,18 +268,19 @@ AI가 11/12 도어 e02 내부 평가를 다시 해 정한 시연 기준(기본 0
 ```
 auth/                로그인·재발급·로그아웃, JWT 필터, 401·403 공통 오류 응답
 ai/                  AI 클라이언트, 요청·응답 형식, 응답 계약 검증, 모델 로드 확인
-admin/               관리자 모델 조회, 정책 등록·조정·적용·중지
+admin/               관리자 모델 조회, 정책 등록·조정·적용·중지, 후보 기준치 비교(PolicySimulation)
 notification/        기기 토큰, Expo 푸시 발송
 part/ monitoring/    부품 목록, 공정 모니터링
 inspection/          접수(InspectionIntakeService), 비동기 분석(AnalysisDispatcher → InspectionAnalysisService),
                      정책 판정(PolicyEvaluator), 결과 저장(AnalysisResultWriter), 상세·이력 조회(InspectionQueryService·InspectionSpecs),
-                     CSV 내보내기(InspectionExportService), 재검사·수동 판정, 재시작 정리
+                     CSV 내보내기(InspectionExportService), 재검사·수동 판정, 재시작 정리,
+                     표본 재확인(RecheckSampler·RecheckSweeper·RecheckService·RecheckSummary)
 storage/             로컬 이미지 저장, 서명된 만료 주소, 이미지 제공 API
 config/              AppProperties(app.*), Security, 분석 스레드 풀, Swagger
 common/              공통 응답·오류, traceId, 시각 변환
 domain/              엔티티·리포지토리
 resources/db/migration   V1 스키마, V2 부품, V3 인증, V4 모니터링·비동기·Grad-CAM, V5 무결성 제약(김남균),
-                         V6 수동 판정, V7 도어 검사항목 UNIFIED
+                         V6 수동 판정, V7 도어 검사항목 UNIFIED, V8 표본 재확인, V9 재확인 공동시험 기록
 resources/db/seed-dev    개발용 계정·Mock 모델·예시 정책, 실제 DOOR 모델(비활성), 프레임·카울커버 모델과 시연 정책,
                          도어 시연 정책(비활성), 도어 e02 시연 보정기·정책(V7_1, 비활성)
 mock-ai/             Mock AI 추론 서버 (FastAPI)
