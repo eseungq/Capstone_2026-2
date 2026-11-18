@@ -32,6 +32,22 @@ export interface ImageReferenceV4 {
   height?: number | null;
 }
 
+/** AUTO_PASS 표본 재확인. 원래 PASS · SYSTEM 판정을 변경하지 않습니다. */
+export interface RecheckBlockV4 {
+  stratum: 'NEAR' | 'MID' | 'LOW';
+  samplingRate: number;
+  ruleVersion: string | null;
+  trialName: string | null;
+  sampledAt: string;
+  result: FinalJudgementV4 | null;
+  comment: string | null;
+  recheckedBy: string | null;
+  recheckedAt: string | null;
+  acknowledgedBy: string | null;
+  acknowledgedAt: string | null;
+  acknowledgeNote: string | null;
+}
+
 export interface InspectionDetailV4 {
   inspectionId: string;         // 서버 API 경로에 쓰는 UUID
   inspectionNo: string;         // UI 표시용: INS-000006
@@ -60,6 +76,7 @@ export interface InspectionDetailV4 {
     recommendedAction: RecommendedActionV4 | null;
     reviewReason: ReviewReasonV4 | null;
   } | null;
+  recheck?: RecheckBlockV4 | null;
   judgement: {
     finalJudgement: FinalJudgementV4 | null;
     judgedBy: JudgedByV4 | null;
@@ -99,6 +116,7 @@ export interface InspectionViewV4 {
   errorMessage: string | null;
   finalJudgement: FinalJudgementV4 | null;
   judgedBy: JudgedByV4 | null;
+  recheck: RecheckBlockV4 | null;
   confirmedBy: string | null;
   confirmedAt: string | null;
   originalImageUrl: string | null;
