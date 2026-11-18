@@ -37,7 +37,7 @@ class PartAiServerTest {
         return new AppProperties(d.upload(), new AppProperties.Ai(baseUrl, a.connectTimeoutMs(), a.readTimeoutMs(),
                 a.retryCount(), a.imageSizeCheckEnabled(), a.maxResponseStringChars(), true, 30, 5,
                 a.modelCheckConnectTimeoutMs(), a.modelCheckReadTimeoutMs(), partBaseUrls),
-                d.storage(), d.auth(), d.inspection(), d.monitoring(), d.policy(), d.push());
+                d.storage(), d.auth(), d.inspection(), d.monitoring(), d.policy(), d.push(), d.recheck());
     }
 
     @Test

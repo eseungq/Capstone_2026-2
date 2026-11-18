@@ -39,7 +39,8 @@ class JwtTokenProviderTest {
     void expiredTokenIsExpired() {
         AppProperties base = TestProps.defaults();
         AppProperties shortTtl = new AppProperties(base.upload(), base.ai(), base.storage(),
-                new AppProperties.Auth(base.auth().jwtSecret(), -10, 100, 5), base.inspection(), base.monitoring(), base.policy(), base.push());
+                new AppProperties.Auth(base.auth().jwtSecret(), -10, 100, 5), base.inspection(), base.monitoring(), base.policy(), base.push(),
+                base.recheck());
         String token = new JwtTokenProvider(shortTtl).createAccessToken("u", "w", Role.ADMIN);
         assertThatThrownBy(() -> provider.parse(token))
                 .isInstanceOf(BusinessException.class)

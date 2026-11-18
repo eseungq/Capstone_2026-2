@@ -52,11 +52,12 @@ public class SecurityConfig {
                         // 작업자 확인: WORKER만 (ADMIN은 조회만)
                         .requestMatchers(HttpMethod.POST, API + "/inspections/*/confirm").hasRole("WORKER")
                         .requestMatchers(HttpMethod.POST, API + "/inspections/*/manual").hasRole("WORKER")
+                        .requestMatchers(HttpMethod.POST, API + "/inspections/*/recheck").hasRole("WORKER")
                         // FAILED 재검사: WORKER·ADMIN
                         .requestMatchers(HttpMethod.POST, API + "/inspections/*/retry").hasAnyRole("WORKER", "ADMIN")
                         // 조회: WORKER·ADMIN
                         .requestMatchers(HttpMethod.GET, API + "/inspections", API + "/inspections/**",
-                                API + "/parts", API + "/monitoring/**").hasAnyRole("WORKER", "ADMIN")
+                                API + "/parts", API + "/monitoring/**", API + "/rechecks").hasAnyRole("WORKER", "ADMIN")
                         .requestMatchers(API + "/notifications/**").hasAnyRole("WORKER", "ADMIN")
                         // 관리자
                         .requestMatchers(API + "/admin/**").hasRole("ADMIN")

@@ -4,6 +4,7 @@ import com.capstone.inspection.common.api.PageResponse;
 import com.capstone.inspection.common.error.BusinessException;
 import com.capstone.inspection.common.error.ErrorCode;
 import com.capstone.inspection.common.time.Times;
+import com.capstone.inspection.domain.inspection.AutoPassRecheckRepository;
 import com.capstone.inspection.domain.inspection.ImageStorage;
 import com.capstone.inspection.domain.inspection.ImageStorageRepository;
 import com.capstone.inspection.domain.inspection.ImageType;
@@ -18,6 +19,7 @@ import com.capstone.inspection.domain.part.Part;
 import com.capstone.inspection.domain.part.PartRepository;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse;
 import com.capstone.inspection.inspection.dto.InspectionHistoryItem;
+import com.capstone.inspection.inspection.dto.RecheckBlock;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse.Ai;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse.FollowUp;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse.ManualOf;
@@ -56,6 +58,7 @@ public class InspectionQueryService {
     private final ImageStorageRepository imageRepository;
     private final WorkerConfirmationRepository confirmationRepository;
     private final ImageUrlSigner signer;
+    private final AutoPassRecheckRepository recheckRepository;
 
     public InspectionDetailResponse getDetail(String inspectionId) {
         Inspection i = inspectionRepository.findDetailById(inspectionId)
@@ -99,7 +102,8 @@ public class InspectionQueryService {
         return new InspectionDetailResponse(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(),
                 i.getLineCode(), i.getStatus(), DisplayState.of(i), Times.toOffset(i.getReceivedAt()),
                 Times.toOffset(i.getCompletedAt()), i.getSource(), retryOf, manualOf, followUp, ai, policy,
-                judgement, images(i), error);
+                judgement, images(i), error,
+                recheckRepository.findByInspectionIdWithUser(i.getId()).map(RecheckBlock::of).orElse(null));
     }
 
     // 검사 이력 (계약 v4 6.6). 작업자도 전체 검사 조회. 기간은 receivedAt 기준 from ≤ receivedAt < to

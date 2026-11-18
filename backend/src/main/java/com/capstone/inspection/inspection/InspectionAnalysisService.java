@@ -6,6 +6,7 @@ import com.capstone.inspection.ai.AiPredictRequest;
 import com.capstone.inspection.ai.AiResponseValidator;
 import com.capstone.inspection.common.error.ErrorCode;
 import com.capstone.inspection.common.trace.TraceIdFilter;
+import com.capstone.inspection.domain.inspection.InspectionStatus;
 import com.capstone.inspection.domain.inspection.PredictedQuality;
 import com.capstone.inspection.storage.ImageUrlSigner;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
-// 검사 1건 분석 (분석 스레드 풀에서 실행): 시작 기록 → AI 호출 → 응답 검증 → 정책 적용·저장 → 알림
+// 검사 1건 분석 (분석 스레드 풀에서 실행): 시작 기록 → AI 호출 → 응답 검증 → 정책 적용·저장 → 알림 → 표본 재확인 추출
 @Service
 @RequiredArgsConstructor
 public class InspectionAnalysisService {
@@ -25,6 +26,7 @@ public class InspectionAnalysisService {
     private final AiClient aiClient;
     private final ImageUrlSigner signer;
     private final InspectionNotifier notifier;
+    private final RecheckSampler recheckSampler;
 
     public void analyze(String inspectionId) {
         AnalysisResultWriter.Started started = writer.start(inspectionId);
@@ -49,5 +51,17 @@ public class InspectionAnalysisService {
             outcome = writer.fail(inspectionId, ErrorCode.INTERNAL_SERVER_ERROR.name(), e.toString());
         }
         notifier.notifyIfNeeded(outcome);
+        if (outcome != null && outcome.status() == InspectionStatus.COMPLETED && !outcome.reviewRequired()) {
+            sampleQuietly(outcome.inspectionId());
+        }
+    }
+
+    // AUTO_PASS 표본 재확인 추출. 판정은 이미 저장됐으므로 실패해도 검사 결과에는 영향 없이 로그만 남김
+    private void sampleQuietly(String inspectionId) {
+        try {
+            recheckSampler.sampleIfNeeded(inspectionId);
+        } catch (RuntimeException e) {
+            log.warn("표본 재확인 추출 실패 {}: {}", inspectionId, e.toString());
+        }
     }
 }
