@@ -828,7 +828,11 @@ export default function InspectionLiveScreen() {
               )}
               {!visibleDetail.canOfferConfirm && !visibleDetail.canOfferRetry && !visibleDetail.canOfferManual && !visibleDetail.followUp && (
                 <Text style={styles.muted}>{visibleDetail.recheck?.result === null
-                    ? '일반 REVIEW 판정이나 FAILED 후속 요청은 없습니다. 표본 재확인은 위 카드에서 제출해 주세요.'
+                    ? (role === 'ADMIN'
+                      ? '관리자 계정은 표본 재확인 상태를 조회만 할 수 있습니다. 재확인 PASS/FAIL은 WORKER 전용입니다.'
+                      : role === 'WORKER'
+                        ? '일반 REVIEW 판정이나 FAILED 후속 요청은 없습니다. 표본 재확인은 위 카드에서 제출해 주세요.'
+                        : '재확인 PASS/FAIL 제출은 WORKER 계정에서만 가능합니다.')
                     : '현재 서버 상태에서는 제출 가능한 일반 판정 또는 후속 검사 요청이 없습니다.'}</Text>
               )}
               {!roleLoading && role === 'ADMIN' && visibleDetail.canOfferManual && (
