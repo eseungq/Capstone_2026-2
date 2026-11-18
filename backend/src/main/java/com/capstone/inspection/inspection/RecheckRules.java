@@ -1,6 +1,6 @@
 package com.capstone.inspection.inspection;
 
-import com.capstone.inspection.config.AppProperties;
+import com.capstone.inspection.domain.inspection.RecheckRule;
 import com.capstone.inspection.domain.inspection.RecheckStratum;
 
 import java.nio.charset.StandardCharsets;
@@ -9,9 +9,10 @@ import java.nio.charset.StandardCharsets;
 //   - 구간: r = 보정 확률 ÷ 판정 당시 기준치 (0 ≤ r ≤ 1). 부품마다 기준치가 달라도 같은 규칙
 //   - 추출: 검사 ID로 정한 0~1 값이 구간 비율보다 작으면 뽑음. 같은 검사·같은 설정이면 항상 같은 결과라
 //     다시 돌려도 재현되고, 사람이 문제가 보이는 건만 골라 넣을 수 없음 (대표성 유지)
-final class RecheckRules {
+//   - 계약 6.9.1 후보 비교의 예상 재확인 건수도 같은 규칙으로 계산 (admin 패키지에서 사용)
+public final class RecheckRules {
 
-    record Decision(RecheckStratum stratum, double rate, boolean sampled) {
+    public record Decision(RecheckStratum stratum, double rate, double ratio, double draw, boolean sampled) {
     }
 
     // 나눗셈 오차 보정 (0.04 / 0.05 = 0.7999999999999999). 확률·기준치는 소수 6자리라 이 크기로는 구간이 잘못 바뀌지 않음
@@ -20,22 +21,28 @@ final class RecheckRules {
     private RecheckRules() {
     }
 
-    static Decision decide(String inspectionId, double calibrated, double threshold, AppProperties.Recheck c) {
-        RecheckStratum stratum = stratum(calibrated, threshold, c);
-        double rate = switch (stratum) {
-            case NEAR -> c.nearRate();
-            case MID -> c.midRate();
-            case LOW -> c.lowRate();
-        };
-        return new Decision(stratum, rate, rate > 0 && draw(inspectionId) < rate);
+    public static Decision decide(String inspectionId, double calibrated, double threshold, RecheckRule rule) {
+        double ratio = ratio(calibrated, threshold);
+        RecheckStratum stratum = stratumOf(ratio, rule);
+        double rate = rule.rateOf(stratum);
+        double draw = draw(inspectionId);
+        return new Decision(stratum, rate, ratio, draw, rate > 0 && draw < rate);
     }
 
-    static RecheckStratum stratum(double calibrated, double threshold, AppProperties.Recheck c) {
-        double r = threshold > 0 ? calibrated / threshold : 1.0; // 기준치 0이면 통과 건은 확률 0뿐이라 기준 근처로 봄
-        if (r + EPSILON >= c.nearRatio()) {
+    public static RecheckStratum stratum(double calibrated, double threshold, RecheckRule rule) {
+        return stratumOf(ratio(calibrated, threshold), rule);
+    }
+
+    // 기준치 0이면 통과 건은 확률 0뿐이라 기준 근처로 봄
+    static double ratio(double calibrated, double threshold) {
+        return threshold > 0 ? calibrated / threshold : 1.0;
+    }
+
+    private static RecheckStratum stratumOf(double r, RecheckRule rule) {
+        if (r + EPSILON >= rule.nearRatio()) {
             return RecheckStratum.NEAR;
         }
-        return r + EPSILON >= c.midRatio() ? RecheckStratum.MID : RecheckStratum.LOW;
+        return r + EPSILON >= rule.midRatio() ? RecheckStratum.MID : RecheckStratum.LOW;
     }
 
     // 검사 ID의 SHA-256 앞 52비트를 [0, 1)로 (double로 정확히 표현되는 범위)

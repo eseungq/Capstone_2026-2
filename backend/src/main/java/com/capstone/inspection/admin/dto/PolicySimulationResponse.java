@@ -13,6 +13,7 @@ public record PolicySimulationResponse(String policyId,
                                        Double validatedMin,
                                        Double validatedMax,
                                        boolean candidateWithinValidatedRange,
+                                       String recheckRuleVersion,      // 예상 재확인 건수에 쓴 규칙 (6.11)
                                        long evaluatedCount,
                                        long defectPredictedCount,
                                        PolicySimulation.Outcome current,

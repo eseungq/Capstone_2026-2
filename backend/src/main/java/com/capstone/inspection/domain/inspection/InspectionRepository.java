@@ -61,14 +61,17 @@ public interface InspectionRepository extends JpaRepository<Inspection, String>,
     // ---- 정책 후보 비교 (계약 6.9.1). 같은 모델·보정기의 분석 완료 건만 (보정 확률 눈금이 같아야 비교 가능) ----
     //   기간이 없으면 그 모델·보정기의 완료 건 전체를 읽음. 캡스톤 규모 기준이며 기록이 많아지면 기간을 지정
 
+    // recheckResult: 표본으로 뽑혀 재확인이 끝난 AUTO_PASS의 결과 (그 외 null, 계약 6.11)
     record ScoredInspection(String id, String inspectionNo, PredictedQuality predictedQuality,
                             Double calibratedDefectProbability, Judgement finalJudgement, JudgedBy judgedBy,
-                            LocalDateTime receivedAt) {
+                            LocalDateTime receivedAt, Judgement recheckResult) {
     }
 
     @Query("select new com.capstone.inspection.domain.inspection.InspectionRepository$ScoredInspection("
-            + "i.id, i.inspectionNo, i.predictedQuality, i.calibratedDefectProbability, i.finalJudgement, i.judgedBy, i.receivedAt) "
-            + "from Inspection i where i.model.id = :modelId and i.calibratorVersion = :calibratorVersion "
+            + "i.id, i.inspectionNo, i.predictedQuality, i.calibratedDefectProbability, i.finalJudgement, i.judgedBy, i.receivedAt, "
+            + "r.result) "
+            + "from Inspection i left join AutoPassRecheck r on r.inspection = i and r.sampled = true "
+            + "where i.model.id = :modelId and i.calibratorVersion = :calibratorVersion "
             + "and i.status = com.capstone.inspection.domain.inspection.InspectionStatus.COMPLETED "
             + "and (:from is null or i.receivedAt >= :from) and (:to is null or i.receivedAt < :to)")
     List<ScoredInspection> findScored(String modelId, String calibratorVersion, LocalDateTime from, LocalDateTime to);

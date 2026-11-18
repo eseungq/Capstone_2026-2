@@ -2,6 +2,7 @@ package com.capstone.inspection.domain.inspection;
 
 import com.capstone.inspection.domain.user.User;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -48,12 +49,17 @@ public class WorkerConfirmation {
     @Column(length = 200)
     private String comment;            // 작업자 메모 (선택)
 
-    public WorkerConfirmation(Inspection inspection, User worker, Judgement finalJudgement, String comment) {
+    @Embedded
+    private ScreenTiming screenTiming; // 화면 체류 시간 (선택, V9). 보내지 않았으면 null
+
+    public WorkerConfirmation(Inspection inspection, User worker, Judgement finalJudgement, String comment,
+                              ScreenTiming screenTiming) {
         this.id = UUID.randomUUID().toString();
         this.inspection = inspection;
         this.worker = worker;
         this.finalJudgement = finalJudgement;
         this.comment = comment;
+        this.screenTiming = screenTiming;
         this.confirmedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
     }
 }
