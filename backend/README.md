@@ -6,7 +6,7 @@
 - 인증: 로그인·토큰 재발급·로그아웃, 역할(WORKER·ADMIN·DEVICE)별 접근 제어, 로그인 5회 실패 잠금
 - 사진 접수(비동기): `POST /api/v1/inspections` → 202, 스레드 풀(1개, 11/04 실측으로 2→1)에서 AI 호출·응답 검증·정책 적용
 - 검사 상세: `GET /api/v1/inspections/{id}` (AI·정책·판정·이미지 블록, 만료되는 이미지 주소)
-- 검사 이력: `GET /api/v1/inspections` (부품·displayState·기간 필터, 페이지)
+- 검사 이력: `GET /api/v1/inspections` (부품·displayState·AI-작업자 불일치(`mismatch`, #32)·기간 필터, 페이지)
 - 모니터링: `GET /api/v1/monitoring/parts` (부품별 요약), `GET /api/v1/monitoring/queue` (확인 필요 목록, 커서)
 - 작업자 확인: `POST /api/v1/inspections/{id}/confirm` (WORKER만)
 - 재검사: `POST /api/v1/inspections/{id}/retry` (FAILED만, 새 검사 생성)
@@ -127,6 +127,9 @@ curl -s -X POST localhost:8080/api/v1/admin/policies/<policyId>/threshold -H "Au
   -H 'Content-Type: application/json' -d '{"passThreshold":0.03}'
 curl -s -X POST localhost:8080/api/v1/admin/policies/<policyId>/activate -H "Authorization: Bearer $AD"
 curl -s -X POST localhost:8080/api/v1/admin/policies/<policyId>/deactivate -H "Authorization: Bearer $AD"
+
+# 검사 기록 CSV (이력과 같은 필터). mismatch=ANY면 AI와 작업자 판정이 엇갈린 확인 완료 건만 (#32)
+curl -s 'localhost:8080/api/v1/admin/inspections/export?partCode=DOOR&mismatch=ANY' -H "Authorization: Bearer $AD" -o inspections.csv
 
 # 기기 토큰 등록·해제 (WORKER·ADMIN). 해제 경로의 [ ]는 인코딩 필수
 curl -s -X POST localhost:8080/api/v1/notifications/devices -H "Authorization: Bearer $WK" \
@@ -253,7 +256,8 @@ admin/               관리자 모델 조회, 정책 등록·조정·적용·중
 notification/        기기 토큰, Expo 푸시 발송
 part/ monitoring/    부품 목록, 공정 모니터링
 inspection/          접수(InspectionIntakeService), 비동기 분석(AnalysisDispatcher → InspectionAnalysisService),
-                     정책 판정(PolicyEvaluator), 결과 저장(AnalysisResultWriter), 상세 조회, 재시작 정리
+                     정책 판정(PolicyEvaluator), 결과 저장(AnalysisResultWriter), 상세·이력 조회(InspectionQueryService·InspectionSpecs),
+                     CSV 내보내기(InspectionExportService), 재검사·수동 판정, 재시작 정리
 storage/             로컬 이미지 저장, 서명된 만료 주소, 이미지 제공 API
 config/              AppProperties(app.*), Security, 분석 스레드 풀, Swagger
 common/              공통 응답·오류, traceId, 시각 변환
@@ -273,7 +277,7 @@ scripts/             연결 점검·전체 흐름·측정·시연 데이터
 | 설정 | TBD |
 |---|---|
 | `app.upload.*` 허용 형식·용량·최소 해상도 | TBD-08 |
-| `app.ai.base-url`, `read-timeout-ms`, `retry-count` | TBD-01 |
+| `app.ai.base-url`, `part-base-urls`(부품별 AI 서버), `read-timeout-ms`, `retry-count` | TBD-01 |
 | `app.storage.type`(local), `public-base-url` | TBD-01 |
 | `app.auth.login-lock-threshold` | TBD-10 |
 | `app.policy.min-sample-count` | TBD-03 |
