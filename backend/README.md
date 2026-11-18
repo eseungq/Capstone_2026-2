@@ -57,6 +57,7 @@ uvicorn main:app --port 8090
 시드에는 Mock 모델 `mock-door-swin-t-v1`(보정기 `mock-cal-v1`, active)과 예시 정책 `example-door-p1`(passThreshold 0.05, 검증 범위 0.02~0.08, ready·active)도 들어 있다. 실제 검증 값이 아니다.
 실제 DOOR 모델 `door-swin-tiny-e20-8d042c7bfab2`(10/28)와 재학습 2회차 `door-swin-tiny-e02-28a2dd1cb40b-dev`(11/03, V5_2)도 보정기·정책 없이 **비활성**으로 등록되어 있다 (아래 "실제 AI 연결").
 도어 Mock 시연 정책 `example-door-demo-0092`(Mock 모델, 기본 기준치 0.0092, 조정 범위 0.0084~0.0092, ready·**비활성**)도 등록되어 있다 (V6_2, 11/12 AI 내부 평가, 아래 "시연 정책"). 먼저 넣은 `example-door-demo-0084`(V6_1)와 11/09 값 `example-door-demo-30`(V5_3, 외부 사진 사후 적용 참고값)은 비활성으로 남아 있다.
+실제 도어 e02에는 시연 보정기 `door-e02-temperature-30962f5cac45-demo`와 정책 `door-e02-demo-0092`(0.0092)·`door-e02-demo-0084`(0.0084), 조정 범위 0.0084~0.0092, 둘 다 ready·**비활성**이 등록되어 있다 (V7_1, 11/17 김도현). 8771이 이 보정기로 응답하기 전에는 정책과 호환되지 않아 계속 REVIEW. 공동 시험에서 0.84% 적용 → 정상 사진(보정 약 0.876%) REVIEW(`ABOVE_THRESHOLD`) → 0.92% 적용 → 같은 사진 새 접수 AUTO_PASS를 확인한다 (통합 테스트 "도어 e02 시연 11/17 (V7_1)").
 **운영 배포 시 `spring.flyway.locations`에서 `classpath:db/seed-dev`를 빼야 한다.**
 
 ## 동작 확인 (curl)
