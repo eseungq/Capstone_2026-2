@@ -1,14 +1,16 @@
--- 최종 스키마 전체 (V1 → V2 → V3 → V4 → V5 → V6 적용 결과를 한 파일로 합친 것) · 김남균 DB · 2026-10-28
+-- 최종 스키마 전체 (V1 → V9 적용 결과를 한 파일로 합친 것) · 김남균 DB · 2026-10-28 (11/20 V7~V9 반영)
 --
 -- 11/11 갱신: V6 수동 판정 반영 — source MANUAL, review_reason AI_UNAVAILABLE, 완료 규칙 통합(chk_insp_completed_v6),
 --   chk_insp_manual·chk_insp_reason_ai_unavailable 추가
--- 용도: 비교·검토용 원본. Flyway에 넣지 않는다 (실제 DB는 V1·V3·V4·V5 마이그레이션이 만든다).
+-- 11/20 갱신: V7 검사항목 코드 UNIFIED(데이터만 변경, 구조 같음), V8 auto_pass_recheck, V9 recheck_rule·
+--   inspection.recheck_rule_id·재확인 결정 규칙·관리자 확인함·화면 체류 시간(worker_confirmation 포함)
+-- 용도: 비교·검토용 원본. Flyway에 넣지 않는다 (실제 DB는 V1~V9 마이그레이션이 만든다).
 --   이 파일과 마이그레이션 결과가 다르면 마이그레이션이 기준이다.
 -- 포함: 테이블·컬럼·키·인덱스·제약 + inspection_no_seq 초기 행 (V4에 있는 것)
--- 제외: V2 부품·검사항목 시드, seed-dev 시드(V3_1 계정, V4_1·V5_1~V5_5 모델·정책)
+-- 제외: V2 부품·검사항목 시드, V7 코드 변경(UPDATE), seed-dev 시드(V3_1 계정, V4_1~V7_1 모델·정책·보정기)
 -- 컬럼 순서: 마이그레이션 적용 후 실제 순서와 같게 맞춤 (V4의 AFTER 위치 반영)
 -- 11/05 갱신: 백엔드 적용 V5(10/28 이승규 수정본) 반영 — gradcam_status NO_ACTIVATION 추가, FAILED면 predicted_quality NULL
--- 상태: 이 파일 자체는 MySQL 실행 미확인 (V5·V6 마이그레이션은 백엔드 MySQL에서 적용 확인).
+-- 상태: 이 파일 자체는 MySQL 실행 미확인 (V5~V9 마이그레이션은 백엔드 MySQL에서 적용 확인).
 --       SQLite 대체 실행으로 마이그레이션과 컬럼·제약 일치만 확인
 -- 대상: MySQL 8.0.19 이상 (백엔드 docker compose 기준 8.4)
 
@@ -62,7 +64,7 @@ CREATE TABLE part (
 CREATE TABLE inspection_item (
     id        CHAR(36)    NOT NULL PRIMARY KEY,
     part_id   CHAR(36)    NOT NULL,
-    item_code VARCHAR(30) NOT NULL,                            -- 코드 이름은 TBD-04 (SCRATCH → APPEARANCE?)
+    item_code VARCHAR(30) NOT NULL,                            -- 세 부품 모두 UNIFIED (TBD-04 확정, V7)
     name      VARCHAR(50) NOT NULL,
     CONSTRAINT uq_item_part_code UNIQUE (part_id, item_code),
     CONSTRAINT uq_item_id_part UNIQUE (id, part_id),           -- V5: 복합 FK 대상
@@ -129,6 +131,23 @@ CREATE TABLE automation_policy (
     CONSTRAINT chk_policy_active_at CHECK (active = FALSE OR activated_at IS NOT NULL)
 );
 
+-- V9: AUTO_PASS 표본 재확인 추출 규칙. 규칙(구간 경계·비율, 시험 이름) 1건 = 1행
+CREATE TABLE recheck_rule (
+    id           CHAR(36)     NOT NULL PRIMARY KEY,
+    rule_version VARCHAR(60)  NOT NULL,   -- 값으로 만든 이름 (예: v1-b40-80-p100-30-10)
+    trial_name   VARCHAR(60)  NULL,       -- 같은 설정의 시험 회차 구분 (선택, 예: 공동시험 1차)
+    trial_key    VARCHAR(60)  AS (COALESCE(trial_name, '')) STORED,  -- NULL도 하나로 묶기 위한 UNIQUE용
+    near_ratio   DECIMAL(7,6) NOT NULL,
+    mid_ratio    DECIMAL(7,6) NOT NULL,
+    near_rate    DECIMAL(7,6) NOT NULL,
+    mid_rate     DECIMAL(7,6) NOT NULL,
+    low_rate     DECIMAL(7,6) NOT NULL,
+    created_at   DATETIME(6)  NOT NULL,
+    CONSTRAINT uk_recheck_rule UNIQUE (rule_version, trial_key),
+    CONSTRAINT chk_recheck_rule_values CHECK (0 <= mid_ratio AND mid_ratio <= near_ratio AND near_ratio <= 1
+        AND near_rate BETWEEN 0 AND 1 AND mid_rate BETWEEN 0 AND 1 AND low_rate BETWEEN 0 AND 1)
+);
+
 -- =====================================================================
 -- 검사 기록
 -- =====================================================================
@@ -174,6 +193,7 @@ CREATE TABLE inspection (
     ai_response_json              JSON          NULL,          -- V4: AI 응답 원문 (이미지 데이터 제외)
     error_detail                  VARCHAR(1000) NULL,          -- V4
     trace_id                      VARCHAR(32)   NULL,          -- V4
+    recheck_rule_id               CHAR(36)      NULL,          -- V9: AUTO_PASS 판정 당시 표본 재확인 규칙 (기능 꺼짐이면 NULL)
     CONSTRAINT uq_insp_no UNIQUE (inspection_no),
     CONSTRAINT uq_insp_retry_of UNIQUE (retry_of_inspection_id),                 -- FAILED 1건당 재검사 또는 수동 전환 1건
     CONSTRAINT uq_insp_client_request UNIQUE (user_id, client_request_id),
@@ -184,6 +204,7 @@ CREATE TABLE inspection (
     CONSTRAINT fk_insp_policy FOREIGN KEY (policy_id) REFERENCES automation_policy (id),
     CONSTRAINT fk_insp_retry_of FOREIGN KEY (retry_of_inspection_id) REFERENCES inspection (id),
     CONSTRAINT fk_insp_item_part FOREIGN KEY (item_id, part_id) REFERENCES inspection_item (id, part_id),   -- V5
+    CONSTRAINT fk_insp_recheck_rule FOREIGN KEY (recheck_rule_id) REFERENCES recheck_rule (id),               -- V9
     INDEX idx_insp_user_created (user_id, received_at),        -- V1 인덱스 (컬럼 이름 변경이 따라 반영됨)
     INDEX idx_insp_part_item_created (part_id, item_id, received_at),
     INDEX idx_insp_part_received (part_id, received_at),       -- V4
@@ -285,7 +306,12 @@ CREATE TABLE inspection (
         AND policy_id IS NULL AND automation_policy_ready = FALSE AND pass_threshold_applied IS NULL)),
     -- AI_UNAVAILABLE 사유는 수동 판정 건에만
     CONSTRAINT chk_insp_reason_ai_unavailable CHECK (review_reason IS NULL
-        OR review_reason <> 'AI_UNAVAILABLE' OR source = 'MANUAL')
+        OR review_reason <> 'AI_UNAVAILABLE' OR source = 'MANUAL'),
+
+    -- ---- V9 표본 재확인 규칙 ----
+    -- 주의: recommended_action이 NULL이면 결과가 NULL이라 통과함. V10에서 IS NOT NULL 보강 예정(11/20 이승규 확인),
+    --       그 전까지 무결성 점검 I18로 확인 (백엔드는 AUTO_PASS 판정 흐름에서만 값을 넣어 현재 위반 행 없음)
+    CONSTRAINT chk_insp_recheck_rule CHECK (recheck_rule_id IS NULL OR recommended_action = 'AUTO_PASS')
 );
 
 -- 패치 좌표 기록. 패치 검사 범위 제외로 신규 기록 중단, 과거 기록만 보존
@@ -309,10 +335,72 @@ CREATE TABLE worker_confirmation (
     final_judgement VARCHAR(10)  NOT NULL,
     confirmed_at    DATETIME(6)  NOT NULL,
     comment         VARCHAR(200) NULL,                         -- V4: 작업자 메모 (선택)
+    screen_dwell_ms BIGINT       NULL,                         -- V9: 상세 화면 체류 시간 합 (ms, 선택)
+    first_opened_at DATETIME(6)  NULL,                         -- V9: 상세 화면 처음 연 시각 (기기 시계)
+    open_count      INT          NULL,                         -- V9: 상세 화면 연 횟수
     CONSTRAINT fk_confirm_insp FOREIGN KEY (inspection_id) REFERENCES inspection (id),
     CONSTRAINT fk_confirm_worker FOREIGN KEY (worker_id) REFERENCES users (id),
-    CONSTRAINT chk_confirm_judgement CHECK (final_judgement IN ('PASS', 'FAIL'))                 -- V5
+    CONSTRAINT chk_confirm_judgement CHECK (final_judgement IN ('PASS', 'FAIL')),                -- V5
+    CONSTRAINT chk_confirm_timing CHECK (                                                        -- V9
+           (screen_dwell_ms IS NULL AND first_opened_at IS NULL AND open_count IS NULL)
+        OR (screen_dwell_ms IS NOT NULL AND first_opened_at IS NOT NULL AND open_count IS NOT NULL
+            AND screen_dwell_ms >= 0 AND open_count >= 1))
 );
+
+-- V8: AUTO_PASS 표본 재확인. AUTO_PASS마다 추출 결정 1행 (뽑히지 않은 건도 sampled = FALSE)
+--     시스템 판정(PASS·SYSTEM)은 바꾸지 않고 이 테이블에만 기록. 집계 방식은 계약 6.11 기준
+--     (V8 주석의 "가중치 1/sampling_rate"가 아니라 구간 AUTO_PASS 비중으로 가중, 11/18 합의)
+--     테이블 간 규칙(대상이 AUTO_PASS·SYSTEM, 재확인자 WORKER 등)은 무결성 점검 I15~I21
+CREATE TABLE auto_pass_recheck (
+    id               CHAR(36)     NOT NULL PRIMARY KEY,
+    inspection_id    CHAR(36)     NOT NULL UNIQUE,          -- 검사당 최대 1건
+    sampled          BOOLEAN      NOT NULL,                 -- 재확인 대상으로 뽑혔는지
+    stratum          VARCHAR(10)  NOT NULL,                 -- NEAR / MID / LOW (보정 확률 ÷ 적용 기준치)
+    sampling_rate    DECIMAL(7,6) NOT NULL,                 -- 이 구간의 추출 비율
+    sampled_at       DATETIME(6)  NOT NULL,                 -- 추출 결정 시각
+    result           VARCHAR(10)  NULL,                     -- PASS / FAIL, 재확인 전·미선정이면 NULL
+    comment          VARCHAR(200) NULL,
+    rechecked_by     CHAR(36)     NULL,
+    rechecked_at     DATETIME(6)  NULL,
+    rule_id          CHAR(36)     NULL,                     -- V9: 결정에 쓴 규칙 (V8 시절 행은 NULL)
+    ratio            DOUBLE       NULL,                     -- V9: 보정 확률 ÷ 적용 기준치
+    draw_value       DOUBLE       NULL,                     -- V9: 검사 ID로 정한 0~1 값 (sampled = draw_value < sampling_rate)
+    acknowledged_by  CHAR(36)     NULL,                     -- V9: 재확인 FAIL 관리자 확인함
+    acknowledged_at  DATETIME(6)  NULL,
+    acknowledge_note VARCHAR(200) NULL,
+    screen_dwell_ms  BIGINT       NULL,                     -- V9: 화면 체류 시간 (재확인 결과와 함께만)
+    first_opened_at  DATETIME(6)  NULL,
+    open_count       INT          NULL,
+    CONSTRAINT fk_recheck_insp FOREIGN KEY (inspection_id) REFERENCES inspection (id),
+    CONSTRAINT fk_recheck_user FOREIGN KEY (rechecked_by) REFERENCES users (id),
+    CONSTRAINT fk_recheck_rule FOREIGN KEY (rule_id) REFERENCES recheck_rule (id),
+    CONSTRAINT fk_recheck_ack_user FOREIGN KEY (acknowledged_by) REFERENCES users (id),
+    CONSTRAINT chk_recheck_values CHECK (stratum IN ('NEAR', 'MID', 'LOW')
+        AND (result IS NULL OR result IN ('PASS', 'FAIL'))),
+    -- 비율 0인 구간은 뽑히지 않으므로 0도 허용. 뽑힌 건은 비율이 0보다 커야 함
+    CONSTRAINT chk_recheck_rate CHECK (sampling_rate >= 0 AND sampling_rate <= 1 AND (sampled = FALSE OR sampling_rate > 0)),
+    -- 뽑히지 않은 건은 재확인 결과가 없음
+    CONSTRAINT chk_recheck_sampled CHECK (sampled = TRUE OR result IS NULL),
+    -- 결과·확인자·확인 시각은 셋 다 없거나 셋 다 있음
+    CONSTRAINT chk_recheck_done CHECK (
+           (result IS NULL AND rechecked_by IS NULL AND rechecked_at IS NULL)
+        OR (result IS NOT NULL AND rechecked_by IS NOT NULL AND rechecked_at IS NOT NULL)),
+    CONSTRAINT chk_recheck_rule CHECK (                                                          -- V9
+           (rule_id IS NULL AND ratio IS NULL AND draw_value IS NULL)
+        OR (rule_id IS NOT NULL AND ratio IS NOT NULL AND draw_value IS NOT NULL
+            AND draw_value >= 0 AND draw_value < 1)),
+    -- 확인함은 재확인 FAIL에만, 확인자·시각은 짝
+    CONSTRAINT chk_recheck_ack CHECK (
+           (acknowledged_by IS NULL AND acknowledged_at IS NULL AND acknowledge_note IS NULL)
+        OR (acknowledged_by IS NOT NULL AND acknowledged_at IS NOT NULL AND result = 'FAIL')),
+    -- 체류 시간은 재확인 결과와 함께만
+    CONSTRAINT chk_recheck_timing CHECK (
+           (screen_dwell_ms IS NULL AND first_opened_at IS NULL AND open_count IS NULL)
+        OR (screen_dwell_ms IS NOT NULL AND first_opened_at IS NOT NULL AND open_count IS NOT NULL
+            AND screen_dwell_ms >= 0 AND open_count >= 1 AND result IS NOT NULL))
+);
+-- 재확인 목록: 뽑힌 건의 대기·완료별 뽑힌 순서
+CREATE INDEX idx_recheck_result_sampled ON auto_pass_recheck (sampled, result, sampled_at);
 
 -- 원본·Grad-CAM 이미지 참조. 검사당 원본 1, Grad-CAM 최대 1
 -- storage_uri는 저장소 상대 키 (예: original/2026/10/16/<id>.jpg). 만료되는 접근 주소는 저장하지 않음

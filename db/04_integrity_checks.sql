@@ -1,5 +1,5 @@
 -- 테이블 간 무결성 점검 (CHECK로 막을 수 없는 규칙). 정상이면 모든 결과가 0건.
--- V1·V3·V4·V5·V6 스키마 명칭 기준 (11/11 수동 판정 I13·I14 추가, I7~I9에 MANUAL 포함). 개발 DB에서 수시로 실행해 백엔드 저장 로직을 점검한다.
+-- V1~V9 스키마 명칭 기준 (11/11 수동 판정 I13·I14, 11/20 표본 재확인 I15~I21 추가). 개발 DB에서 수시로 실행해 백엔드 저장 로직을 점검한다.
 
 -- I1. REVIEW 확정 건인데 작업자 확인 기록이 없음
 SELECT 'I1' AS rule_name, i.id, i.inspection_no FROM inspection i
@@ -76,3 +76,63 @@ SELECT 'I14' AS rule_name, m.id, m.inspection_no FROM inspection m
 LEFT JOIN worker_confirmation w ON w.inspection_id = m.id
 WHERE m.source = 'MANUAL' AND m.final_judgement IS NOT NULL
   AND (m.judged_by IS NULL OR m.judged_by <> 'WORKER' OR w.id IS NULL);
+
+-- ===================== 표본 재확인 (V8·V9, 11/20) =====================
+-- 화면 체류 시간의 first_opened_at은 기기 시계라 서버 시각과 비교하지 않는다.
+
+-- I15. 재확인 결정 행의 대상 검사가 AUTO_PASS·PASS·SYSTEM이 아님
+SELECT 'I15' AS rule_name, i.id, i.inspection_no FROM auto_pass_recheck r
+JOIN inspection i ON i.id = r.inspection_id
+WHERE COALESCE(i.recommended_action, '') <> 'AUTO_PASS'
+   OR COALESCE(i.final_judgement, '') <> 'PASS' OR COALESCE(i.judged_by, '') <> 'SYSTEM';
+
+-- I16. 재확인자가 WORKER가 아님
+SELECT 'I16' AS rule_name, i.id, i.inspection_no FROM auto_pass_recheck r
+JOIN inspection i ON i.id = r.inspection_id
+JOIN users u ON u.id = r.rechecked_by
+WHERE u.role <> 'WORKER';
+
+-- I17. 재확인 FAIL "확인함"을 남긴 사람이 ADMIN이 아님
+SELECT 'I17' AS rule_name, i.id, i.inspection_no FROM auto_pass_recheck r
+JOIN inspection i ON i.id = r.inspection_id
+JOIN users u ON u.id = r.acknowledged_by
+WHERE u.role <> 'ADMIN';
+
+-- I18. 재확인 규칙(recheck_rule_id)이 있는 검사가 AUTO_PASS·PASS·SYSTEM이 아님
+--      (V9 chk_insp_recheck_rule은 recommended_action이 NULL이면 통과하므로 여기서 함께 확인)
+SELECT 'I18' AS rule_name, i.id, i.inspection_no FROM inspection i
+WHERE i.recheck_rule_id IS NOT NULL
+  AND (COALESCE(i.recommended_action, '') <> 'AUTO_PASS'
+       OR COALESCE(i.final_judgement, '') <> 'PASS' OR COALESCE(i.judged_by, '') <> 'SYSTEM');
+
+-- I19. 결정 행의 규칙(rule_id)이 검사의 판정 당시 규칙(recheck_rule_id)과 다름 (V8 시절 행은 rule_id NULL이라 제외)
+SELECT 'I19' AS rule_name, i.id, i.inspection_no FROM auto_pass_recheck r
+JOIN inspection i ON i.id = r.inspection_id
+WHERE r.rule_id IS NOT NULL AND (i.recheck_rule_id IS NULL OR r.rule_id <> i.recheck_rule_id);
+
+-- I20. 결정 행의 값이 규칙으로 계산한 값과 다름 (rule_id 있는 행만)
+--      ratio = 보정 확률 ÷ 판정 당시 기준치, 구간: ratio ≥ near_ratio → NEAR, ≥ mid_ratio → MID, 나머지 LOW
+--      (백엔드 RecheckRules와 같이 1e-9 여유), 비율 = 규칙의 구간 비율, 뽑힘 = 비율 > 0 이고 draw_value < 비율
+SELECT 'I20' AS rule_name, i.id, i.inspection_no FROM auto_pass_recheck r
+JOIN inspection i ON i.id = r.inspection_id
+JOIN recheck_rule k ON k.id = r.rule_id
+WHERE i.calibrated_defect_probability IS NULL OR i.pass_threshold_applied IS NULL
+   OR ABS(r.ratio - CASE WHEN i.pass_threshold_applied > 0
+                         THEN i.calibrated_defect_probability / i.pass_threshold_applied ELSE 1 END) > 0.000001
+   OR r.stratum <> CASE WHEN r.ratio + 0.000000001 >= k.near_ratio THEN 'NEAR'
+                        WHEN r.ratio + 0.000000001 >= k.mid_ratio THEN 'MID' ELSE 'LOW' END
+   OR r.sampling_rate <> CASE r.stratum WHEN 'NEAR' THEN k.near_rate WHEN 'MID' THEN k.mid_rate ELSE k.low_rate END
+   OR r.sampled <> (r.sampling_rate > 0 AND r.draw_value < r.sampling_rate);
+
+-- I21. 시각 순서가 맞지 않음: 추출 결정이 검사 완료 전, 재확인이 추출 결정 전, 확인함이 재확인 전
+SELECT 'I21' AS rule_name, i.id, i.inspection_no FROM auto_pass_recheck r
+JOIN inspection i ON i.id = r.inspection_id
+WHERE r.sampled_at < i.completed_at
+   OR (r.rechecked_at IS NOT NULL AND r.rechecked_at < r.sampled_at)
+   OR (r.acknowledged_at IS NOT NULL AND r.acknowledged_at < r.rechecked_at);
+
+-- ===================== 참고 (0건이 아니어도 오류는 아님) =====================
+-- X1. 판정 당시 규칙이 있는데 1시간이 지나도 추출 결정 행이 없는 AUTO_PASS (RecheckSweeper 재처리 대상·누락 확인용)
+SELECT 'X1' AS rule_name, i.id, i.inspection_no, i.completed_at FROM inspection i
+LEFT JOIN auto_pass_recheck r ON r.inspection_id = i.id
+WHERE i.recheck_rule_id IS NOT NULL AND r.id IS NULL AND i.completed_at < NOW() - INTERVAL 1 HOUR;
