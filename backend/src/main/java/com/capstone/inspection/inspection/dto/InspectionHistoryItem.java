@@ -22,5 +22,6 @@ public record InspectionHistoryItem(String inspectionId,
                                     String thumbnailUrl,         // 원본 서명 주소 (만료됨)
                                     Judgement finalJudgement,
                                     JudgedBy judgedBy,
-                                    OffsetDateTime confirmedAt) { // 작업자 확인 시각 (REVIEW_DONE일 때만)
+                                    OffsetDateTime confirmedAt,  // 작업자 확인 시각 (REVIEW_DONE일 때만)
+                                    Judgement correctedJudgement) { // 마지막 정정 판정 (계약 6.12), 없으면 null
 }
