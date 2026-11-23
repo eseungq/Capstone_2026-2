@@ -1,6 +1,6 @@
 # 백엔드 API 계약 v4 (11/18 갱신 · 최종 확정 전)
 
-3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장) · 11/02 갱신 (구현 세부 반영: 6.1~6.4, 6.6~6.9, 7.4, 8장, 10장, 12장) · 11/04 갱신 (실제 AI 연결 확인: 7.3, 7.4, 12장 TBD-01) · 11/05 갱신 (통합 시험: 6.2 모델 확인 타임아웃, 8.4 앱 시험, 12장 TBD-01·14) · 11/09 갱신 (12장 TBD-01 실행 타임아웃 20초) · 11/10 갱신 (6.1·6.9 계정 잠금 해제, 9.1 통계, 10장 USER_NOT_FOUND, 12장 TBD-10·14) · 11/11 갱신 (6.3 recent inspectionNo, 12장 TBD-01 부품별 AI 서버, **수동 판정** 3장·4장·6.1·6.5·6.6·6.8·6.10·10장) · 11/17 갱신 (TBD-04 확정 `UNIFIED`: 7장·9장·12장) · 11/18 갱신 (6.1 검사 기록 CSV 내보내기, 6.6 `mismatch` 필터) · 11/23 제안 (REVIEW 개선·판정 확인 요청: 6.1·6.4·6.5·6.6·6.7.1·6.12·10장·12장 TBD-18·19)
+3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장) · 11/02 갱신 (구현 세부 반영: 6.1~6.4, 6.6~6.9, 7.4, 8장, 10장, 12장) · 11/04 갱신 (실제 AI 연결 확인: 7.3, 7.4, 12장 TBD-01) · 11/05 갱신 (통합 시험: 6.2 모델 확인 타임아웃, 8.4 앱 시험, 12장 TBD-01·14) · 11/09 갱신 (12장 TBD-01 실행 타임아웃 20초) · 11/10 갱신 (6.1·6.9 계정 잠금 해제, 9.1 통계, 10장 USER_NOT_FOUND, 12장 TBD-10·14) · 11/11 갱신 (6.3 recent inspectionNo, 12장 TBD-01 부품별 AI 서버, **수동 판정** 3장·4장·6.1·6.5·6.6·6.8·6.10·10장) · 11/17 갱신 (TBD-04 확정 `UNIFIED`: 7장·9장·12장) · 11/18 갱신 (6.1 검사 기록 CSV 내보내기, 6.6 `mismatch` 필터) · 11/23 제안 (REVIEW 개선·판정 확인 요청: 6.1·6.4·6.5·6.6·6.7.1·6.12·10장·12장 TBD-18·19 / 자동 불량·날짜별 이력: 3장·4.1·6.9·6.13·8.2)
 
 - 기준 1: 「자동차부품_공정모니터링_개발계획서_최종합의반영」(10/14 합의본)
 - 기준 2: 「요구사항명세서_패치검사_개정본3」(9/30)의 규칙 중 합의본과 충돌하지 않는 것은 그대로 승계
@@ -93,9 +93,9 @@
 | 필드 | 값 | 설명 |
 |---|---|---|
 | `status` | `RECEIVED` / `ANALYZING` / `COMPLETED` / `FAILED` | 처리 단계. RECEIVED는 v4 추가 |
-| `recommendedAction` | `AUTO_PASS` / `REVIEW` / `null` | 정책 적용 결과. COMPLETED에서만 값 존재 [승계] |
+| `recommendedAction` | `AUTO_PASS` / `AUTO_FAIL` / `REVIEW` / `null` | 정책 적용 결과. COMPLETED에서만 값 존재 [승계]. `AUTO_FAIL`은 4.1 [제안 11/23] |
 | `finalJudgement` | `PASS` / `FAIL` / `null` | 최종 판정 [승계] |
-| `judgedBy` | `SYSTEM` / `WORKER` / `null` | 최종 판정 주체. AUTO_PASS는 SYSTEM [제안] |
+| `judgedBy` | `SYSTEM` / `WORKER` / `null` | 최종 판정 주체. AUTO_PASS·AUTO_FAIL은 SYSTEM [제안] |
 | `displayState` | 아래 표 | 앱 표시용 파생 값 [제안] |
 | `source` | `DEVICE` / `ADMIN` / `RETRY` / `MANUAL` | 검사가 생긴 경로. `MANUAL`은 AI 없이 작업자 판정용으로 만든 검사 (6.10) [구현 11/11] |
 
@@ -105,6 +105,7 @@
 |---|---|---|---|---|---|
 | `ANALYZING` | RECEIVED / ANALYZING | null | null | null | 없음 |
 | `AUTO_PASS` | COMPLETED | AUTO_PASS | PASS | SYSTEM | 없음 |
+| `AUTO_FAIL` [제안 11/23] | COMPLETED | AUTO_FAIL | FAIL | SYSTEM | 없음 (8.2) |
 | `REVIEW_PENDING` | COMPLETED | REVIEW | null | null | **확인 필요 알림** |
 | `REVIEW_DONE` | COMPLETED | REVIEW | PASS / FAIL | WORKER | 없음 |
 | `FAILED` | FAILED | null | null | null | **오류 알림** |
@@ -114,6 +115,8 @@
 - AUTO_PASS는 작업자 확인이 아니므로 작업자 확인 기록을 만들지 않음 [확정]
 - REVIEW는 불량 확정이 아님. 정상 쪽 예측이어도 AUTO_PASS 조건을 못 맞추면 REVIEW [확정]
 - 불량(DEFECT) 예측은 보정 확률과 관계없이 항상 REVIEW. 자동 FAIL은 없음 [합의 10/15]
+  - **11/23 변경 [합의 11/23 김도현, TBD-18]:** 정책에서 자동 불량을 켠 경우에만 4.1 조건을 만족하는 DEFECT 예측이 `AUTO_FAIL`. 기본은 꺼짐이라 켜기 전까지 위 규칙 그대로
+- AUTO_FAIL도 작업자 확인 기록을 만들지 않음. 다르게 확인되면 판정 확인 요청(6.12)으로 정정하고 최초 판정은 그대로 [제안 11/23]
 - 작업자 판정은 AI 결과·정책 결과를 덮어쓰지 않고 별도로 저장 [확정·승계]
 - 수동 판정 건(`source=MANUAL`)은 COMPLETED·REVIEW(`AI_UNAVAILABLE`)로 생성되어 위 표의 `REVIEW_PENDING` → `REVIEW_DONE`을 그대로 따름. AI 결과·정책 값은 없음 (6.10) [구현 11/11]
 - AUTO_PASS 건이 표본 재확인(6.11)으로 뽑히고 재확인 결과가 FAIL이어도 `displayState`·`finalJudgement`·`judgedBy`는 **바뀌지 않음**. 재확인 결과는 상세의 `recheck` 블록에 표시하고 원래 판정과 함께 보여 줌 [제안 11/18]
@@ -122,6 +125,7 @@
 
 ```
 RECEIVED ──▶ ANALYZING ──▶ COMPLETED (AUTO_PASS)
+                       ├─▶ COMPLETED (AUTO_FAIL, 자동 불량을 켠 정책만)
                        ├─▶ COMPLETED (REVIEW) ──▶ 작업자 PASS/FAIL
                        └─▶ FAILED (이후 변경 없음)
                                 │
@@ -160,6 +164,23 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 
 - 여러 사유가 동시에 해당하면 우선순위가 가장 높은 **하나만** 기록 [제안]. 나머지 근거는 상세의 `ai`·`policy` 블록 값으로 확인 가능
 - 예: DEFECT 예측 + 정책 없음 → `DEFECT_PREDICTED`
+
+### 4.1 AUTO_FAIL 판정 규칙 [제안 11/23, 합의 11/23 김도현 범위 변경, TBD-18]
+
+분석이 정상 완료된 건이 아래를 **모두** 만족하면 AUTO_FAIL(`FAIL · SYSTEM`), 아니면 지금처럼 REVIEW(`DEFECT_PREDICTED`)
+
+1. `predictedQuality = DEFECT`
+2. `calibratedDefectProbability`가 null이 아님
+3. 4장 3·4번과 같은 정책(부품·모델·보정기 호환, ready·active)
+4. 그 정책의 `autoFailEnabled = true`이고 `failThreshold`가 있음
+5. `calibratedDefectProbability ≥ failThreshold` (같으면 자동 불량. 반올림 전 값으로 비교)
+
+- 자동 통과(4장)는 지금처럼 정책 `active`로 켜고 끔. 자동 불량은 같은 정책 안에서 `autoFailEnabled`로 **따로** 켬. 가능한 조합은 둘 다 꺼짐(정책 중지)·자동 통과만·둘 다 켜짐. "자동 불량만"은 두지 않음 [제안] (쓰임이 없고 새 REVIEW 사유가 필요해짐)
+- 기본은 꺼짐: 기존 정책과 새로 등록한 정책 모두 `autoFailEnabled = false`, `failThreshold = null`. 과거 검사에 소급하지 않음
+- 판정 당시 `failThreshold`를 검사에 스냅숏으로 저장(`failThresholdApplied`). 자동 불량이 꺼져 있었으면 null. 정책을 바꿔도 과거 검사의 판정·기준은 그대로
+- REVIEW 사유는 바뀌지 않음: 자동 불량 조건을 못 맞춘 DEFECT 예측은 `DEFECT_PREDICTED`
+- Grad-CAM은 지금처럼 DEFECT 예측이면 생성 (자동 불량 건도 근거 이미지로 표시). 판정에는 쓰지 않음
+- 자동 불량의 정상 오판은 판정 확인 요청(6.12)으로 확인된 건만 셈. 전체 오판율은 추정할 수 없음 (TBD-19)
 
 ---
 
@@ -433,6 +454,7 @@ REVIEW 정렬·필터 [제안 11/23, 김도현 시안]: 기존 호출은 그대�
 - `followUp` [구현 11/11]: FAILED 건에 재검사·수동 전환 검사가 이미 있으면 `{ inspectionId, inspectionNo, source }` (`RETRY`/`MANUAL`). 앱은 버튼을 숨기고 그 검사로 이동
 - 앱은 passThreshold를 해석해 상태를 바꾸지 않고 백엔드가 준 상태를 표시 [승계]
 - `recheck` [제안 11/18]: AUTO_PASS 표본 재확인(6.11)으로 뽑힌 건만 `{ stratum, samplingRate, ruleVersion, trialName, sampledAt, result, comment, recheckedBy, recheckedAt, acknowledgedBy, acknowledgedAt, acknowledgeNote }`, 아니면 null. 재확인 FAIL이어도 `judgement` 블록(시스템 PASS)은 그대로이므로 **두 블록을 함께** 표시. `acknowledgedAt`이 있으면 "확인함"(해결 완료 아님)
+- `policy`에 `failThreshold`(판정 당시 자동 불량 기준, 꺼져 있었으면 null) 추가 [제안 11/23]
 - `judgementRequests` [제안 11/23]: 판정 확인 요청(6.12) 목록, 최신순. 없으면 `[]`. 항목 형식은 6.12 요청 1건과 같음
 - `correction` [제안 11/23]: 정정된 적이 있으면 마지막 정정 `{ requestId, correctedJudgement, correctedBy, correctedAt, note }`, 없으면 null. **`judgement` 블록(최초 판정)은 바뀌지 않으므로** 정정된 건은 "최초 판정 → 정정 판정"을 함께 표시
 
@@ -542,6 +564,11 @@ REVIEW 정렬·필터 [제안 11/23, 김도현 시안]: 기존 호출은 그대�
 ```
 
 - `ready`: 검증 근거가 준비됐는지. `active`: 현재 적용 중인지 [확정]
+- 자동 불량 [제안 11/23, 4.1]: 정책 형식에 `autoFailEnabled`(기본 false), `failThreshold`, `failValidatedMin`, `failValidatedMax`(모두 null 허용) 추가
+  - **불량 기준 등록·조정** `POST /admin/policies/{id}/fail-threshold` `{ failThreshold, failValidatedMin, failValidatedMax }` (ADMIN): 기준치 조정과 같이 기존 정책을 고치지 않고 **새 버전**(`-f번호`, `active = false`)을 만듦. 0~1, 소수 6자리. `failValidatedMin ≤ failThreshold ≤ failValidatedMax`가 아니면 `400 POLICY_THRESHOLD_OUT_OF_RANGE`, `failThreshold ≤ passThreshold`이면 `400 INVALID_PARAMETER`
+  - **켜고 끄기** `POST /admin/policies/{id}/auto-fail` `{ enabled }` (ADMIN): 역시 새 버전(`-a번호`, `active = false`)을 만들고, 관리자가 activate하면 적용. `failThreshold`가 없는 정책을 켜면 `409 AUTO_FAIL_NOT_CONFIGURED`
+  - 켜기 전 김도현 새 자료 검증 결과를 `metrics`에 남김 (예: `metrics.autoFail = { sampleCount, normalAutoFailed, note }`). 서버는 값 형식만 검사하고 판단은 하지 않음
+  - 기준치 조정(`/threshold`)으로 만든 새 버전도 자동 불량 값(켜짐 여부·기준·검증 범위)을 이어받음
 - 위 숫자는 형식 예시일 뿐 실제 값이 아님. 실제 값과 범위는 AI 검증 후 제공 [확정]. 검증 전 시연용 정책은 `example-` 접두어 [승계]
 - **threshold 조정**: `{ "passThreshold": 0.030 }`. `validatedMin ≤ 값 ≤ validatedMax`가 아니면 `400 POLICY_THRESHOLD_OUT_OF_RANGE`. 통과하면 기존 정책을 수정하지 않고 **새 버전을 만들고** `active = false`로 시작 [제안]
 - **activate**: `ready = true`이고 활성 모델과 호환되는 정책만 가능, 아니면 `409 POLICY_NOT_READY` [승계]. 같은 부품·모델 버전의 다른 정책은 자동으로 비활성 (active 최대 1개) [승계]
@@ -826,6 +853,48 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 - 테이블 간 규칙(대상이 `judged_by = SYSTEM`, 요청자 WORKER, 처리자 ADMIN)은 점검 SQL로 확인
 - 일괄 FAIL 묶음: `worker_confirmation.batch_id` CHAR(36) NULL (6.7.1)
 
+### 6.13 관리자 날짜별 이력·기준 상세 [제안 11/23, 합의 11/23 김도현 범위 변경, TBD-18]
+
+**날짜별 이력** `GET /admin/automation/daily?partCode=COWL_COVER&from=2026-11-20&to=2026-11-24` (ADMIN)
+- `partCode` 필수, `from`·`to`는 KST 날짜(`from ≤ 날짜 < to`), 최대 92일. 응답은 최신 날짜부터
+- **날짜는 KST(Asia/Seoul) 고정**: 검사 `receivedAt`의 KST 날짜. 서버·DB 시간대와 무관. 수동 전환 검사는 새 REVIEW 검사가 생긴 날짜 [합의 11/23 김도현]
+- 한 날짜 안에서 판정 당시 정책·모델·보정기 조합별로 행을 나눔. 정책이 없어 REVIEW가 된 건과 수동 전환 건은 각각 정책 없는 행
+
+```json
+{
+  "data": [
+    {
+      "date": "2026-11-24",
+      "policyId": "...", "policyVersion": "cowl-e08-demo-0163-f1-a1",
+      "modelVersion": "...", "calibratorVersion": "...",
+      "passThreshold": 0.0163, "failThreshold": 0.9966, "autoFailEnabled": true,
+      "total": 8, "autoPass": 2, "autoFail": 2,
+      "review": { "done": 0, "total": 4 },
+      "manual": { "done": 0, "total": 0 },
+      "failed": 0,
+      "confirmedOpposite": { "autoPassThenFail": 0, "autoFailThenPass": 0, "resolvedRequests": 0 },
+      "openRequests": 0
+    }
+  ]
+}
+```
+
+- `total = autoPass + autoFail + review.total` (최초 경로가 정해진 검사). `review`는 수동 전환을 뺀 REVIEW, `manual`은 수동 전환 REVIEW. 화면은 "REVIEW 3/4 · 수동 전환 1/1"처럼 함께 표시 [합의 11/23 김도현]
+- `done`: 그 배정 건 중 **조회 시점까지** 작업자 판정이 끝난 수. 다음 날 판정해도 원래 날짜 행에 반영
+- `failed`: 분석 실패(FAILED) 건수. `total`에 넣지 않는 장애 기록. AI 성능(REVIEW 비율 등)은 `review`·`autoPass`·`autoFail`만으로 계산하고 수동 전환은 제외
+- `confirmedOpposite`: 판정 확인 요청(6.12) 중 처리된 것만. `autoPassThenFail`·`autoFailThenPass`는 `CORRECTED` 건을 검사 ID당 1건으로 셈, `resolvedRequests`는 처리된 요청이 있는 검사 수(`KEPT` 포함). `resolvedRequests = 0`이면 앱은 "확인 자료 없음", 0보다 크면 "확인 n건 중 m건" [TBD-19]. 대기 요청은 `openRequests`로 따로
+- 표본 재확인(6.11) 결과는 넣지 않음. 재확인 요약에서 따로 봄
+
+**기준 상세** `GET /admin/automation/daily/detail?partCode&date&policyId&band=0.05` (ADMIN)
+- 날짜 행 하나(같은 날짜·정책)의 기준 주변 REVIEW를 두 구간으로 나눔. `band`(기본 0.05, 0.001~0.5)는 기준에서 떨어진 정도(확률 차)
+  - 통과 기준 위: GOOD 예측 REVIEW 중 `passThreshold < 확률 ≤ passThreshold + band`
+  - 불량 기준 아래: DEFECT 예측 REVIEW 중 `failThreshold − band ≤ 확률 < failThreshold`. 정책에 `failThreshold`가 없으면 이 구간은 null
+- 구간마다 `{ from, to, total, pass, fail, pending, items: [{ inspectionId, inspectionNo, calibratedDefectProbability, finalJudgement, correctedJudgement }] }`. `pass + fail + pending = total`
+- 기준 라벨·실물 확인 결과는 서버에 저장하는 곳이 없어 `reference: null`("자료 없음") [TBD-20]
+- 같은 날짜 행과 같은 정책 조건만 씀 (다른 버전 점수가 섞이지 않음)
+
+오류: 없는 `partCode` `400 INVALID_PART_CODE`, 날짜 형식·범위·`band` 오류 `400 INVALID_PARAMETER`, 없는 `policyId` `404 POLICY_NOT_FOUND`
+
 ## 7. AI 연동 규격 [합의 10/15]
 
 ### 7.1 요청 `POST {AI}/internal/v1/predict`
@@ -957,6 +1026,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | `REVIEW_REQUIRED` | COMPLETED + REVIEW | 등록된 WORKER·ADMIN 기기 전체 [제안] |
 | `ANALYSIS_FAILED` | FAILED | 등록된 WORKER·ADMIN 기기 전체 [제안] |
 | (없음) | AUTO_PASS | 발송 안 함 |
+| (없음) | AUTO_FAIL [제안 11/23] | 발송 안 함. 모니터링·이력에 표시. 라인에서 바로 빼야 한다면 이벤트 추가 (홍승인 확인) |
 
 ### 8.3 푸시 data payload
 
@@ -1071,6 +1141,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | 추가 | 409 | `REQUEST_ALREADY_OPEN` | 같은 검사에 처리 대기 요청이 이미 있음 [제안 11/23] |
 | 추가 | 409 | `REQUEST_ALREADY_RESOLVED` | 다른 결정으로 이미 처리된 요청 [제안 11/23] |
 | 추가 | 404 | `REQUEST_NOT_FOUND` | 없는 판정 확인 요청 [제안 11/23] |
+| 추가 | 409 | `AUTO_FAIL_NOT_CONFIGURED` | 불량 기준 없이 자동 불량을 켬 [제안 11/23] |
 | 추가 | 400 | `INVALID_DEVICE_TOKEN` | 기기 토큰 형식 오류 |
 | 추가 | 502 | `AI_REQUEST_REJECTED` | AI 서버가 4xx로 요청을 거절 (검사는 FAILED, 재시도 안 함) |
 | 미사용 | 409 | `REQUEST_IN_PROGRESS` | 비동기 접수로 불필요 (6.2) [제안] |
@@ -1109,7 +1180,8 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | TBD-15 | 과거 결과 재계산 설계 유지 여부 | **해소** | 제외 | — |
 | TBD-16 | 표본 재확인 구간 경계(0.4·0.8)·비율(1.0·0.3·0.1), 불확실성 표시 방법 | 공동시험값 확정 (11/18) | **공동시험은 경계 0.4·0.8, 100·30·10%로 수집하고 50·30·10%를 같은 기록으로 비교** [합의 11/18 김도현]. 장기 적용값은 시험 후 결정. 규칙은 `v1-b40-80-p100-30-10` 형식으로 자동 생성하고 시험 이름은 선택, 판정 당시 규칙을 검사에 남겨 재처리도 그 규칙으로(V9). 전체 불량률은 구간 AUTO_PASS 건수 비중으로 가중 [합의 11/18 김도현]. 기본 꺼 둠. 신뢰구간 표시는 다음 단계 (6.11) | 김도현 |
 | TBD-17 | 재확인 FAIL 시 알림·후속 조치 | 1차 합의 (11/18) | 원래 PASS·SYSTEM 유지, 상세에서 두 결과 함께 표시, 완료 목록 붉은색 + 관리자 안내, 관리자 "확인함"(해결 완료 아님) [합의 11/18 홍승인·김도현]. 푸시·자동 조치·해결 상태 기록은 팀 논의 후 (6.11) | 홍승인·전체 |
-| TBD-18 | 자동 불량(AUTO_FAIL)·관리자 날짜별 집계·기준 상세 | 범위 변경 합의 (11/23) | 10/14 개발계획서 제외 항목(자동 FAIL, 통계·관리자 분석 화면)을 **범위 변경으로 진행** [합의 11/23 김도현]. 근거: 1차 공동시험에서 작업자가 PASS한 불량 3건 중 INS-000146·149가 제안 기준이면 자동 불량 대상(151은 REVIEW, 검사 기준 표시로 보완). AUTO_FAIL은 부품 정책별 기본 꺼짐 → 새 자료 검증 → 부품별 활성화. 3.2·4장·정책 형식 변경과 V11은 별도 초안 (6.4·6.7.1·6.12 다음). 날짜별 집계 원칙 [합의 11/23 김도현]: 수동 전환(`AI_UNAVAILABLE`)은 작업자에게 배정된 REVIEW라 작업량에 포함하고 따로 표시 (예: REVIEW 3/4 · 수동 전환 1/1). AI의 REVIEW 비율 등 AI 성능 계산에서는 수동 전환을 제외. 원래 FAILED는 날짜표 검사 건수에서 빼되 장애 기록으로 남김. 수동 전환 검사는 새 REVIEW 검사가 생성된 KST 날짜에 귀속 | 김도현·홍승인·김남균 |
+| TBD-18 | 자동 불량(AUTO_FAIL)·관리자 날짜별 집계·기준 상세 | 범위 변경 합의 (11/23) | 10/14 개발계획서 제외 항목(자동 FAIL, 통계·관리자 분석 화면)을 **범위 변경으로 진행** [합의 11/23 김도현]. 근거: 1차 공동시험에서 작업자가 PASS한 불량 3건 중 INS-000146·149가 제안 기준이면 자동 불량 대상(151은 REVIEW, 검사 기준 표시로 보완). AUTO_FAIL은 부품 정책별 기본 꺼짐 → 새 자료 검증 → 부품별 활성화. 초안 11/23: 3.2·4.1·6.9·6.13·8.2, 저장은 V13 (정책 `auto_fail_enabled`·`fail_threshold`·`fail_validated_min/max`, 검사 `fail_threshold_applied`, V5 CHECK 교체). 날짜별 집계 원칙 [합의 11/23 김도현]: 수동 전환(`AI_UNAVAILABLE`)은 작업자에게 배정된 REVIEW라 작업량에 포함하고 따로 표시 (예: REVIEW 3/4 · 수동 전환 1/1). AI의 REVIEW 비율 등 AI 성능 계산에서는 수동 전환을 제외. 원래 FAILED는 날짜표 검사 건수에서 빼되 장애 기록으로 남김. 수동 전환 검사는 새 REVIEW 검사가 생성된 KST 날짜에 귀속 | 김도현·홍승인·김남균 |
 | TBD-19 | 판정 확인 요청의 근거 사진, 재확인과의 집계 관계 | 제안 (11/23) | 1단계는 글(부위·사유)만 받고 사진 첨부는 다음 단계. "자동 통과 후 불량 확인" 집계는 `CORRECTED` 요청 기준 검사 ID당 1건으로 세고, 표본 재확인 FAIL은 재확인 요약(6.11)에 따로 표시해 같은 검사를 두 번 세지 않음. **AUTO_FAIL 표본 재확인은 이번에 추가하지 않음** [합의 11/23 김도현]. 확인 요청만으로는 발견된 사례만 기록되고 전체 정상 오판 건수·비율은 알 수 없으며, 요청 0건이 오판 0건을 뜻하지 않음 → 신규 자료 검증과 기본 꺼짐으로 대응. 기존 재확인 구조는 재사용할 수 있으나 대상 조건·DB 제약·API·화면 변경이 필요한 후속 확장. 보고서 문구: "자동 불량의 정상 오판은 작업자 확인 요청과 관리자 정정을 통해 확인된 사례만 집계한다. 전수 확인이나 표본 검증을 수행하지 않으므로, 이 집계로 전체 오판율을 추정할 수 없다. 자동 불량 표본 재확인은 후속 확장 대상으로 둔다." | 김도현·홍승인 |
+| TBD-20 | 기준 상세의 기준 라벨·실물 확인 결과 출처 | 제안 (11/23) | 서버에 라벨 저장 기능이 없어 이번에는 `reference: null`(자료 없음). 라벨 자료를 넣는 방식(파일 등록·검사 ID 매핑)은 김도현과 결정 | 김도현 |
 | — | Grad-CAM 0맵·상수맵 처리 | **해소** [합의 10/28] | `gradcamStatus = NO_ACTIVATION`, 이미지 없음, 분류·REVIEW 유지 (6.5, 7.2) | — |
 | — | `inferenceTimeMs` 측정 범위 | **해소** [합의 10/28] | AI handler 진입~응답 직렬화 직전, 모델 최초 로드 제외 (7.2) | — |
