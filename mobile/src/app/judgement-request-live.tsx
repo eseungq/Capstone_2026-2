@@ -1,0 +1,141 @@
+import React,{useCallback,useEffect,useRef,useState} from 'react';
+import {router,Stack,useLocalSearchParams} from 'expo-router';
+import {ActivityIndicator,Alert,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {authV4} from '../api/backendV4/authRuntime';
+import type {BackendRole} from '../api/backendV4/authCore';
+import {createInspectionReadServiceV4} from '../api/backendV4/inspectionReadService';
+import {createJudgementRequestServiceV4} from '../api/backendV4/judgementRequestServiceV4';
+import {currentJudgementV4,judgementRequestStatusLabelV4} from '../api/backendV4/judgementRequestCoreV4';
+import type {InspectionViewV4,FinalJudgementV4} from '../api/backendV4/types';
+const reader=createInspectionReadServiceV4({mode:'api',transport:authV4});
+const writer=createJudgementRequestServiceV4(authV4);
+const err=(e:unknown)=>e instanceof Error?e.message:'서버 요청 오류';
+
+export default function JudgementRequestLiveScreen(){
+  const {inspectionId}=useLocalSearchParams<{inspectionId?:string}>();
+  const id=typeof inspectionId==='string'?inspectionId:'';
+  const [role,setRole]=useState<BackendRole|null>(null);
+  const [loading,setLoading]=useState(true);
+  const [detail,setDetail]=useState<InspectionViewV4|null>(null);
+  const [error,setError]=useState<string|null>(null);
+  const [area,setArea]=useState('');
+  const [reason,setReason]=useState('');
+  const [claim,setClaim]=useState<FinalJudgementV4>('FAIL');
+  const [submitting,setSubmitting]=useState(false);
+  const [success,setSuccess]=useState<string|null>(null);
+  const submittingRef=useRef(false),serial=useRef(0),mounted=useRef(true);
+  const refresh=useCallback(async()=>{
+    const count=++serial.current;
+    setLoading(true);setError(null);
+    try{
+      const session=await authV4.restore();
+      if(!session.signedIn)throw new Error('서버 로그인이 필요합니다.');
+      const result=await reader.detail(id);
+      if(count!==serial.current||!mounted.current)return;
+      if(result.source!=='SERVER')throw new Error('실제 서버 검사 응답이 아닙니다.');
+      setRole(session.role);setDetail(result.value);
+      const current=currentJudgementV4(result.value.finalJudgement,result.value.correction);
+      if(current)setClaim(current==='PASS'?'FAIL':'PASS');
+    }catch(e){if(count===serial.current&&mounted.current){setError(err(e));setDetail(null);}}
+    finally{if(count===serial.current&&mounted.current)setLoading(false);}
+  },[id]);
+  useEffect(()=>{mounted.current=true;void refresh();return()=>{mounted.current=false;serial.current++};},[refresh]);
+  const available=role==='WORKER'&&detail?.judgedBy==='SYSTEM'&&detail.finalJudgement!==null&&
+    !detail.judgementRequests.some(x=>x.status==='OPEN');
+  const send=async()=>{
+    if(submittingRef.current||!detail||!available)return;
+    submittingRef.current=true;setSubmitting(true);setError(null);setSuccess(null);
+    try{
+      const session=await authV4.restore();
+      if(!session.signedIn||session.role!=='WORKER')throw new Error('WORKER 로그인 정보를 확인하세요.');
+      // 전송 전 서버 최신 판정·정정·OPEN 요청을 다시 조회하여 화면의 낡은 값으로 POST하지 않습니다.
+      const latest=(await reader.detail(id)).value;
+      if(latest.judgedBy!=='SYSTEM'||latest.finalJudgement!==detail.finalJudgement||
+        currentJudgementV4(latest.finalJudgement,latest.correction)!==
+        currentJudgementV4(detail.finalJudgement,detail.correction)||
+        latest.judgementRequests.some(x=>x.status==='OPEN')){
+        if(mounted.current)setDetail(latest);
+        throw new Error('검사 판정/요청 상태가 변경됐습니다. 최신 상세를 다시 검토해 주세요.');
+      }
+      const result=await writer.request(session.role,latest,claim,area,reason);
+      if(mounted.current){
+        setSuccess(`판정 확인 요청이 ${result.status==='OPEN'?'접수되었습니다.':'처리되었습니다.'} 관리자 검토를 기다려 주세요.`);
+        setDetail((await reader.detail(id)).value);
+        setArea('');setReason('');
+      }
+    }catch(e){if(mounted.current)setError(err(e));}
+    finally{submittingRef.current=false;if(mounted.current)setSubmitting(false);}
+  };
+  const confirm=()=>{
+    if(!available||submitting)return;
+    if(!reason.trim()){setError('확인 근거를 입력해 주세요.');return;}
+    Alert.alert('판정 확인 요청 제출',`${detail?.inspectionNo} · 현재 ${currentJudgementV4(detail?.finalJudgement??null,detail?.correction??null)} → 주장 ${claim}\n원본 시스템 판정은 변경되지 않으며 관리자 검토를 요청합니다.`,[
+      {text:'취소',style:'cancel'}, {text:'확인 요청',onPress:()=>{void send();}},
+    ]);
+  };
+  return <SafeAreaView style={s.root}>
+    <Stack.Screen options={{headerShown:false}}/>
+    <View style={s.top}>
+      <Pressable onPress={()=>router.back()}><Text style={s.link}>‹ 검사 상세로 돌아가기</Text></Pressable>
+      <Text style={s.title}>시스템 판정 확인 요청</Text>
+      <Text style={s.muted}>실물·추가 자료와 다른 시스템 판정이 의심될 때만 요청합니다. 최초 판정은 그대로 보존됩니다.</Text>
+    </View>
+    <ScrollView contentContainerStyle={s.body}>
+      {loading&&<ActivityIndicator/>}
+      {error&&<Text style={s.error}>{error}</Text>}
+      {!loading&&<Pressable style={s.outline} onPress={()=>{void refresh();}}><Text style={s.link}>최신 검사 다시 조회</Text></Pressable>}
+      {detail&&<View style={s.card}>
+        <Text style={s.strong}>{detail.inspectionNo} · {detail.partCode}</Text>
+        <Text style={s.muted}>최초 판정: {detail.finalJudgement??'미확정'} · {detail.judgedBy??'미제공'}</Text>
+        <Text style={s.muted}>현재 판정: {currentJudgementV4(detail.finalJudgement,detail.correction)??'미확정'}</Text>
+        {detail.correction&&<Text style={s.muted}>기존 정정: {detail.correction.correctedJudgement} · {detail.correction.correctedBy} ({detail.correction.note})</Text>}
+        {detail.judgementRequests.map(r=><View key={r.requestId} style={s.history}>
+          <Text style={s.strong}>{judgementRequestStatusLabelV4(r.status)} · 주장 {r.claimedJudgement}</Text>
+          <Text style={s.muted}>{r.requestedBy}: {r.reason}</Text>
+          {r.resolveNote&&<Text style={s.muted}>관리자 처리: {r.resolveNote}</Text>}
+        </View>)}
+        {role!=='WORKER'&&<Text style={s.error}>WORKER 계정에서만 요청할 수 있습니다.</Text>}
+        {role==='WORKER'&&detail.judgedBy!=='SYSTEM'&&<Text style={s.error}>시스템 판정 건이 아니므로 요청 대상이 아닙니다.</Text>}
+        {detail.judgementRequests.some(x=>x.status==='OPEN')&&
+          <Text style={s.error}>이미 처리 대기 중인 요청이 있습니다. 중복 요청은 할 수 없습니다.</Text>}
+      </View>}
+      {available&&<View style={s.card}>
+        <Text style={s.strong}>요청할 판정 (현재 판정과 달라야 함)</Text>
+        <View style={s.row}>
+          {(['PASS','FAIL'] as const).map(value=><Pressable key={value}
+            style={[s.choice,claim===value&&s.choiceOn]} onPress={()=>setClaim(value)}
+            accessibilityRole="button" accessibilityState={{selected:claim===value}}>
+            <Text style={[s.choiceText,claim===value&&s.choiceOnText]}>{value}</Text>
+          </Pressable>)}
+        </View>
+        <Text style={s.strong}>확인 부위 (선택, 최대 100자)</Text>
+        <TextInput value={area} onChangeText={setArea} maxLength={100}
+          placeholder="예: 고정핀" style={s.input}/>
+        <Text style={s.strong}>판정 확인 근거 (필수, 1~500자)</Text>
+        <TextInput value={reason} onChangeText={setReason} maxLength={500} multiline
+          placeholder="실물 관찰 근거를 구체적으로 작성하세요." style={[s.input,s.multi]}/>
+        <Text style={s.muted}>근거 사진 첨부는 이번 버전의 지원 범위 밖입니다.</Text>
+        <Pressable disabled={submitting} style={[s.submit,submitting&&s.disabled]} onPress={confirm}>
+          <Text style={s.submitText}>{submitting?'요청 제출 중…':'관리자 판정 확인 요청'}</Text>
+        </Pressable>
+      </View>}
+      {success&&<View style={s.card}><Text style={s.success}>{success}</Text></View>}
+    </ScrollView>
+  </SafeAreaView>;
+}
+const s=StyleSheet.create({
+  root:{flex:1,backgroundColor:'#F5F7FB'},top:{padding:18,gap:9},body:{paddingHorizontal:18,paddingBottom:28,gap:12},
+  title:{fontSize:22,fontWeight:'700',color:'#111827'},muted:{fontSize:12,lineHeight:19,color:'#64748B'},
+  link:{fontSize:13,fontWeight:'700',color:'#2054D8'},strong:{fontSize:13,fontWeight:'700',color:'#111827'},
+  card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:15,gap:12},
+  error:{color:'#B42318',fontSize:13,lineHeight:19},success:{color:'#067647',fontSize:13},
+  row:{flexDirection:'row',gap:8},choice:{flex:1,alignItems:'center',padding:13,borderWidth:1,
+    borderColor:'#CBD5E1',borderRadius:10},choiceOn:{backgroundColor:'#2054D8',borderColor:'#2054D8'},
+  choiceText:{color:'#334155',fontWeight:'700'},choiceOnText:{color:'#FFFFFF'},
+  input:{borderWidth:1,borderColor:'#CBD5E1',borderRadius:10,padding:12,color:'#111827',fontSize:13},
+  multi:{minHeight:110,textAlignVertical:'top'},history:{borderTopColor:'#E4E7EC',borderTopWidth:1,paddingTop:10,gap:5},
+  outline:{borderWidth:1,borderColor:'#2054D8',borderRadius:10,padding:11,alignItems:'center'},
+  submit:{backgroundColor:'#2054D8',padding:14,borderRadius:10,alignItems:'center'},
+  submitText:{fontSize:13,color:'#FFFFFF',fontWeight:'700'},disabled:{opacity:.5},
+});

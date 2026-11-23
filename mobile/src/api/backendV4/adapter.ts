@@ -1,3 +1,4 @@
+import {decodeJudgementCorrectionV4,decodeJudgementRequestListV4} from './judgementRequestCoreV4';
 import type {
   ApiV4DataEnvelope, DisplayStateV4, GradcamStatusV4,
   InspectionDetailV4, InspectionViewV4, ProcessingStatusV4, ReviewReasonV4,
@@ -201,6 +202,8 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
     judgement: j == null ? null : j as unknown as InspectionDetailV4['judgement'],
     images,
     error: e == null ? null : e as unknown as InspectionDetailV4['error'],
+    judgementRequests: decodeJudgementRequestListV4(d.judgementRequests),
+    correction: decodeJudgementCorrectionV4(d.correction),
   };
   return detail;
 }
@@ -237,6 +240,9 @@ export function mapInspectionDetailV4(detail: InspectionDetailV4): InspectionVie
     canOfferConfirm: detail.displayState === 'REVIEW_PENDING',
     canOfferRetry: detail.displayState === 'FAILED' && detail.error?.retryable === true && !detail.followUp,
     canOfferManual: detail.displayState === 'FAILED' && detail.error?.retryable === true && !detail.followUp,
+    judgementRequests: detail.judgementRequests ?? [],
+    correction: detail.correction ?? null,
+    correctedJudgement: detail.correction?.correctedJudgement ?? null,
     isServerAutoPass: detail.displayState === 'AUTO_PASS',
   };
 }

@@ -3,6 +3,7 @@
  * 이 타입은 실제 API 계약을 나타내며, src/data/mockInspections.ts의 시연 모델과 분리합니다.
  * 아직 서버 Swagger의 실제 JSON으로 검증하지 않았습니다.
  */
+import type {JudgementCorrectionV4,JudgementRequestV4} from './judgementRequestCoreV4';
 export type ProcessingStatusV4 = 'RECEIVED' | 'ANALYZING' | 'COMPLETED' | 'FAILED';
 export type DisplayStateV4 = 'ANALYZING' | 'AUTO_PASS' | 'REVIEW_PENDING' | 'REVIEW_DONE' | 'FAILED';
 export type PredictedQualityV4 = 'GOOD' | 'DEFECT';
@@ -73,6 +74,8 @@ export interface InspectionDetailV4 {
     urlExpiresAt: string | null;
   } | null;
   error: { code: string; message: string; retryable: boolean } | null;
+  judgementRequests?: JudgementRequestV4[];
+  correction?: JudgementCorrectionV4 | null;
 }
 
 export interface ApiV4DataEnvelope<T> { data: T }
@@ -112,5 +115,8 @@ export interface InspectionViewV4 {
   canOfferManual: boolean; // WORKER 권한·서버 충돌 검증이 별도로 필요
   canOfferConfirm: boolean; // 화면 표시 힌트. 서버 권한 검사를 대신하지 않음.
   canOfferRetry: boolean;   // 화면 표시 힌트. 서버 409 검사 필수.
+  judgementRequests: JudgementRequestV4[];
+  correction: JudgementCorrectionV4 | null;
+  correctedJudgement: FinalJudgementV4 | null;
   isServerAutoPass: boolean; // Mock AUTO_PASS_EXAMPLE과 혼동 금지
 }

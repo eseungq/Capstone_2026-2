@@ -47,6 +47,7 @@ export interface HistoryRowV4 {
   errorCode: string | null;
   thumbnailUrl: string | null;
   finalJudgement: FinalJudgementV4 | null;
+  correctedJudgement?: FinalJudgementV4 | null;
   judgedBy: 'SYSTEM' | 'WORKER' | null;
   confirmedAt: string | null;
 }
@@ -102,6 +103,7 @@ export function decodeHistoryRowV4(value: unknown): HistoryRowV4 {
   if (!optionalString(value.inspectionNo) || !optionalPrediction(value.predictedQuality) ||
       !optionalReason(value.reviewReason) || !optionalString(value.errorCode) ||
       !optionalUrl(value.thumbnailUrl) || !optionalJudgement(value.finalJudgement) ||
+      !optionalJudgement(value.correctedJudgement) ||
       (value.source != null && !inspectionSources.includes(value.source as InspectionSourceV4)) ||
       (value.judgedBy != null && value.judgedBy !== 'WORKER' && value.judgedBy !== 'SYSTEM') ||
       (value.confirmedAt != null && !validIso(value.confirmedAt))) {
@@ -116,6 +118,7 @@ export function decodeHistoryRowV4(value: unknown): HistoryRowV4 {
     errorCode: nullableField(value.errorCode as string | null | undefined),
     thumbnailUrl: nullableField(value.thumbnailUrl as string | null | undefined),
     finalJudgement: nullableField(value.finalJudgement as FinalJudgementV4 | null | undefined),
+    correctedJudgement: nullableField(value.correctedJudgement as FinalJudgementV4 | null | undefined),
     judgedBy: nullableField(value.judgedBy as 'WORKER' | 'SYSTEM' | null | undefined),
     confirmedAt: nullableField(value.confirmedAt as string | null | undefined),
   };

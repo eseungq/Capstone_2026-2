@@ -129,6 +129,16 @@ export default function SettingsScreen() {
           </Text>
         </Card>
 
+        {isAdmin && mode === 'live' && (
+          <Pressable style={[styles.button, styles.primary]}
+            accessibilityRole="button"
+            onPress={() => router.push('/judgement-requests-admin-live')}>
+            <Text style={[styles.buttonText, { color: color.white }]}>
+              판정 확인 요청 관리 · SERVER
+            </Text>
+          </Pressable>
+        )}
+
         {isAdmin && (
           <Pressable style={[styles.button, styles.primary]} 
 onPress={() => {

@@ -569,13 +569,52 @@ export default function InspectionLiveScreen() {
                   <Field label="REVIEW 사유" value={visibleDetail.reviewReasonText ?? '해당 없음'} />
                 </>
               )}
-              <Field label="최종 작업자 판정" value={visibleDetail.finalJudgement ?? '미확정'} />
+              <Field label="최초 판정" value={visibleDetail.finalJudgement ?? '미확정'} />
+              {visibleDetail.correction && (
+                <>
+                  <Field label="최종 정정 판정" value={visibleDetail.correction.correctedJudgement} />
+                  <Field label="관리자 정정자" value={visibleDetail.correction.correctedBy} />
+                  <Field label="정정 시각" value={formatTime(visibleDetail.correction.correctedAt)} />
+                  <Text style={styles.muted}>정정 근거: {visibleDetail.correction.note}</Text>
+                </>
+              )}
               <Field label="판정 주체" value={visibleDetail.judgedBy ?? '미제공'} />
               <Field label="판정 시각" value={formatTime(visibleDetail.confirmedAt)} />
               {visibleDetail.errorCode && <Field label="오류 코드" value={visibleDetail.errorCode} />}
               {visibleDetail.errorMessage && <Text style={styles.errorText}>{visibleDetail.errorMessage}</Text>}
             </View>
 
+            {visibleDetail.judgedBy === 'SYSTEM' && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>시스템 판정 확인 요청 · 정정 이력</Text>
+                <Text style={styles.muted}>
+                  최초 시스템 판정은 변경하지 않고, 확인 요청과 관리자 정정을 별도로 기록합니다.
+                </Text>
+                <Field label="현재 판정" value={visibleDetail.correctedJudgement ?? visibleDetail.finalJudgement ?? '미제공'} />
+                {visibleDetail.judgementRequests.length === 0 ? (
+                  <Text style={styles.muted}>판정 확인 요청 기록이 없습니다.</Text>
+                ) : visibleDetail.judgementRequests.map(request => (
+                  <View key={request.requestId} style={styles.field}>
+                    <Text style={styles.muted}>
+                      {request.status === 'OPEN' ? '검토 대기' : request.status === 'KEPT' ? '유지 처리' : '정정 완료'}
+                      {' · '}작업자 주장 {request.claimedJudgement}
+                    </Text>
+                    <Text style={styles.muted}>근거: {request.reason}</Text>
+                    {request.resolveNote && <Text style={styles.muted}>관리자 판단: {request.resolveNote}</Text>}
+                  </View>
+                ))}
+                {!roleLoading && role === 'WORKER' && !visibleDetail.judgementRequests.some(r => r.status === 'OPEN') && (
+                  <Pressable style={({pressed}) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed]}
+                    accessibilityRole="button"
+                    onPress={() => router.push({
+                      pathname: '/judgement-request-live',
+                      params: { inspectionId: visibleDetail.inspectionId },
+                    })}>
+                    <Text style={styles.secondaryButtonText}>시스템 판정 확인 요청 ›</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>작업자 판정 · 후속 처리</Text>
               <Text style={styles.muted}>요청 전 내용을 확인해 주세요. 중복 제출은 하지 않습니다.</Text>
