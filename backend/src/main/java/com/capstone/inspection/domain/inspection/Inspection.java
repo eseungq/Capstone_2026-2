@@ -93,7 +93,7 @@ public class Inspection {
 
     private Double passThresholdApplied;         // 판정 당시 기준치 스냅숏
 
-    private Double failThresholdApplied;         // 판정 당시 자동 불량 기준 스냅숏 (V13, 자동 불량이 꺼져 있었으면 null)
+    private Double failThresholdApplied;         // 판정 당시 자동 불량 기준 스냅숏 (V14, 자동 불량이 꺼져 있었으면 null)
 
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
