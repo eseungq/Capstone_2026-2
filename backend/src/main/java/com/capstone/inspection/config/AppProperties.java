@@ -79,7 +79,8 @@ public record AppProperties(Upload upload, Ai ai, Storage storage, Auth auth, In
     }
 
     // Expo 푸시 발송 (계약 8장). enabled=false면 로그만 남김
-    public record Push(boolean enabled, String expoUrl, int connectTimeoutMs, int readTimeoutMs) {
+    //   autoFailed: AUTO_FAILED 원격 푸시. 이번 시연은 앱 5초 폴링 내부 알림이라 기본 false (계약 8.2, 김도현·홍승인 11/23)
+    public record Push(boolean enabled, boolean autoFailed, String expoUrl, int connectTimeoutMs, int readTimeoutMs) {
     }
 
     // AUTO_PASS 표본 재확인 (계약 6.11, TBD-16). 구간은 보정 확률 ÷ 적용 기준치 r로 나눔

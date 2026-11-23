@@ -21,13 +21,17 @@ public class InspectionNotifier {
 
     private static final Logger log = LoggerFactory.getLogger(InspectionNotifier.class);
 
+    private static final String AUTO_FAILED = "AUTO_FAILED";
+
     private final boolean pushEnabled;
+    private final boolean autoFailedPush;
     private final PushService pushService;
     private final ThreadPoolTaskExecutor executor;
 
     public InspectionNotifier(AppProperties props, PushService pushService,
                               @Qualifier(AsyncConfig.PUSH_EXECUTOR) ThreadPoolTaskExecutor executor) {
         this.pushEnabled = props.push().enabled();
+        this.autoFailedPush = props.push().autoFailed();
         this.pushService = pushService;
         this.executor = executor;
     }
@@ -37,7 +41,7 @@ public class InspectionNotifier {
         if (notice == null) {
             return;
         }
-        if (!pushEnabled) {
+        if (!sendsRemotely(notice.type(), pushEnabled, autoFailedPush)) {
             log.info("[알림 로그] {} {} {} {}", notice.type(), notice.inspectionNo(), notice.partCode(),
                     notice.inspectionId());
             return;
@@ -55,6 +59,11 @@ public class InspectionNotifier {
         }
     }
 
+    // 원격 푸시 여부. AUTO_FAILED는 이벤트 정의만 두고 기본은 보내지 않음 (앱이 폴링으로 표시, 계약 8.2)
+    static boolean sendsRemotely(String type, boolean pushEnabled, boolean autoFailedPush) {
+        return pushEnabled && (autoFailedPush || !AUTO_FAILED.equals(type));
+    }
+
     // 알림 대상이 아니면 null
     static PushService.Notice noticeFor(AnalysisResultWriter.Outcome outcome) {
         if (outcome == null) {
@@ -68,7 +77,7 @@ public class InspectionNotifier {
         }
         // 자동 불량은 재판정 없이 발생 사실만 알림. 오판이 의심되면 판정 확인 요청(6.12) [제안 11/23 김도현]
         if (outcome.action() == RecommendedAction.AUTO_FAIL) {
-            return notice("AUTO_FAILED", outcome, "자동 불량", "자동 불량으로 판정됐습니다.");
+            return notice(AUTO_FAILED, outcome, "자동 불량", "자동 불량으로 판정됐습니다.");
         }
         return null; // AUTO_PASS는 발송 안 함
     }

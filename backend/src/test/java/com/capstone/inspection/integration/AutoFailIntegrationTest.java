@@ -92,6 +92,10 @@ class AutoFailIntegrationTest extends IntegrationTestBase {
         assertThat(detail.path("status").asText()).isEqualTo("COMPLETED");
         assertThat(detail.path("displayState").asText()).isEqualTo("AUTO_FAIL");
         assertThat(detail.at("/policy/recommendedAction").asText()).isEqualTo("AUTO_FAIL");
+        // 앱 내부 알림(5초 폴링)은 이력 API로 AUTO_FAIL만 받아 새 inspectionId를 찾음 (계약 8.2)
+        var history = json(call(get("/api/v1/inspections").param("displayState", "AUTO_FAIL").param("size", "100"), worker()));
+        assertThat(history.at("/data/items").findValuesAsText("inspectionId")).contains(id);
+        assertThat(history.at("/data/items").findValuesAsText("displayState")).containsOnly("AUTO_FAIL");
         assertThat(detail.at("/policy/reviewReason").isNull()).isTrue();
         assertThat(detail.at("/policy/policyVersion").asText()).isEqualTo(policy.path("policyVersion").asText());
         assertThat(detail.at("/policy/passThreshold").asDouble()).isEqualTo(0.03);
