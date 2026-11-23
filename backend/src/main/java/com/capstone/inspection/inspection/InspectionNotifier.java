@@ -12,7 +12,7 @@ import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
-// 알림 발송 지점 (계약 v4 8장). REVIEW → REVIEW_REQUIRED, FAILED → ANALYSIS_FAILED, AUTO_PASS는 발송 안 함
+// 알림 발송 지점 (계약 v4 8장). REVIEW → REVIEW_REQUIRED, FAILED → ANALYSIS_FAILED, AUTO_PASS·AUTO_FAIL은 발송 안 함
 // 결과 저장 커밋 후 호출됨. 발송은 전용 스레드에서 해서 분석 스레드를 잡지 않고, 실패해도 분석 결과에 영향 없음
 @Component
 public class InspectionNotifier {
@@ -61,7 +61,7 @@ public class InspectionNotifier {
         if (outcome.status() == InspectionStatus.FAILED) {
             return notice("ANALYSIS_FAILED", outcome, "분석 실패", "다시 검사가 필요합니다.");
         }
-        if (outcome.status() == InspectionStatus.COMPLETED && outcome.reviewRequired()) {
+        if (outcome.reviewRequired()) { // AUTO_PASS·AUTO_FAIL은 발송 안 함 (계약 8.2)
             return notice("REVIEW_REQUIRED", outcome, "확인 필요", "작업자 확인이 필요합니다.");
         }
         return null;

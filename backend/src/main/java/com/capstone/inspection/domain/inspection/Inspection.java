@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 // 검사 1건. AI 예측, 정책 적용 결과, 최종 판정을 함께 보관 (작업자 확인 기록은 WorkerConfirmation에 분리)
-// 상태 전이: RECEIVED → ANALYZING → COMPLETED(AUTO_PASS·REVIEW) 또는 FAILED (계약 v4 3장)
+// 상태 전이: RECEIVED → ANALYZING → COMPLETED(AUTO_PASS·AUTO_FAIL·REVIEW) 또는 FAILED (계약 v4 3장)
 @Entity
 @Table(name = "inspection")
 @Getter
@@ -93,9 +93,11 @@ public class Inspection {
 
     private Double passThresholdApplied;         // 판정 당시 기준치 스냅숏
 
+    private Double failThresholdApplied;         // 판정 당시 자동 불량 기준 스냅숏 (V13, 자동 불량이 꺼져 있었으면 null)
+
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
-    private Judgement finalJudgement;            // AUTO_PASS면 PASS, REVIEW는 작업자 확인 후
+    private Judgement finalJudgement;            // AUTO_PASS면 PASS, AUTO_FAIL이면 FAIL, REVIEW는 작업자 확인 후
 
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
@@ -193,18 +195,23 @@ public class Inspection {
         this.aiResponseJson = aiResponseJson;
     }
 
-    // 정책 적용 결과로 COMPLETED 확정. AUTO_PASS면 최종 PASS(SYSTEM)까지 기록
+    // 정책 적용 결과로 COMPLETED 확정. AUTO_PASS면 최종 PASS(SYSTEM), AUTO_FAIL이면 최종 FAIL(SYSTEM)까지 기록
+    // AUTO_FAIL도 작업자 확인 기록은 만들지 않음 (계약 3.2)
     public void complete(RecommendedAction action, ReviewReason reviewReason, AutomationPolicy policy,
-                         Double passThresholdApplied, GradcamStatus gradcamStatus) {
+                         Double passThresholdApplied, Double failThresholdApplied, GradcamStatus gradcamStatus) {
         this.status = InspectionStatus.COMPLETED;
         this.recommendedAction = action;
         this.reviewReason = action == RecommendedAction.REVIEW ? reviewReason : null;
         this.policy = policy;
         this.automationPolicyReady = policy != null;
         this.passThresholdApplied = passThresholdApplied;
+        this.failThresholdApplied = failThresholdApplied;
         this.gradcamStatus = gradcamStatus;
         if (action == RecommendedAction.AUTO_PASS) {
             this.finalJudgement = Judgement.PASS;
+            this.judgedBy = JudgedBy.SYSTEM;
+        } else if (action == RecommendedAction.AUTO_FAIL) {
+            this.finalJudgement = Judgement.FAIL;
             this.judgedBy = JudgedBy.SYSTEM;
         }
         this.completedAt = LocalDateTime.now();

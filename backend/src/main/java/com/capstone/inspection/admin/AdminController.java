@@ -1,5 +1,7 @@
 package com.capstone.inspection.admin;
 
+import com.capstone.inspection.admin.dto.AutoFailRequest;
+import com.capstone.inspection.admin.dto.FailThresholdRequest;
 import com.capstone.inspection.admin.dto.ModelResponse;
 import com.capstone.inspection.admin.dto.PolicyCreateRequest;
 import com.capstone.inspection.admin.dto.PolicyResponse;
@@ -34,7 +36,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 // ADMIN만 호출 가능 (SecurityConfig)
-@Tag(name = "관리자", description = "모델 조회, 자동 통과 정책 등록·조정·적용·중지, 검사 기록 CSV, 계정 잠금 해제")
+@Tag(name = "관리자", description = "모델 조회, 자동 통과·자동 불량 정책 등록·조정·적용·중지, 검사 기록 CSV, 계정 잠금 해제")
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
@@ -71,6 +73,25 @@ public class AdminController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<PolicyResponse> threshold(@PathVariable String id, @Valid @RequestBody ThresholdRequest request) {
         return ApiResponse.of(policyService.adjustThreshold(id, request.passThreshold()));
+    }
+
+    @Operation(summary = "불량 기준 등록·조정", description = "자동 불량 기준과 검증 범위(0~1, 소수 6자리). "
+            + "범위 밖이면 400 POLICY_THRESHOLD_OUT_OF_RANGE, 통과 기준 이하·min>max면 400 INVALID_PARAMETER. "
+            + "기존 정책은 그대로 두고 새 버전(-f번호, active=false)을 만듦")
+    @PostMapping("/policies/{id}/fail-threshold")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<PolicyResponse> failThreshold(@PathVariable String id,
+                                                     @Valid @RequestBody FailThresholdRequest request) {
+        return ApiResponse.of(policyService.adjustFailThreshold(id, request.failThreshold(),
+                request.failValidatedMin(), request.failValidatedMax()));
+    }
+
+    @Operation(summary = "자동 불량 켜고 끄기", description = "새 버전(-a번호, active=false)을 만들고 정책 적용으로 반영. "
+            + "불량 기준이 없는 정책을 켜면 409 AUTO_FAIL_NOT_CONFIGURED")
+    @PostMapping("/policies/{id}/auto-fail")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<PolicyResponse> autoFail(@PathVariable String id, @Valid @RequestBody AutoFailRequest request) {
+        return ApiResponse.of(policyService.setAutoFail(id, request.enabled()));
     }
 
     @Operation(summary = "정책 적용", description = "ready이고 모델이 active이며 보정기가 일치할 때만. 같은 모델의 다른 정책은 자동 중지")

@@ -109,6 +109,8 @@ public final class InspectionSpecs {
             case ANALYZING -> status.in(InspectionStatus.RECEIVED, InspectionStatus.ANALYZING);
             case AUTO_PASS -> cb.and(cb.equal(status, InspectionStatus.COMPLETED),
                     cb.equal(action, RecommendedAction.AUTO_PASS));
+            case AUTO_FAIL -> cb.and(cb.equal(status, InspectionStatus.COMPLETED),
+                    cb.equal(action, RecommendedAction.AUTO_FAIL));
             case REVIEW_PENDING -> cb.and(cb.equal(status, InspectionStatus.COMPLETED),
                     cb.equal(action, RecommendedAction.REVIEW), cb.isNull(judgement));
             case REVIEW_DONE -> cb.and(cb.equal(status, InspectionStatus.COMPLETED),

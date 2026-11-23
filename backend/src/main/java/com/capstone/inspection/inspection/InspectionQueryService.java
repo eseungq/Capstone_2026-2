@@ -69,7 +69,7 @@ public class InspectionQueryService {
                 i.getRawDefectProbability(), i.getCalibratedDefectProbability(), i.getInferenceTimeMs()) : null;
         Policy policy = completed ? new Policy(i.isAutomationPolicyReady(),
                 i.getPolicy() != null ? i.getPolicy().getPolicyVersion() : null, i.getPassThresholdApplied(),
-                i.getRecommendedAction(), i.getReviewReason()) : null;
+                i.getFailThresholdApplied(), i.getRecommendedAction(), i.getReviewReason()) : null;
 
         WorkerConfirmation confirmation = confirmationRepository.findByInspectionIdWithWorker(i.getId()).orElse(null);
         JudgementBlock judgement = new JudgementBlock(i.getFinalJudgement(), i.getJudgedBy(),
