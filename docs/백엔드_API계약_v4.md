@@ -502,8 +502,9 @@ REVIEW 정렬·필터 [제안 11/23, 김도현 시안]: 기존 호출은 그대�
 | `CONFLICT` | 이미 PASS로 확정됨. 덮어쓰지 않음 | `409 ALREADY_CONFIRMED` |
 | `NOT_REVIEWABLE` | REVIEW 대기가 아님 (AUTO_PASS·FAILED·분석 중) | `409 NOT_REVIEWABLE` |
 | `NOT_FOUND` | 없는 검사 | `404 INSPECTION_NOT_FOUND` |
+| `ERROR` | 그 건 처리 중 예상 못 한 서버 오류(DB·잠금 등). 그 건만 롤백하고 나머지는 계속 처리, `errorCode = INTERNAL_SERVER_ERROR` [구현 11/23] | `500` |
 
-- 실패 결과(`CONFLICT`·`NOT_REVIEWABLE`·`NOT_FOUND`)는 `finalJudgement` 등 현재 값만 있으면 채우고 `errorCode`에 6.7과 같은 코드를 넣음
+- 성공 결과의 `errorCode`는 null [구현 11/23]. 실패 결과(`CONFLICT`·`NOT_REVIEWABLE`·`NOT_FOUND`·`ERROR`)는 `finalJudgement` 등 현재 값만 있으면 채우고 `errorCode`에 6.7과 같은 코드를 넣음
 - 같은 검사가 다른 요청과 동시에 들어와도 판정은 1건만 저장 (6.7 규칙 그대로)
 - `batchId`: 이 요청으로 저장된 판정 묶음. 일괄로 저장된 판정에는 같은 값이 남아 나중에 "일괄로 확정한 건"을 구분할 수 있음 (저장: `worker_confirmation.batch_id`, NULL이면 단건, 김남균 협의). 응답을 못 받은 재전송은 새 `batchId`가 생기지만 이미 저장된 건은 `ALREADY_CONFIRMED`라 판정이 두 번 기록되지 않음
 - 권한: WORKER만 (`403 ACCESS_DENIED`). 앱은 제출 전 선택한 검사번호 목록을 보여 주고, 응답의 건별 결과를 표시
