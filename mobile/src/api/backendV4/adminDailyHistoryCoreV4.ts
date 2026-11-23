@@ -133,7 +133,7 @@ function band(raw:unknown,name:string):DailyBandV4|null{
    if(ids.has(row.inspectionId))return bad(name+'에 동일 검사 ID가 중복됩니다.');
    ids.add(row.inspectionId);
    const prob=row.calibratedDefectProbability;
-   if(prob==null||prob<raw.from||prob>raw.to||prob<prior)
+   if(prob==null||prob<(raw.from as number)||prob>(raw.to as number)||prob<prior)
      return bad(name+' 검사의 보정 확률이 범위를 벗어나거나 순서가 올바르지 않습니다.');
    prior=prob;
    return {inspectionId:row.inspectionId,inspectionNo:row.inspectionNo,
@@ -161,7 +161,7 @@ export function decodeDailyDetailV4(raw:unknown,expected:{
  if(raw.passThreshold==null&&passBand!==null)
    return bad('통과 기준이 없는 정책인데 통과 기준 주변 구간이 반환됐습니다.');
  return {
-   date:raw.date,partCode:raw.partCode,policyId:raw.policyId,
+   date:raw.date,partCode:raw.partCode as AutomationDailyPartV4,policyId:raw.policyId,
    policyVersion:raw.policyVersion,
    modelVersion:(raw.modelVersion??null) as string|null,
    calibratorVersion:(raw.calibratorVersion??null) as string|null,
