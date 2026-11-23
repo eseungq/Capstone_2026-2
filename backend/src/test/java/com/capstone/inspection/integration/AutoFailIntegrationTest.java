@@ -82,7 +82,7 @@ class AutoFailIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("자동 불량 켠 정책: DEFECT + 보정 ≥ 기준 → AUTO_FAIL·FAIL·SYSTEM, 작업자 확인·표본·알림 대상 아님")
+    @DisplayName("자동 불량 켠 정책: DEFECT + 보정 ≥ 기준 → AUTO_FAIL·FAIL·SYSTEM, 작업자 확인·표본 대상 아님")
     void autoFailEndToEnd() throws Exception {
         JsonNode policy = activeAutoFailPolicy();
         ai = r -> response(r, "DEFECT", 0.95, 0.85);
