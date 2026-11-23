@@ -804,7 +804,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 - `claimedJudgement`: `PASS`·`FAIL` 중 **현재 판정(정정됐으면 정정 판정)과 다른 값**. 같으면 `400 INVALID_PARAMETER`
 - `reason` 필수 1~500자, `area` 선택 최대 100자. 근거 사진 첨부는 다음 단계 (TBD-19)
 - 응답 `201`: 요청 1건
-- 검사당 **처리 대기 요청은 1건**. 대기 중에 같은 작업자가 같은 `claimedJudgement`로 다시 보내면 기존 요청 `200`, 그 밖에는 `409 REQUEST_ALREADY_OPEN`. 처리된 뒤에는 새 요청 가능
+- 검사 순서: 판정 값(400) → 대기 요청(409) [구현 11/23]. 검사당 **처리 대기 요청은 1건**. 대기 중에 같은 작업자가 같은 `claimedJudgement`로 다시 보내면 기존 요청 `200`, 그 밖에는 `409 REQUEST_ALREADY_OPEN`. 처리된 뒤에는 새 요청 가능
 
 요청 1건 형식
 
@@ -829,7 +829,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 }
 ```
 
-- `originalJudgement`·`originalJudgedBy`: 검사의 최초 판정 (`judgement` 블록 값). `currentJudgement`: 요청 당시 현재 판정(앞선 정정이 있으면 그 값)
+- `originalJudgement`·`originalJudgedBy`: 검사의 최초 판정 (`judgement` 블록 값, `originalJudgedBy`는 저장하지 않고 검사에서 읽음). `currentJudgement`: 요청 당시 현재 판정(앞선 정정이 있으면 그 값)
 - `status`: `OPEN`(대기) · `KEPT`(현재 판정 유지) · `CORRECTED`(정정)
 
 **목록** `GET /admin/judgement-requests` (ADMIN)
@@ -843,7 +843,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 ```
 
 - `decision`: `KEEP`(유지) · `CORRECT`(요청한 판정으로 정정). `note` 필수 1~500자
-- 응답 `200`: 처리된 요청 1건 + 검사의 `correction` (6.5)
+- 응답 `200`: `{ request: 요청 1건, correction: 검사의 correction(6.5) 또는 null }` [구현 11/23]
 - 이미 처리된 요청에 같은 `decision`이면 처음 기록 그대로 `200`, 다른 `decision`이면 `409 REQUEST_ALREADY_RESOLVED`. 동시 처리는 1건만 저장
 - 정정해도 `inspection.final_judgement`·`judged_by`(최초 판정)는 바꾸지 않음. AUTO_PASS는 `PASS·SYSTEM`이라는 V5 CHECK와, 정책 실적을 최초 경로로 세는 규칙을 지키기 위함. 현재 판정 = 마지막 `CORRECTED` 요청의 판정, 없으면 최초 판정
 
