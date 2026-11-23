@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-// 자동 불량 AUTO_FAIL (계약 4.1·6.9, V13)
+// 자동 불량 AUTO_FAIL (계약 4.1·6.9, V13 정책·V14 검사)
 //   정책은 테스트마다 새로 등록해 쓰고, 적용 상태는 IntegrationTestBase가 예시 정책(example-door-p1)으로 되돌림
 //   재확인은 켜 둔 설정(RecheckConstraintIntegrationTest와 같은 값, 컨텍스트 공유)으로 AUTO_FAIL이 표본에 안 뽑히는지 확인
 @TestPropertySource(properties = {"app.recheck.enabled=true", "app.recheck.near-rate=1.0", "app.recheck.mid-rate=1.0", "app.recheck.low-rate=0"})
@@ -298,7 +298,7 @@ class AutoFailIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("V13 CHECK: AUTO_FAIL은 불량 기준 스냅숏 필수·보정 확률 ≥ 스냅숏, 정책은 켜면 기준 필수·불량 기준 > 통과 기준")
+    @DisplayName("V13·V14 CHECK: AUTO_FAIL은 불량 기준 스냅숏 필수·보정 확률 ≥ 스냅숏, 정책은 켜면 기준 필수·불량 기준 > 통과 기준")
     void dbChecks() throws Exception {
         activeAutoFailPolicy();
         ai = r -> response(r, "DEFECT", 0.95, 0.85);
