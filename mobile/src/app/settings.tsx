@@ -144,6 +144,15 @@ onPress={() => {
           </Pressable>
         )}
 
+{isAdmin && mode === 'live' && (
+  <Pressable style={[styles.button, styles.primary]} accessibilityRole="button"
+    onPress={() => router.push('/admin-daily-live')}>
+    <Text style={[styles.buttonText, {color: color.white}]}>
+      날짜별 자동 판정 통계 · SERVER
+    </Text>
+  </Pressable>
+)}
+
 {isAdmin && (
   <Pressable
     style={[styles.button, styles.secondary]}
