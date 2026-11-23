@@ -2,7 +2,12 @@ import { router } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { API_BASE_URL } from '../api/backendV4/authRuntime';
+import { API_BASE_URL, authV4 } from '../api/backendV4/authRuntime';
+import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
+import {
+  createReviewQueueBrowserV4, type ReviewQueueSortV4,
+  type ReviewQueueBrowseSnapshotV4,
+} from '../api/backendV4/reviewQueueBrowseCoreV4';
 import { liveMonitoringReaderV4 } from '../api/backendV4/monitoringLiveReaderV4';
 import { useMonitoringPollV4 } from '../api/backendV4/useMonitoringPollV4';
 import type { MonitorAlertV4 } from '../api/backendV4/monitoringPollCore';
@@ -11,6 +16,10 @@ import { monitoringThumbnailNeedsReloadV4, resolveMonitoringThumbnailUrlV4 } fro
 
 const MONITORED_PARTS = ['DOOR', 'FRAME', 'COWL_COVER'] as const;
 const INITIAL_VISIBLE_QUEUE_COUNT = 3;
+const reviewQueueReaderV4 = createInspectionReadServiceV4({ mode: 'api', transport: authV4 });
+function probabilityLabelV4(value: number | null | undefined): string {
+  return value == null ? '미제공' : `${(value * 100).toFixed(2)}%`;
+}
 type MonitoredPart = (typeof MONITORED_PARTS)[number];
 
 function statusLabel(displayState: string): string {
@@ -167,7 +176,27 @@ export default function MonitoringLiveDashboardV4({
 
   const [partCode, setPartCode] = useState<MonitoredPart>('DOOR');
   const [visibleQueueCount, setVisibleQueueCount] = useState(INITIAL_VISIBLE_QUEUE_COUNT);
+  const [queueSort, setQueueSort] = useState<ReviewQueueSortV4>('RECEIVED');
+  const [aiDefectOnly, setAiDefectOnly] = useState(false);
+  const queueBrowser = useMemo(() => createReviewQueueBrowserV4(reviewQueueReaderV4), []);
+  const [browse, setBrowse] = useState<ReviewQueueBrowseSnapshotV4>(() => queueBrowser.getSnapshot());
+  useEffect(() => queueBrowser.subscribe(setBrowse), [queueBrowser]);
+
+  // 선택한 정렬·필터만 별도 읽기 전용 조회. 기본 목록/알림 5초 폴링은 변경하지 않습니다.
+  const filteredMode = queueSort === 'PRIORITY' || aiDefectOnly;
+  useEffect(() => {
+    if (!filteredMode) { queueBrowser.clear(); return; }
+    queueBrowser.setFilters({ partCode, sort: queueSort, aiDefectOnly });
+    void queueBrowser.refresh();
+  }, [queueBrowser, partCode, queueSort, aiDefectOnly, filteredMode]);
+
   const vm = buildMonitoringViewModelV4(snapshot, partCode);
+  const matchingBrowse = browse.filters?.partCode === partCode &&
+    browse.filters.sort === queueSort && browse.filters.aiDefectOnly === aiDefectOnly;
+  const queueItems = filteredMode ? (matchingBrowse ? browse.items : []) : vm.queue;
+  const queueReady = filteredMode ? matchingBrowse && browse.loaded : vm.hasSuccessfulRead;
+  const queueLoading = filteredMode && (!matchingBrowse || browse.status === 'loading');
+  const queueError = filteredMode && matchingBrowse ? browse.error : null;
   const recent = vm.part?.recent[0] ?? null;
 
   const connectionLabel = !vm.hasSuccessfulRead
@@ -262,57 +291,136 @@ export default function MonitoringLiveDashboardV4({
 
       <View style={styles.card}>
         <Text style={styles.title}>처리 필요 검사 · {partCode}</Text>
-        {vm.queue.length === 0 ? (
+        <Text style={styles.description}>
+          기본 목록은 5초마다 갱신됩니다. 정렬·필터 목록은 선택 시 서버에서 조회하며 새로고침할 수 있습니다.
+        </Text>
+        <Text style={styles.filterLabel}>정렬</Text>
+        <View style={styles.filterControls}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: queueSort === 'RECEIVED' }}
+            style={[styles.filterButton, queueSort === 'RECEIVED' && styles.filterButtonActive]}
+            onPress={() => { setQueueSort('RECEIVED'); setVisibleQueueCount(INITIAL_VISIBLE_QUEUE_COUNT); }}
+          >
+            <Text style={[styles.filterButtonText, queueSort === 'RECEIVED' && styles.filterButtonTextActive]}>
+              접수순
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: queueSort === 'PRIORITY' }}
+            style={[styles.filterButton, queueSort === 'PRIORITY' && styles.filterButtonActive]}
+            onPress={() => { setQueueSort('PRIORITY'); setVisibleQueueCount(INITIAL_VISIBLE_QUEUE_COUNT); }}
+          >
+            <Text style={[styles.filterButtonText, queueSort === 'PRIORITY' && styles.filterButtonTextActive]}>
+              우선 검토
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: aiDefectOnly }}
+            style={[styles.filterButton, aiDefectOnly && styles.filterButtonActive]}
+            onPress={() => { setAiDefectOnly((prev) => !prev); setVisibleQueueCount(INITIAL_VISIBLE_QUEUE_COUNT); }}
+          >
+            <Text style={[styles.filterButtonText, aiDefectOnly && styles.filterButtonTextActive]}>
+              AI 불량 의심만
+            </Text>
+          </Pressable>
+        </View>
+        {queueSort === 'PRIORITY' && (
           <Text style={styles.description}>
-            {vm.hasSuccessfulRead ? '현재 처리할 검사가 없습니다.' : '검사 목록 조회 대기'}
+            GOOD 예측·자동 통과 기준 초과 REVIEW를 먼저, 나머지는 뒤에 표시합니다. 각 그룹은 오래된 순입니다.
           </Text>
-        ) : (
-          <>
-            {vm.queue.slice(0, visibleQueueCount).map((item) => (
-              <Pressable
-                key={item.inspectionId}
-                style={({ pressed }) => [styles.inspectionRow, pressed && styles.pressed]}
-                accessibilityRole="button"
-                accessibilityLabel={(item.inspectionNo ?? '검사번호 미제공') + ' 상세 보기'}
-                onPress={() => openInspection(item.inspectionId)}
-              >
-                <InspectionThumbnail inspectionId={item.inspectionId} url={item.thumbnailUrl} />
-                <View style={styles.rowInfo}>
-                  <Text style={styles.itemTitle}>{item.inspectionNo ?? '검사번호 미제공'}</Text>
-                  <Text style={styles.itemStatus}>{statusLabel(item.displayState)}</Text>
-                  <Text style={styles.description}>
-                    {item.reviewReason === 'AI_UNAVAILABLE'
-                      ? 'AI 분석 없이 작업자 판정'
-                      : item.displayState === 'FAILED'
-                        ? '실패 사유는 상세에서 확인'
-                        : 'AI 예측: ' + (item.predictedQuality ?? '미제공')}
-                  </Text>
-                  <Text style={styles.detailLink}>상세 보기 ›</Text>
-                </View>
-              </Pressable>
-            ))}
-            {vm.queue.length > visibleQueueCount && (
-              <Pressable
-                style={({ pressed }) => [styles.moreButton, pressed && styles.pressed]}
-                accessibilityRole="button"
-                onPress={() => setVisibleQueueCount((count) => count + 20)}
-              >
-                <Text style={styles.moreButtonText}>
-                  목록 더 보기 · 다음 {Math.min(20, vm.queue.length - visibleQueueCount)}건
-                </Text>
-              </Pressable>
-            )}
-            {visibleQueueCount > INITIAL_VISIBLE_QUEUE_COUNT && (
-              <Pressable
-                style={({ pressed }) => [styles.collapseButton, pressed && styles.pressed]}
-                accessibilityRole="button"
-                onPress={() => setVisibleQueueCount(INITIAL_VISIBLE_QUEUE_COUNT)}
-              >
-                <Text style={styles.collapseText}>처음 3건만 보기</Text>
-              </Pressable>
-            )}
-          </>
         )}
+        {aiDefectOnly && (
+          <Text style={styles.description}>
+            AI가 DEFECT로 예측한 REVIEW 검사만 조회합니다. 작업자 최종 불량 판정과는 다릅니다.
+          </Text>
+        )}
+        {filteredMode && (
+          <Pressable
+            accessibilityRole="button"
+            disabled={queueLoading}
+            style={[styles.refreshFilterButton, queueLoading && styles.disabled]}
+            onPress={() => { setVisibleQueueCount(INITIAL_VISIBLE_QUEUE_COUNT); void queueBrowser.refresh(); }}
+          >
+            <Text style={styles.refreshFilterText}>필터 목록 새로고침</Text>
+          </Pressable>
+        )}
+        {queueError && (
+          <Text style={styles.warning}>
+            정렬·필터 조회 실패: {queueError} · 서버 기능 적용 여부와 네트워크를 확인해 주세요.
+          </Text>
+        )}
+        {queueLoading && <Text style={styles.description}>정렬·필터 목록 조회 중...</Text>}
+        {!queueLoading && queueItems.length === 0 && (
+          <Text style={styles.description}>
+            {!queueReady ? '검사 목록 조회 대기' : '해당 조건의 처리 필요 검사가 없습니다.'}
+          </Text>
+        )}
+        {queueItems.slice(0, visibleQueueCount).map((item) => (
+          <Pressable
+            key={item.inspectionId}
+            style={({ pressed }) => [styles.inspectionRow, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel={(item.inspectionNo ?? '검사번호 미제공') + ' 상세 보기'}
+            onPress={() => openInspection(item.inspectionId)}
+          >
+            <InspectionThumbnail inspectionId={item.inspectionId} url={item.thumbnailUrl} />
+            <View style={styles.rowInfo}>
+              <Text style={styles.itemTitle}>{item.inspectionNo ?? '검사번호 미제공'}</Text>
+              <Text style={styles.itemStatus}>{statusLabel(item.displayState)}</Text>
+              <Text style={styles.description}>
+                {item.reviewReason === 'AI_UNAVAILABLE'
+                  ? 'AI 분석 없이 작업자 판정'
+                  : item.displayState === 'FAILED'
+                    ? '실패 사유는 상세에서 확인'
+                    : 'AI 예측: ' + (item.predictedQuality ?? '미제공')}
+              </Text>
+              {item.reviewReason === 'ABOVE_THRESHOLD' && (
+                <Text style={styles.priorityHint}>자동 통과 기준 초과 · REVIEW</Text>
+              )}
+              {item.displayState === 'REVIEW_PENDING' && (
+                <Text style={styles.description}>
+                  보정 불량 확률: {probabilityLabelV4(item.calibratedDefectProbability)}
+                  {' · '}적용된 통과 기준: {probabilityLabelV4(item.passThresholdApplied)}
+                </Text>
+              )}
+              <Text style={styles.detailLink}>상세 보기 ›</Text>
+            </View>
+          </Pressable>
+        ))}
+        {queueItems.length > visibleQueueCount && (
+          <Pressable
+            style={({ pressed }) => [styles.moreButton, pressed && styles.pressed]}
+            accessibilityRole="button"
+            onPress={() => setVisibleQueueCount((count) => count + 20)}
+          >
+            <Text style={styles.moreButtonText}>
+              목록 더 보기 · 다음 {Math.min(20, queueItems.length - visibleQueueCount)}건
+            </Text>
+          </Pressable>
+        )}
+        {filteredMode && matchingBrowse && browse.loaded && !queueLoading &&
+          queueItems.length <= visibleQueueCount && browse.nextCursor !== null && (
+          <Pressable
+            style={({ pressed }) => [styles.moreButton, pressed && styles.pressed]}
+            accessibilityRole="button"
+            onPress={() => { void queueBrowser.loadNext(); setVisibleQueueCount((count) => count + 20); }}
+          >
+            <Text style={styles.moreButtonText}>서버 다음 페이지 20건 불러오기</Text>
+          </Pressable>
+        )}
+        {visibleQueueCount > INITIAL_VISIBLE_QUEUE_COUNT && (
+          <Pressable
+            style={({ pressed }) => [styles.collapseButton, pressed && styles.pressed]}
+            accessibilityRole="button"
+            onPress={() => setVisibleQueueCount(INITIAL_VISIBLE_QUEUE_COUNT)}
+          >
+            <Text style={styles.collapseText}>처음 3건만 보기</Text>
+          </Pressable>
+        )}
+
       </View>
     </View>
   );
@@ -321,6 +429,18 @@ export default function MonitoringLiveDashboardV4({
 const styles = StyleSheet.create({
   container: { gap: 12, paddingBottom: 16 },
   card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 14, padding: 16, gap: 10 },
+  filterLabel: { color: '#334155', fontSize: 12, fontWeight: '700' },
+  filterControls: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  filterButton: { minHeight: 40, paddingHorizontal: 11, paddingVertical: 10, borderRadius: 9,
+    backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1' },
+  filterButtonActive: { backgroundColor: '#2054D8', borderColor: '#2054D8' },
+  filterButtonText: { color: '#475569', fontSize: 12, fontWeight: '700' },
+  filterButtonTextActive: { color: '#FFFFFF' },
+  refreshFilterButton: { alignSelf: 'flex-start', paddingHorizontal: 11, paddingVertical: 8,
+    borderWidth: 1, borderColor: '#2054D8', borderRadius: 9 },
+  refreshFilterText: { color: '#2054D8', fontSize: 12, fontWeight: '700' },
+  disabled: { opacity: 0.5 },
+  priorityHint: { color: '#A74B12', fontSize: 11, fontWeight: '600' },
   pressed: { opacity: 0.76 },
   headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   title: { fontSize: 17, fontWeight: '700', color: '#111827', flexShrink: 1 },
