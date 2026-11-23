@@ -177,7 +177,7 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 
 - 자동 통과(4장)는 지금처럼 정책 `active`로 켜고 끔. 자동 불량은 같은 정책 안에서 `autoFailEnabled`로 **따로** 켬. 가능한 조합은 둘 다 꺼짐(정책 중지)·자동 통과만·둘 다 켜짐. "자동 불량만"은 두지 않음 [제안] (쓰임이 없고 새 REVIEW 사유가 필요해짐)
 - 기본은 꺼짐: 기존 정책과 새로 등록한 정책 모두 `autoFailEnabled = false`, `failThreshold = null`. 과거 검사에 소급하지 않음
-- 판정 당시 `failThreshold`를 검사에 스냅숏으로 저장(`failThresholdApplied`). 자동 불량이 꺼져 있었으면 null. 정책을 바꿔도 과거 검사의 판정·기준은 그대로
+- 판정 당시 `failThreshold`를 검사에 스냅숏으로 저장(`failThresholdApplied`). 자동 불량을 켠 정책으로 판정한 건은 AUTO_PASS·REVIEW에도 남고(기준 상세 6.13에 씀), 꺼져 있었으면 null. 정책을 바꿔도 과거 검사의 판정·기준은 그대로
 - REVIEW 사유는 바뀌지 않음: 자동 불량 조건을 못 맞춘 DEFECT 예측은 `DEFECT_PREDICTED`
 - Grad-CAM은 지금처럼 DEFECT 예측이면 생성 (자동 불량 건도 근거 이미지로 표시). 판정에는 쓰지 않음
 - 자동 불량의 정상 오판은 판정 확인 요청(6.12)으로 확인된 건만 셈. 전체 오판율은 추정할 수 없음 (TBD-19)
@@ -569,6 +569,8 @@ REVIEW 정렬·필터 [제안 11/23, 김도현 시안]: 기존 호출은 그대�
   - **켜고 끄기** `POST /admin/policies/{id}/auto-fail` `{ enabled }` (ADMIN): 역시 새 버전(`-a번호`, `active = false`)을 만들고, 관리자가 activate하면 적용. `failThreshold`가 없는 정책을 켜면 `409 AUTO_FAIL_NOT_CONFIGURED`
   - 켜기 전 김도현 새 자료 검증 결과를 `metrics`에 남김 (예: `metrics.autoFail = { sampleCount, normalAutoFailed, note }`). 서버는 값 형식만 검사하고 판단은 하지 않음
   - 기준치 조정(`/threshold`)으로 만든 새 버전도 자동 불량 값(켜짐 여부·기준·검증 범위)을 이어받음
+  - 구현 세부 [구현 11/23]: `failThreshold`가 있으면 `failValidatedMin`·`failValidatedMax`도 필수(DB CHECK). `/threshold`로 새 `passThreshold`가 `failThreshold` 이상이 되면 `400 INVALID_PARAMETER`. 이미 같은 켜짐 상태여도 `/auto-fail`은 새 버전을 만듦
+  - 이름 [구현 11/23]: `-t`·`-f`·`-a` 모두 `basedOnPolicyId`를 끝까지 따라가 원본 이름에 `-<접미어><번호>`를 붙이고, 번호는 접미어마다 따로 셈 (예: `p` → `p-f1` → `p-a1` → `p-t1` → `p-f2`). 어느 버전에서 왔는지는 `basedOnPolicyId`로 확인
 - 위 숫자는 형식 예시일 뿐 실제 값이 아님. 실제 값과 범위는 AI 검증 후 제공 [확정]. 검증 전 시연용 정책은 `example-` 접두어 [승계]
 - **threshold 조정**: `{ "passThreshold": 0.030 }`. `validatedMin ≤ 값 ≤ validatedMax`가 아니면 `400 POLICY_THRESHOLD_OUT_OF_RANGE`. 통과하면 기존 정책을 수정하지 않고 **새 버전을 만들고** `active = false`로 시작 [제안]
 - **activate**: `ready = true`이고 활성 모델과 호환되는 정책만 가능, 아니면 `409 POLICY_NOT_READY` [승계]. 같은 부품·모델 버전의 다른 정책은 자동으로 비활성 (active 최대 1개) [승계]
