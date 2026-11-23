@@ -4,7 +4,7 @@
  * 아직 서버 Swagger의 실제 JSON으로 검증하지 않았습니다.
  */
 export type ProcessingStatusV4 = 'RECEIVED' | 'ANALYZING' | 'COMPLETED' | 'FAILED';
-export type DisplayStateV4 = 'ANALYZING' | 'AUTO_PASS' | 'REVIEW_PENDING' | 'REVIEW_DONE' | 'FAILED';
+export type DisplayStateV4 = 'ANALYZING' | 'AUTO_PASS' | 'AUTO_FAIL' | 'REVIEW_PENDING' | 'REVIEW_DONE' | 'FAILED';
 export type PredictedQualityV4 = 'GOOD' | 'DEFECT';
 export type FinalJudgementV4 = 'PASS' | 'FAIL';
 export type InspectionSourceV4 = 'DEVICE' | 'ADMIN' | 'RETRY' | 'MANUAL';
@@ -19,7 +19,7 @@ export interface InspectionFollowUpV4 {
   inspectionNo: string;
   source: 'RETRY' | 'MANUAL';
 }
-export type RecommendedActionV4 = 'AUTO_PASS' | 'REVIEW';
+export type RecommendedActionV4 = 'AUTO_PASS' | 'AUTO_FAIL' | 'REVIEW';
 export type JudgedByV4 = 'SYSTEM' | 'WORKER';
 export type ReviewReasonV4 =
   | 'DEFECT_PREDICTED' | 'NO_ACTIVE_POLICY'

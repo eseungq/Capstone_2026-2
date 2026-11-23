@@ -19,7 +19,7 @@ const nullableText = (v: unknown): v is string | null | undefined => v == null |
 const probability = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
 
 const processingStatuses = ['RECEIVED', 'ANALYZING', 'COMPLETED', 'FAILED'] as const;
-const displayStates = ['ANALYZING', 'AUTO_PASS', 'REVIEW_PENDING', 'REVIEW_DONE', 'FAILED'] as const;
+const displayStates = ['ANALYZING', 'AUTO_PASS', 'AUTO_FAIL', 'REVIEW_PENDING', 'REVIEW_DONE', 'FAILED'] as const;
 const reviewReasons = ['DEFECT_PREDICTED', 'NO_ACTIVE_POLICY', 'CALIBRATION_UNAVAILABLE', 'ABOVE_THRESHOLD', 'AI_UNAVAILABLE'] as const;
 const inspectionSources = ['DEVICE', 'ADMIN', 'RETRY', 'MANUAL'] as const;
 const inspectionUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -37,6 +37,7 @@ export const reviewReasonLabels: Record<ReviewReasonV4, string> = {
 export const stateLabels: Record<DisplayStateV4, string> = {
   ANALYZING: '분석 중',
   AUTO_PASS: '자동 통과',
+  AUTO_FAIL: '자동 불량',
   REVIEW_PENDING: '작업자 확인 대기',
   REVIEW_DONE: '작업자 판정 완료',
   FAILED: 'AI 분석 실패',
@@ -110,7 +111,7 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
   if (p != null && (!obj(p) || typeof p.automationPolicyReady !== 'boolean' ||
       !nullableText(p.policyVersion) ||
       (p.passThreshold != null && !probability(p.passThreshold)) ||
-      !oneOf(p.recommendedAction, ['AUTO_PASS', 'REVIEW', null] as const) ||
+      !oneOf(p.recommendedAction, ['AUTO_PASS', 'AUTO_FAIL', 'REVIEW', null] as const) ||
       !oneOf(p.reviewReason, [...reviewReasons, null] as const))) {
     throw new ContractV4Error('policy 블록 값이 유효하지 않습니다.');
   }
@@ -163,6 +164,9 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
   if (displayState === 'AUTO_PASS' && (status !== 'COMPLETED' || action !== 'AUTO_PASS' || final !== 'PASS' || by !== 'SYSTEM')) {
     throw new ContractV4Error('AUTO_PASS의 시스템 PASS 판정 조합이 잘못됐습니다.');
   }
+  if (displayState === 'AUTO_FAIL' && (status !== 'COMPLETED' || action !== 'AUTO_FAIL' || final !== 'FAIL' || by !== 'SYSTEM' || !obj(a) || a.predictedQuality !== 'DEFECT' || a.calibratedDefectProbability == null || !obj(p) || p.reviewReason != null)) {
+    throw new ContractV4Error('AUTO_FAIL의 시스템 FAIL 판정 조합이 잘못됐습니다.');
+  }
   if (displayState === 'REVIEW_PENDING' && (status !== 'COMPLETED' || action !== 'REVIEW' || final != null)) {
     throw new ContractV4Error('REVIEW_PENDING 판정 조합이 잘못됐습니다.');
   }
@@ -179,7 +183,7 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
        !['REVIEW_PENDING', 'REVIEW_DONE'].includes(displayState))) {
     throw new ContractV4Error('MANUAL 검사의 상태·AI 미사용·정책 사유가 계약과 다릅니다.');
   }
-  if (status === 'COMPLETED' && !['AUTO_PASS', 'REVIEW_PENDING', 'REVIEW_DONE'].includes(displayState)) {
+  if (status === 'COMPLETED' && !['AUTO_PASS', 'AUTO_FAIL', 'REVIEW_PENDING', 'REVIEW_DONE'].includes(displayState)) {
     throw new ContractV4Error('COMPLETED 상태에 유효한 displayState가 없습니다.');
   }
 

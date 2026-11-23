@@ -7,7 +7,7 @@ import { ContractV4Error } from './adapter';
 import type { DisplayStateV4, FinalJudgementV4, InspectionSourceV4, PredictedQualityV4, ReviewReasonV4 } from './types';
 
 export const INSPECTION_UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const displayStates: readonly DisplayStateV4[] = ['ANALYZING', 'AUTO_PASS', 'REVIEW_PENDING', 'REVIEW_DONE', 'FAILED'];
+const displayStates: readonly DisplayStateV4[] = ['ANALYZING', 'AUTO_PASS', 'AUTO_FAIL', 'REVIEW_PENDING', 'REVIEW_DONE', 'FAILED'];
 const reviewReasons: readonly ReviewReasonV4[] = ['DEFECT_PREDICTED', 'NO_ACTIVE_POLICY', 'CALIBRATION_UNAVAILABLE', 'ABOVE_THRESHOLD', 'AI_UNAVAILABLE'];
 const inspectionSources: readonly InspectionSourceV4[] = ['DEVICE', 'ADMIN', 'RETRY', 'MANUAL'];
 

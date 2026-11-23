@@ -19,6 +19,7 @@ function statusLabel(displayState: string): string {
     case 'REVIEW_PENDING': return '작업자 확인 필요';
     case 'REVIEW_DONE': return '판정 완료';
     case 'AUTO_PASS': return '자동 통과';
+    case 'AUTO_FAIL': return '자동 불량';
     case 'ANALYZING': return '분석 중';
     default: return '검사 상태 확인';
   }
