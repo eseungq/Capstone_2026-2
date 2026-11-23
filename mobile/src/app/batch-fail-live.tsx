@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { router, Stack } from 'expo-router';
 import {
-  ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet,
+  ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet,
   Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -47,6 +47,7 @@ export default function BatchFailLiveScreen() {
   const [reply, setReply] = useState<BatchFailReplyV4 | null>(null);
   const loadingRef = useRef(false);
   const requestId = useRef(0);
+  const detailRequestId = useRef(0);
   const mountedRef = useRef(true);
   const submitLock = useRef(false);
 
@@ -57,7 +58,7 @@ export default function BatchFailLiveScreen() {
       if (!cancelled) setRole(session.signedIn ? session.role : null);
     }).catch(() => { if (!cancelled) setRole(null); })
       .finally(() => { if (!cancelled) setAuthLoading(false); });
-    return () => { cancelled = true; mountedRef.current = false; requestId.current += 1; };
+    return () => { cancelled = true; mountedRef.current = false; requestId.current += 1; detailRequestId.current += 1; };
   }, []);
 
   const loadQueue = useCallback(async (append: boolean) => {
@@ -96,21 +97,32 @@ export default function BatchFailLiveScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, role]);
 
+  // 상세 검토는 별도 모달에 표시해 검사 목록의 현재 스크롤 위치를 보존합니다.
+  // 닫은 뒤 늦게 도착한 서버 응답이 모달을 다시 열지 않도록 요청 세대를 무효화합니다.
+  const closeDetail = () => {
+    detailRequestId.current += 1;
+    setPreview(null);
+    setPreviewError(null);
+    setReviewed(false);
+    setPreviewLoading(false);
+  };
+
   const openDetail = async (item: QueueItemV4) => {
     if (previewLoading || submitting) return;
+    const serial = ++detailRequestId.current;
     setPreview(null);
     setPreviewError(null);
     setReviewed(false);
     setPreviewLoading(true);
     try {
       const result = await reader.detail(item.inspectionId);
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || serial !== detailRequestId.current) return;
       if (result.source !== 'SERVER') throw new Error('실제 서버 검사 상세가 아닙니다.');
       setPreview(result.value);
     } catch(cause) {
-      if (mountedRef.current) setPreviewError(errorText(cause));
+      if (mountedRef.current && serial === detailRequestId.current) setPreviewError(errorText(cause));
     } finally {
-      if (mountedRef.current) setPreviewLoading(false);
+      if (mountedRef.current && serial === detailRequestId.current) setPreviewLoading(false);
     }
   };
 
@@ -123,8 +135,7 @@ export default function BatchFailLiveScreen() {
         if (old.length >= MAX_BATCH_FAIL_V4) return old;
         return [...old, item];
       });
-      setPreview(null);
-      setReviewed(false);
+      closeDetail();
     } catch(cause) { Alert.alert('선택 불가', errorText(cause)); }
   };
 
@@ -214,50 +225,6 @@ export default function BatchFailLiveScreen() {
               )}
             </View>
             <View style={s.card}>
-              <Text style={s.cardTitle}>검사 상세 검토</Text>
-              {previewLoading && <ActivityIndicator />}
-              {previewError && <Text style={s.error}>상세 조회 실패: {previewError}</Text>}
-              {!preview && !previewLoading && !previewError && (
-                <Text style={s.muted}>위 목록에서 '상세 검토'를 눌러 원본과 AI 정보를 먼저 확인하세요.</Text>
-              )}
-              {preview && (
-                <>
-                  <Text style={s.strong}>{preview.inspectionNo} · {preview.partCode}</Text>
-                  <Text style={s.muted}>상태: {preview.displayStateLabel}</Text>
-                  <Text style={s.muted}>AI 예측: {preview.prediction ?? '미제공'} · 보정 불량 확률 {percent(preview.calibratedDefectProbability)}</Text>
-                  <Text style={s.muted}>현재 판정: {preview.finalJudgement ?? '미판정'}</Text>
-                  <Text style={s.strong}>원본 사진</Text>
-                  {preview.originalImageUrl ? (
-                    <Image style={s.photo} resizeMode="contain" source={{uri:preview.originalImageUrl}} />
-                  ) : <Text style={s.error}>원본 사진을 제공받지 못해 일괄 선택할 수 없습니다.</Text>}
-                  <Text style={s.strong}>AI 판단 근거 이미지</Text>
-                  {preview.gradcamImageUrl ? (
-                    <Image style={s.photo} resizeMode="contain" source={{uri:preview.gradcamImageUrl}} />
-                  ) : <Text style={s.muted}>AI 판단 근거 이미지 없음 또는 제공 대상 아님</Text>}
-                  {preview.displayState === 'REVIEW_PENDING' && preview.originalImageUrl && (
-                    <>
-                      <Pressable accessibilityRole="checkbox"
-                        accessibilityState={{checked:reviewed}}
-                        style={s.line} onPress={()=>setReviewed(value=>!value)}>
-                        <Text style={s.strong}>{reviewed ? '☑' : '□'} 이 검사의 원본과 AI 결과를 직접 검토했습니다.</Text>
-                      </Pressable>
-                      <Pressable accessibilityRole="button" style={[s.action, !reviewed && s.disabled]}
-                        disabled={!reviewed || selected.length >= MAX_BATCH_FAIL_V4 ||
-                          selected.some(x=>x.inspectionId === preview.inspectionId)}
-                        onPress={addSelection}>
-                        <Text style={s.actionText}>
-                          {selected.some(x=>x.inspectionId === preview.inspectionId)
-                            ? '이미 선택한 검사' : '이 검사를 일괄 FAIL 대상에 추가'}
-                        </Text>
-                      </Pressable>
-                    </>
-                  )}
-                  {preview.displayState !== 'REVIEW_PENDING' &&
-                    <Text style={s.error}>현재 REVIEW 대기가 아니어서 선택할 수 없습니다.</Text>}
-                </>
-              )}
-            </View>
-            <View style={s.card}>
               <Text style={s.cardTitle}>선택 검사 · {selected.length}/{MAX_BATCH_FAIL_V4}건</Text>
               <Text style={s.muted}>제출 전 검사번호를 확인하세요. 이 목록의 검사만 한 번에 FAIL을 요청합니다.</Text>
               {selected.length === 0 && <Text style={s.muted}>선택된 검사가 없습니다.</Text>}
@@ -303,6 +270,69 @@ export default function BatchFailLiveScreen() {
           </>
         )}
       </ScrollView>
+      {/* 목록과 독립된 상세 검토 화면: 뒤로 가면 기존 목록 스크롤 위치 유지. */}
+      <Modal
+        visible={previewLoading || preview !== null || previewError !== null}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={closeDetail}
+      >
+        <SafeAreaView style={s.screen}>
+          <View style={s.modalHeading}>
+            <Pressable accessibilityRole="button" onPress={closeDetail}>
+              <Text style={s.back}>‹ 검사 목록으로 돌아가기</Text>
+            </Pressable>
+            <Text style={s.title}>검사 상세 검토</Text>
+            <Text style={s.muted}>원본 사진과 AI 판단 근거를 확인한 뒤에만 검사를 선택할 수 있습니다.</Text>
+          </View>
+          <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
+            <View style={s.card}>
+              <Text style={s.cardTitle}>검사 상세 검토</Text>
+              {previewLoading && <ActivityIndicator />}
+              {previewError && <Text style={s.error}>상세 조회 실패: {previewError}</Text>}
+              {!preview && !previewLoading && !previewError && (
+                <Text style={s.muted}>위 목록에서 '상세 검토'를 눌러 원본과 AI 정보를 먼저 확인하세요.</Text>
+              )}
+              {preview && (
+                <>
+                  <Text style={s.strong}>{preview.inspectionNo} · {preview.partCode}</Text>
+                  <Text style={s.muted}>상태: {preview.displayStateLabel}</Text>
+                  <Text style={s.muted}>AI 예측: {preview.prediction ?? '미제공'} · 보정 불량 확률 {percent(preview.calibratedDefectProbability)}</Text>
+                  <Text style={s.muted}>현재 판정: {preview.finalJudgement ?? '미판정'}</Text>
+                  <Text style={s.strong}>원본 사진</Text>
+                  {preview.originalImageUrl ? (
+                    <Image style={s.photo} resizeMode="contain" source={{uri:preview.originalImageUrl}} />
+                  ) : <Text style={s.error}>원본 사진을 제공받지 못해 일괄 선택할 수 없습니다.</Text>}
+                  <Text style={s.strong}>AI 판단 근거 이미지</Text>
+                  {preview.gradcamImageUrl ? (
+                    <Image style={s.photo} resizeMode="contain" source={{uri:preview.gradcamImageUrl}} />
+                  ) : <Text style={s.muted}>AI 판단 근거 이미지 없음 또는 제공 대상 아님</Text>}
+                  {preview.displayState === 'REVIEW_PENDING' && preview.originalImageUrl && (
+                    <>
+                      <Pressable accessibilityRole="checkbox"
+                        accessibilityState={{checked:reviewed}}
+                        style={s.line} onPress={()=>setReviewed(value=>!value)}>
+                        <Text style={s.strong}>{reviewed ? '☑' : '□'} 이 검사의 원본과 AI 결과를 직접 검토했습니다.</Text>
+                      </Pressable>
+                      <Pressable accessibilityRole="button" style={[s.action, !reviewed && s.disabled]}
+                        disabled={!reviewed || selected.length >= MAX_BATCH_FAIL_V4 ||
+                          selected.some(x=>x.inspectionId === preview.inspectionId)}
+                        onPress={addSelection}>
+                        <Text style={s.actionText}>
+                          {selected.some(x=>x.inspectionId === preview.inspectionId)
+                            ? '이미 선택한 검사' : '이 검사를 일괄 FAIL 대상에 추가'}
+                        </Text>
+                      </Pressable>
+                    </>
+                  )}
+                  {preview.displayState !== 'REVIEW_PENDING' &&
+                    <Text style={s.error}>현재 REVIEW 대기가 아니어서 선택할 수 없습니다.</Text>}
+                </>
+              )}
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -311,6 +341,7 @@ const s = StyleSheet.create({
   screen:{flex:1,backgroundColor:'#F5F7FB'},
   heading:{paddingHorizontal:18,paddingTop:10,paddingBottom:14,gap:7},
   back:{color:'#2054D8',fontSize:13,fontWeight:'700'},
+  modalHeading:{paddingHorizontal:18,paddingTop:12,paddingBottom:16,gap:9},
   title:{color:'#111827',fontSize:23,fontWeight:'700'},
   body:{paddingHorizontal:18,paddingBottom:30,gap:12},
   card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:14,gap:11},
