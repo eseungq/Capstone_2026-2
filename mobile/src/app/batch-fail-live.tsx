@@ -4,7 +4,7 @@ import {
   ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet,
   Text, TextInput, View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { authV4 } from '../api/backendV4/authRuntime';
 import type { BackendRole } from '../api/backendV4/authCore';
 import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
@@ -277,9 +277,12 @@ export default function BatchFailLiveScreen() {
         presentationStyle="fullScreen"
         onRequestClose={closeDetail}
       >
-        <SafeAreaView style={s.screen}>
+        {/* RN Modal은 별도의 네이티브 창이므로 모달 안에서 안전 영역을 다시 측정합니다. */}
+        <SafeAreaProvider>
+          <SafeAreaView style={s.screen} edges={['top', 'bottom', 'left', 'right']}>
           <View style={s.modalHeading}>
-            <Pressable accessibilityRole="button" onPress={closeDetail}>
+            <Pressable accessibilityRole="button" style={s.modalBackButton}
+              hitSlop={10} onPress={closeDetail}>
               <Text style={s.back}>‹ 검사 목록으로 돌아가기</Text>
             </Pressable>
             <Text style={s.title}>검사 상세 검토</Text>
@@ -331,7 +334,8 @@ export default function BatchFailLiveScreen() {
               )}
             </View>
           </ScrollView>
-        </SafeAreaView>
+          </SafeAreaView>
+        </SafeAreaProvider>
       </Modal>
     </SafeAreaView>
   );
@@ -342,6 +346,7 @@ const s = StyleSheet.create({
   heading:{paddingHorizontal:18,paddingTop:10,paddingBottom:14,gap:7},
   back:{color:'#2054D8',fontSize:13,fontWeight:'700'},
   modalHeading:{paddingHorizontal:18,paddingTop:12,paddingBottom:16,gap:9},
+  modalBackButton:{alignSelf:'flex-start',minHeight:44,justifyContent:'center',paddingVertical:7},
   title:{color:'#111827',fontSize:23,fontWeight:'700'},
   body:{paddingHorizontal:18,paddingBottom:30,gap:12},
   card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:14,gap:11},
