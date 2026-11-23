@@ -134,6 +134,10 @@ public class Inspection {
 
     private LocalDateTime completedAt;           // COMPLETED·FAILED 확정 시각
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recheck_rule_id")
+    private RecheckRuleSnapshot recheckRule;     // AUTO_PASS 판정 당시 표본 재확인 규칙 (V9, 기능이 꺼져 있었으면 null)
+
     // 접수: 원본 저장과 같은 트랜잭션에서 RECEIVED로 생성
     public Inspection(String inspectionNo, User user, InspectionSource source, Part part, InspectionItem item,
                       AiModel model, String lineCode, LocalDateTime capturedAt, String clientRequestId,
@@ -204,6 +208,13 @@ public class Inspection {
             this.judgedBy = JudgedBy.SYSTEM;
         }
         this.completedAt = LocalDateTime.now();
+    }
+
+    // AUTO_PASS 판정과 같은 트랜잭션에서 그때 적용 중인 재확인 규칙을 남김. 추출·재처리는 이 규칙으로 함 (계약 6.11)
+    public void applyRecheckRule(RecheckRuleSnapshot rule) {
+        if (recommendedAction == RecommendedAction.AUTO_PASS) {
+            this.recheckRule = rule;
+        }
     }
 
     // 분석 실패. recommendedAction·finalJudgement는 null 유지 (계약 3.2)

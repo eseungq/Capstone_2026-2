@@ -16,12 +16,16 @@ public record RecheckListItem(String inspectionId,
                               RecheckStratum stratum,
                               OffsetDateTime sampledAt,
                               Judgement result,
-                              OffsetDateTime recheckedAt) {
+                              OffsetDateTime recheckedAt,
+                              String acknowledgedBy,          // 관리자 확인함 (해결 완료 아님)
+                              OffsetDateTime acknowledgedAt) {
 
     public static RecheckListItem of(AutoPassRecheck r) {
         Inspection i = r.getInspection();
         return new RecheckListItem(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(),
                 Times.toOffset(i.getReceivedAt()), r.getStratum(), Times.toOffset(r.getSampledAt()), r.getResult(),
-                Times.toOffset(r.getRecheckedAt()));
+                Times.toOffset(r.getRecheckedAt()),
+                r.getAcknowledgedBy() == null ? null : r.getAcknowledgedBy().getLoginId(),
+                Times.toOffset(r.getAcknowledgedAt()));
     }
 }

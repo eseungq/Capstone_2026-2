@@ -1,6 +1,7 @@
 package com.capstone.inspection.inspection;
 
 import com.capstone.inspection.config.AppProperties;
+import com.capstone.inspection.domain.inspection.RecheckRule;
 import com.capstone.inspection.domain.inspection.RecheckStratum;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,7 +14,7 @@ import static org.assertj.core.api.Assertions.within;
 
 class RecheckRulesTest {
 
-    private static final AppProperties.Recheck CONFIG = new AppProperties.Recheck(true, 0.8, 0.4, 1.0, 0.3, 0.1);
+    private static final RecheckRule CONFIG = new RecheckRule(0.8, 0.4, 1.0, 0.3, 0.1);
 
     @Test
     @DisplayName("구간: 보정 확률 ÷ 기준치 0.8 이상 NEAR, 0.4 이상 MID, 나머지 LOW (경계 포함)")
@@ -31,7 +32,7 @@ class RecheckRulesTest {
     void rateBounds() {
         String id = UUID.randomUUID().toString();
         assertThat(RecheckRules.decide(id, 0.045, 0.05, CONFIG).sampled()).isTrue();
-        AppProperties.Recheck none = new AppProperties.Recheck(true, 0.8, 0.4, 0, 0, 0);
+        RecheckRule none = new RecheckRule(0.8, 0.4, 0, 0, 0);
         assertThat(RecheckRules.decide(id, 0.045, 0.05, none).sampled()).isFalse();
         assertThat(RecheckRules.draw(id)).isEqualTo(RecheckRules.draw(id)).isBetween(0.0, 1.0);
     }
@@ -39,13 +40,13 @@ class RecheckRulesTest {
     @Test
     @DisplayName("잘못된 설정은 생성 시 실패: 비율 1 초과·음수·0 근처, 구간 순서 뒤바뀜")
     void invalidConfig() {
-        assertThatThrownBy(() -> new AppProperties.Recheck(true, 0.8, 0.4, 1.5, 0.3, 0.1))
+        assertThatThrownBy(() -> new AppProperties.Recheck(true, 0.8, 0.4, 1.5, 0.3, 0.1, null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new AppProperties.Recheck(true, 0.8, 0.4, 1.0, -0.1, 0.1))
+        assertThatThrownBy(() -> new AppProperties.Recheck(true, 0.8, 0.4, 1.0, -0.1, 0.1, null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new AppProperties.Recheck(true, 0.8, 0.4, 1.0, 0.3, 1e-7))
+        assertThatThrownBy(() -> new AppProperties.Recheck(true, 0.8, 0.4, 1.0, 0.3, 1e-7, null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new AppProperties.Recheck(true, 0.4, 0.8, 1.0, 0.3, 0.1))
+        assertThatThrownBy(() -> new AppProperties.Recheck(true, 0.4, 0.8, 1.0, 0.3, 0.1, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -61,5 +62,16 @@ class RecheckRulesTest {
             sampled += d.sampled() ? 1 : 0;
         }
         assertThat(sampled / (double) n).isCloseTo(0.3, within(0.04));
+    }
+
+    @Test
+    @DisplayName("규칙 버전: 경계(MID·NEAR)와 비율(NEAR·MID·LOW)을 %로 고정 순서, 시험 이름은 공백이면 null")
+    void ruleVersion() {
+        assertThat(CONFIG.version()).isEqualTo("v1-b40-80-p100-30-10");
+        assertThat(new RecheckRule(0.8, 0.4, 0.5, 0.3, 0.1).version()).isEqualTo("v1-b40-80-p50-30-10");
+        assertThat(new RecheckRule(0.75, 0.4, 0.005, 0, 1).version()).isEqualTo("v1-b40-75-p0.5-0-100");
+        assertThat(new AppProperties.Recheck(true, 0.8, 0.4, 1.0, 0.3, 0.1, "  ").trialName()).isNull();
+        assertThat(new AppProperties.Recheck(true, 0.8, 0.4, 1.0, 0.3, 0.1, " 공동시험 1차 ").trialName())
+                .isEqualTo("공동시험 1차");
     }
 }

@@ -2,8 +2,10 @@ package com.capstone.inspection.admin;
 
 import com.capstone.inspection.admin.dto.PolicySimulationResponse;
 import com.capstone.inspection.common.error.BusinessException;
+import com.capstone.inspection.config.AppProperties;
 import com.capstone.inspection.common.error.ErrorCode;
 import com.capstone.inspection.domain.inspection.InspectionRepository;
+import com.capstone.inspection.domain.inspection.RecheckRule;
 import com.capstone.inspection.domain.model.AutomationPolicy;
 import com.capstone.inspection.domain.model.AutomationPolicyRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ public class PolicySimulationService {
 
     private final AutomationPolicyRepository policyRepository;
     private final InspectionRepository inspectionRepository;
+    private final AppProperties props;
 
     @Transactional(readOnly = true)
     public PolicySimulationResponse simulate(String policyId, double candidateThreshold, LocalDateTime from,
@@ -36,15 +39,18 @@ public class PolicySimulationService {
                     "기준치나 보정기 버전이 없는 정책은 비교할 수 없습니다.");
         }
         double candidate = PolicyRules.round6(candidateThreshold);
+        // 꺼져 있어도 켰을 때 기준으로 예상 재확인 건수를 냄. 설정 자체가 없으면 예상 0
+        RecheckRule recheckRule = props.recheck() != null ? props.recheck().rule() : RecheckRule.NONE;
         PolicySimulation.Result result = PolicySimulation.run(
                 inspectionRepository.findScored(policy.getModel().getId(), policy.getCalibratorVersion(), from, to),
-                policy.getPassThreshold(), candidate);
+                policy.getPassThreshold(), candidate, recheckRule);
         boolean withinRange = policy.getValidatedMin() != null && policy.getValidatedMax() != null
                 && candidate >= policy.getValidatedMin() && candidate <= policy.getValidatedMax();
         return new PolicySimulationResponse(policy.getId(), policy.getPolicyVersion(),
                 policy.getItem().getPart().getPartCode(), policy.getModel().getModelVersion(),
                 policy.getCalibratorVersion(), policy.getPassThreshold(), candidate, policy.getValidatedMin(),
-                policy.getValidatedMax(), withinRange, result.evaluatedCount(), result.defectPredictedCount(),
+                policy.getValidatedMax(), withinRange, recheckRule.version(), result.evaluatedCount(),
+                result.defectPredictedCount(),
                 result.current(), result.candidate(), result.change());
     }
 }

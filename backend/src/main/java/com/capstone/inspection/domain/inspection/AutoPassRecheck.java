@@ -2,6 +2,7 @@ package com.capstone.inspection.domain.inspection;
 
 import com.capstone.inspection.domain.user.User;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -48,6 +49,13 @@ public class AutoPassRecheck {
     @Column(nullable = false)
     private LocalDateTime sampledAt;    // 추출 결정 시각
 
+    // 결정할 때 쓴 규칙 (V9). V8로 기록된 행은 셋 다 null
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rule_id")
+    private RecheckRuleSnapshot rule;
+    private Double ratio;               // 보정 확률 ÷ 적용 기준치
+    private Double drawValue;           // 검사 ID로 정한 0~1 값. 비율이 이보다 크면 뽑힘
+
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
     private Judgement result;           // 재확인 전이면 null
@@ -61,12 +69,29 @@ public class AutoPassRecheck {
 
     private LocalDateTime recheckedAt;
 
-    public AutoPassRecheck(Inspection inspection, boolean sampled, RecheckStratum stratum, double samplingRate) {
+    @Embedded
+    private ScreenTiming screenTiming;  // 재확인 화면 체류 시간 (선택, V9)
+
+    // 관리자 확인함 (V9): 재확인 FAIL을 관리자가 봤다는 기록. 문제 해결 완료가 아님
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "acknowledged_by")
+    private User acknowledgedBy;
+
+    private LocalDateTime acknowledgedAt;
+
+    @Column(length = 200)
+    private String acknowledgeNote;
+
+    public AutoPassRecheck(Inspection inspection, boolean sampled, RecheckStratum stratum, double samplingRate,
+                           RecheckRuleSnapshot rule, double ratio, double drawValue) {
         this.id = UUID.randomUUID().toString();
         this.inspection = inspection;
         this.sampled = sampled;
         this.stratum = stratum;
         this.samplingRate = samplingRate;
         this.sampledAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
+        this.rule = rule;
+        this.ratio = ratio;
+        this.drawValue = drawValue;
     }
 }

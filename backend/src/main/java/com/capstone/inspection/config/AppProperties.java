@@ -1,5 +1,6 @@
 package com.capstone.inspection.config;
 
+import com.capstone.inspection.domain.inspection.RecheckRule;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.LinkedHashSet;
@@ -83,11 +84,16 @@ public record AppProperties(Upload upload, Ai ai, Storage storage, Auth auth, In
 
     // AUTO_PASS 표본 재확인 (계약 6.11, TBD-16). 구간은 보정 확률 ÷ 적용 기준치 r로 나눔
     //   r ≥ nearRatio → NEAR, r ≥ midRatio → MID, 나머지 LOW. 비율 0이면 그 구간은 뽑지 않음
+    //   trialName: 같은 설정으로 여러 번 시험할 때 회차 구분 (선택, 예: 공동시험 1차). 빈 값은 null
     public record Recheck(boolean enabled, double nearRatio, double midRatio, double nearRate, double midRate,
-                          double lowRate) {
+                          double lowRate, String trialName) {
 
         // 잘못된 값이면 기동 시 실패 (그대로 두면 DB CHECK 위반으로 표본이 조용히 안 뽑힘)
         public Recheck {
+            trialName = trialName == null || trialName.isBlank() ? null : trialName.trim();
+            if (trialName != null && trialName.length() > 60) {
+                throw new IllegalArgumentException("app.recheck.trial-name은 60자 이하여야 합니다.");
+            }
             if (!(0 <= midRatio && midRatio <= nearRatio && nearRatio <= 1)) {
                 throw new IllegalArgumentException("app.recheck: 0 ≤ mid-ratio ≤ near-ratio ≤ 1 이어야 합니다.");
             }
@@ -96,6 +102,16 @@ public record AppProperties(Upload upload, Ai ai, Storage storage, Auth auth, In
                     throw new IllegalArgumentException("app.recheck: 비율은 0 또는 0.000001~1 이어야 합니다.");
                 }
             }
+        }
+
+        // 결정 행에 남길 규칙 값 (계약 6.11). DB DECIMAL(7,6)에 맞춰 소수 6자리
+        public RecheckRule rule() {
+            return new RecheckRule(round6(nearRatio), round6(midRatio), round6(nearRate), round6(midRate),
+                    round6(lowRate));
+        }
+
+        private static double round6(double value) {
+            return Math.round(value * 1_000_000) / 1_000_000.0;
         }
     }
 }
