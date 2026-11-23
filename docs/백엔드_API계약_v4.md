@@ -1,6 +1,6 @@
 # 백엔드 API 계약 v4 (11/18 갱신 · 최종 확정 전)
 
-3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장) · 11/02 갱신 (구현 세부 반영: 6.1~6.4, 6.6~6.9, 7.4, 8장, 10장, 12장) · 11/04 갱신 (실제 AI 연결 확인: 7.3, 7.4, 12장 TBD-01) · 11/05 갱신 (통합 시험: 6.2 모델 확인 타임아웃, 8.4 앱 시험, 12장 TBD-01·14) · 11/09 갱신 (12장 TBD-01 실행 타임아웃 20초) · 11/10 갱신 (6.1·6.9 계정 잠금 해제, 9.1 통계, 10장 USER_NOT_FOUND, 12장 TBD-10·14) · 11/11 갱신 (6.3 recent inspectionNo, 12장 TBD-01 부품별 AI 서버, **수동 판정** 3장·4장·6.1·6.5·6.6·6.8·6.10·10장) · 11/17 갱신 (TBD-04 확정 `UNIFIED`: 7장·9장·12장) · 11/18 갱신 (6.1 검사 기록 CSV 내보내기, 6.6 `mismatch` 필터)
+3조 김이홍 · 백엔드 API 이승규 · 2026-10-15 작성 · 10/28 갱신 (AI 연동 준비·V5: 6.5, 7.2, 9장, 12장) · 11/02 갱신 (구현 세부 반영: 6.1~6.4, 6.6~6.9, 7.4, 8장, 10장, 12장) · 11/04 갱신 (실제 AI 연결 확인: 7.3, 7.4, 12장 TBD-01) · 11/05 갱신 (통합 시험: 6.2 모델 확인 타임아웃, 8.4 앱 시험, 12장 TBD-01·14) · 11/09 갱신 (12장 TBD-01 실행 타임아웃 20초) · 11/10 갱신 (6.1·6.9 계정 잠금 해제, 9.1 통계, 10장 USER_NOT_FOUND, 12장 TBD-10·14) · 11/11 갱신 (6.3 recent inspectionNo, 12장 TBD-01 부품별 AI 서버, **수동 판정** 3장·4장·6.1·6.5·6.6·6.8·6.10·10장) · 11/17 갱신 (TBD-04 확정 `UNIFIED`: 7장·9장·12장) · 11/18 갱신 (6.1 검사 기록 CSV 내보내기, 6.6 `mismatch` 필터) · 11/23 제안 (REVIEW 개선·판정 확인 요청: 6.1·6.4·6.5·6.6·6.7.1·6.12·10장·12장 TBD-18·19)
 
 - 기준 1: 「자동차부품_공정모니터링_개발계획서_최종합의반영」(10/14 합의본)
 - 기준 2: 「요구사항명세서_패치검사_개정본3」(9/30)의 규칙 중 합의본과 충돌하지 않는 것은 그대로 승계
@@ -201,6 +201,8 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 | GET | `/inspections` | 검사 이력 (필터·페이지) | WORKER, ADMIN |
 | GET | `/inspections/{id}` | 검사 상세 (원본·Grad-CAM 접근 정보 포함) | WORKER, ADMIN |
 | POST | `/inspections/{id}/confirm` | REVIEW 최종 판정 | **WORKER** |
+| POST | `/inspections/confirm-batch` | 선택한 REVIEW 건 일괄 FAIL (검사 ID별 결과) [제안 11/23] | **WORKER** |
+| POST | `/inspections/{id}/judgement-requests` | 시스템 판정 건 판정 확인 요청 [제안 11/23] | **WORKER** |
 | POST | `/inspections/{id}/retry` | FAILED 재검사 (새 검사 생성) | WORKER, ADMIN |
 | POST | `/inspections/{id}/manual` | FAILED를 AI 없이 작업자 판정으로 전환 (새 검사 생성) [구현 11/11] | **WORKER** |
 | GET | `/rechecks` | AUTO_PASS 표본 재확인 목록 (대기·완료, 결과·확인함 필터) [제안·구현 11/18] | WORKER, ADMIN |
@@ -215,6 +217,8 @@ REVIEW 사유 코드 `reviewReason` [확정 10/15]: 앱 상세 화면에서 "왜
 | POST | `/admin/policies/{id}/deactivate` | 적용 중지 | ADMIN |
 | GET | `/admin/policies/{id}/simulation` | 후보 기준치 비교 (같은 검사 기록에 현재·후보 기준치 대입, 조회만) [구현 11/18] | ADMIN |
 | POST | `/admin/rechecks/{inspectionId}/acknowledge` | 재확인 FAIL 건 관리자 확인함 (해결 완료 아님) [구현 11/18] | ADMIN |
+| GET | `/admin/judgement-requests` | 판정 확인 요청 목록 (대기·처리 완료) [제안 11/23] | ADMIN |
+| POST | `/admin/judgement-requests/{requestId}/resolve` | 판정 확인 요청 처리 (유지·정정) [제안 11/23] | ADMIN |
 | GET | `/admin/rechecks/summary` | 재확인 요약 (규칙별 구간 집계·누락·대기·비교 비율·대기 시간·체류 시간) [구현 11/18] | ADMIN |
 | POST | `/admin/users/{loginId}/unlock` | 계정 잠금 해제 [구현 11/10] | ADMIN |
 | GET | `/admin/inspections/export` | 검사 기록 CSV (이력과 같은 partCode·displayState·mismatch·from·to, 접수 시각 오름차순, 최대 10,000건, 엑셀용 UTF-8 BOM, 이미지·AI 원문 제외). 보고서용, 앱 미사용 [구현 11/18] | ADMIN |
@@ -355,6 +359,13 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - FAILED 건 중 이미 재검사한 건은 목록에서 제외 [제안]
 - 목록 항목 선택 → `GET /inspections/{id}`로 상세 이동 [확정]
 
+REVIEW 정렬·필터 [제안 11/23, 김도현 시안]: 기존 호출은 그대로 동작하고 아래는 선택 쿼리로만 추가
+- `sort=RECEIVED|PRIORITY` (기본 `RECEIVED` = 지금과 같은 오래된 순)
+  - `PRIORITY`: `predictedQuality = GOOD`이고 `reviewReason = ABOVE_THRESHOLD`인 REVIEW를 먼저, 나머지(DEFECT 예측·정책 없음·보정값 없음·수동 판정·FAILED)를 뒤에. 각 그룹 안에서는 오래된 순 유지
+  - 커서는 정렬마다 따로 만들어지며, 다른 `sort`의 커서를 주면 `400 INVALID_PARAMETER`. `RECEIVED` 커서 형식은 지금과 같음
+- `predictedQuality=GOOD|DEFECT`: AI 예측으로 거름 ("AI 불량 의심" = `type=REVIEW&predictedQuality=DEFECT`). 예측이 없는 FAILED·수동 판정은 이 필터를 주면 나오지 않음. 없는 값은 `400 INVALID_PARAMETER`
+- 항목에 `calibratedDefectProbability`, `passThresholdApplied` 추가 (없으면 null). 목록에서 기준 대비 위치를 보여 주기 위한 값이며 앱이 상태를 다시 계산하지 않음 [승계]
+
 ### 6.5 검사 상세 `GET /inspections/{id}`
 
 ```json
@@ -422,6 +433,8 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - `followUp` [구현 11/11]: FAILED 건에 재검사·수동 전환 검사가 이미 있으면 `{ inspectionId, inspectionNo, source }` (`RETRY`/`MANUAL`). 앱은 버튼을 숨기고 그 검사로 이동
 - 앱은 passThreshold를 해석해 상태를 바꾸지 않고 백엔드가 준 상태를 표시 [승계]
 - `recheck` [제안 11/18]: AUTO_PASS 표본 재확인(6.11)으로 뽑힌 건만 `{ stratum, samplingRate, ruleVersion, trialName, sampledAt, result, comment, recheckedBy, recheckedAt, acknowledgedBy, acknowledgedAt, acknowledgeNote }`, 아니면 null. 재확인 FAIL이어도 `judgement` 블록(시스템 PASS)은 그대로이므로 **두 블록을 함께** 표시. `acknowledgedAt`이 있으면 "확인함"(해결 완료 아님)
+- `judgementRequests` [제안 11/23]: 판정 확인 요청(6.12) 목록, 최신순. 없으면 `[]`. 항목 형식은 6.12 요청 1건과 같음
+- `correction` [제안 11/23]: 정정된 적이 있으면 마지막 정정 `{ requestId, correctedJudgement, correctedBy, correctedAt, note }`, 없으면 null. **`judgement` 블록(최초 판정)은 바뀌지 않으므로** 정정된 건은 "최초 판정 → 정정 판정"을 함께 표시
 
 ### 6.6 검사 이력 `GET /inspections`
 
@@ -431,6 +444,7 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - 작업자도 모든 검사를 조회 가능 [제안]. 합의본 표현은 "공통 업무 범위에서 조회"
 - receivedAt 최신순(같으면 id), 기간은 `from ≤ receivedAt < to`, `size` 최대 100, 없는 `partCode`는 `400 INVALID_PART_CODE` [구현 10/19]
 - `mismatch`: AI 예측과 작업자 판정이 엇갈린 `REVIEW_DONE` 건만. `ANY`(둘 다)·`DEFECT_PASSED`(AI DEFECT → 작업자 PASS)·`GOOD_FAILED`(AI GOOD → 작업자 FAIL). 수동 판정은 AI 예측이 없어 제외, AUTO_PASS는 사람이 보지 않아 대상 아님. 추가 검토·재학습 후보 선별용이며 전체 오류율이 아님. 없는 값은 `400 INVALID_PARAMETER`, 빈 값은 필터 없음. `REVIEW_DONE` 외의 `displayState`와 함께 주면 빈 결과 [구현 11/18]
+- 항목에 `correctedJudgement` 추가 [제안 11/23]: 정정된 건의 마지막 정정 판정, 없으면 null. `finalJudgement`·`judgedBy`는 최초 판정 그대로
 
 ### 6.7 작업자 확인 `POST /inspections/{id}/confirm`
 
@@ -446,6 +460,53 @@ Idempotency-Key 재전송 처리 (비동기에 맞춰 조정)
 - `comment`는 선택, 최대 200자 [제안]
 - 재전송 비교는 `finalJudgement`만 (comment는 비교하지 않음), 공백 comment는 null로 저장 [구현 10/19]
 - `screenDwellMs`·`firstOpenedAt`·`openCount` [구현 11/18]: 화면 체류 시간 (선택, 셋 다 보내거나 생략). 규칙은 6.11 "화면 체류 시간"과 같음. 재전송이면 처음 값 유지. 값 오류는 `400 INVALID_PARAMETER`
+
+### 6.7.1 일괄 FAIL `POST /inspections/confirm-batch` [제안 11/23, 김도현 시안]
+
+작업자가 상세를 보고 불량으로 확인해 **직접 고른** REVIEW 건만 한 번에 FAIL로 확정. 판정 주체는 작업자(WORKER)라 4장 판정 규칙과 10/15 합의를 바꾸지 않음
+
+```json
+{
+  "finalJudgement": "FAIL",
+  "comment": "고정핀 들뜸",
+  "items": [
+    { "inspectionId": "...", "screenDwellMs": 8200, "firstOpenedAt": "2026-11-24T10:01:02+09:00", "openCount": 1 },
+    { "inspectionId": "..." }
+  ]
+}
+```
+
+- `finalJudgement`는 `FAIL`만 허용 (일괄 PASS 없음). 다른 값은 `400 INVALID_PARAMETER`
+- `items` 1~50건. 같은 `inspectionId`가 두 번 있거나 범위 밖이면 `400 INVALID_PARAMETER` (요청 전체 거절, 아무것도 저장 안 함)
+- `comment`는 모든 건에 같이 저장 (선택, 최대 200자). 화면 체류 시간은 건별 선택 (6.7과 같은 규칙)
+- **건마다 6.7과 같은 규칙으로 따로 처리**하고, 한 건이 실패해도 다른 건은 저장. 응답은 `200`이고 요청 순서대로 결과를 돌려줌
+
+```json
+{
+  "data": {
+    "batchId": "...",
+    "results": [
+      { "inspectionId": "...", "inspectionNo": "INS-000151", "result": "CONFIRMED",
+        "finalJudgement": "FAIL", "judgedBy": "WORKER", "confirmedBy": "worker01", "confirmedAt": "..." },
+      { "inspectionId": "...", "inspectionNo": "INS-000154", "result": "ALREADY_CONFIRMED",
+        "finalJudgement": "FAIL", "judgedBy": "WORKER", "confirmedBy": "worker02", "confirmedAt": "..." }
+    ]
+  }
+}
+```
+
+| `result` | 뜻 | 6.7 단건이면 |
+|---|---|---|
+| `CONFIRMED` | 이번 요청으로 FAIL 저장 | 200 |
+| `ALREADY_CONFIRMED` | 이미 FAIL로 확정됨 (재전송 또는 다른 작업자가 먼저 FAIL). 처음 기록을 그대로 돌려줌 | 200 (같은 값 재전송) |
+| `CONFLICT` | 이미 PASS로 확정됨. 덮어쓰지 않음 | `409 ALREADY_CONFIRMED` |
+| `NOT_REVIEWABLE` | REVIEW 대기가 아님 (AUTO_PASS·FAILED·분석 중) | `409 NOT_REVIEWABLE` |
+| `NOT_FOUND` | 없는 검사 | `404 INSPECTION_NOT_FOUND` |
+
+- 실패 결과(`CONFLICT`·`NOT_REVIEWABLE`·`NOT_FOUND`)는 `finalJudgement` 등 현재 값만 있으면 채우고 `errorCode`에 6.7과 같은 코드를 넣음
+- 같은 검사가 다른 요청과 동시에 들어와도 판정은 1건만 저장 (6.7 규칙 그대로)
+- `batchId`: 이 요청으로 저장된 판정 묶음. 일괄로 저장된 판정에는 같은 값이 남아 나중에 "일괄로 확정한 건"을 구분할 수 있음 (저장: `worker_confirmation.batch_id`, NULL이면 단건, 김남균 협의). 응답을 못 받은 재전송은 새 `batchId`가 생기지만 이미 저장된 건은 `ALREADY_CONFIRMED`라 판정이 두 번 기록되지 않음
+- 권한: WORKER만 (`403 ACCESS_DENIED`). 앱은 제출 전 선택한 검사번호 목록을 보여 주고, 응답의 건별 결과를 표시
 
 ### 6.8 재검사 `POST /inspections/{id}/retry`
 
@@ -699,6 +760,71 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 - 정책·모델·보정기 버전이나 추출 규칙이 다른 검사는 합치지 않음. 요약은 이 조합별로 `rules[]` 항목을 나눔 (부품도 정책에 따라 갈림)
 - 건수가 적으면 불확실성이 큼. 신뢰구간 표시 방법은 TBD-16
 
+### 6.12 판정 확인 요청·정정 [제안 11/23, 김도현 시안]
+
+시스템이 판정한 건(`judgedBy = SYSTEM`, 지금은 AUTO_PASS)을 작업자가 실물·추가 사진으로 다르게 확인했을 때 근거를 남기고, 관리자가 **유지** 또는 **정정**함. 최초 판정과 정책 실적은 바꾸지 않고 정정은 별도 기록으로 남김
+
+- 대상: `judgedBy = SYSTEM`인 검사만. 없는 검사는 `404 INSPECTION_NOT_FOUND`. 작업자 판정(REVIEW·수동 판정) 건은 `409 NOT_REQUESTABLE`. 자동 불량(TBD-18)을 도입하면 같은 흐름을 씀
+- 표본 재확인(6.11)과는 별도 기록. 재확인 FAIL이 나온 건도 정정이 필요하면 이 요청을 따로 올림. 집계는 같은 검사를 두 번 세지 않도록 TBD-19에서 정함
+
+**요청** `POST /inspections/{id}/judgement-requests` (WORKER)
+
+```json
+{ "claimedJudgement": "FAIL", "area": "고정핀", "reason": "실물 확인 결과 고정핀이 접촉면에서 들떠 있음" }
+```
+
+- `claimedJudgement`: `PASS`·`FAIL` 중 **현재 판정(정정됐으면 정정 판정)과 다른 값**. 같으면 `400 INVALID_PARAMETER`
+- `reason` 필수 1~500자, `area` 선택 최대 100자. 근거 사진 첨부는 다음 단계 (TBD-19)
+- 응답 `201`: 요청 1건
+- 검사당 **처리 대기 요청은 1건**. 대기 중에 같은 작업자가 같은 `claimedJudgement`로 다시 보내면 기존 요청 `200`, 그 밖에는 `409 REQUEST_ALREADY_OPEN`. 처리된 뒤에는 새 요청 가능
+
+요청 1건 형식
+
+```json
+{
+  "requestId": "...",
+  "inspectionId": "...",
+  "inspectionNo": "INS-000143",
+  "partCode": "FRAME",
+  "originalJudgement": "PASS",
+  "originalJudgedBy": "SYSTEM",
+  "currentJudgement": "PASS",
+  "claimedJudgement": "FAIL",
+  "area": "헤밍부",
+  "reason": "...",
+  "requestedBy": "worker01",
+  "requestedAt": "...",
+  "status": "OPEN",
+  "resolvedBy": null,
+  "resolvedAt": null,
+  "resolveNote": null
+}
+```
+
+- `originalJudgement`·`originalJudgedBy`: 검사의 최초 판정 (`judgement` 블록 값). `currentJudgement`: 요청 당시 현재 판정(앞선 정정이 있으면 그 값)
+- `status`: `OPEN`(대기) · `KEPT`(현재 판정 유지) · `CORRECTED`(정정)
+
+**목록** `GET /admin/judgement-requests` (ADMIN)
+- 쿼리: `status=OPEN|RESOLVED|ALL` (기본 `OPEN`), `partCode`, `page`, `size`(기본 20, 최대 100). `RESOLVED` = `KEPT`+`CORRECTED`
+- 정렬: `OPEN`은 오래된 요청부터, 그 밖에는 최근 처리·요청부터
+
+**처리** `POST /admin/judgement-requests/{requestId}/resolve` (ADMIN)
+
+```json
+{ "decision": "CORRECT", "note": "실물 사진 확인, 고정핀 들뜸 맞음" }
+```
+
+- `decision`: `KEEP`(유지) · `CORRECT`(요청한 판정으로 정정). `note` 필수 1~500자
+- 응답 `200`: 처리된 요청 1건 + 검사의 `correction` (6.5)
+- 이미 처리된 요청에 같은 `decision`이면 처음 기록 그대로 `200`, 다른 `decision`이면 `409 REQUEST_ALREADY_RESOLVED`. 동시 처리는 1건만 저장
+- 정정해도 `inspection.final_judgement`·`judged_by`(최초 판정)는 바꾸지 않음. AUTO_PASS는 `PASS·SYSTEM`이라는 V5 CHECK와, 정책 실적을 최초 경로로 세는 규칙을 지키기 위함. 현재 판정 = 마지막 `CORRECTED` 요청의 판정, 없으면 최초 판정
+
+저장 [제안, 김남균 협의] `judgement_request`: id, inspection_id(FK), requested_by(FK users), requested_at, original_judgement, current_judgement, claimed_judgement, area, reason, status, resolved_by(FK users), resolved_at, resolve_note
+- CHECK 후보: `claimed_judgement <> current_judgement`, 상태별 처리자·시각·메모 짝 (`OPEN`이면 셋 다 NULL, 아니면 셋 다 있음). NULL 비교는 `IS NOT NULL`을 함께 검사
+- 검사당 대기 1건: `open_key = IF(status = 'OPEN', inspection_id, NULL)` 생성 컬럼 UNIQUE (V9 `trial_key`와 같은 방식)
+- 테이블 간 규칙(대상이 `judged_by = SYSTEM`, 요청자 WORKER, 처리자 ADMIN)은 점검 SQL로 확인
+- 일괄 FAIL 묶음: `worker_confirmation.batch_id` CHAR(36) NULL (6.7.1)
+
 ## 7. AI 연동 규격 [합의 10/15]
 
 ### 7.1 요청 `POST {AI}/internal/v1/predict`
@@ -940,6 +1066,10 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | 추가 | 409 | `NOT_RECHECKABLE` | 표본 재확인 대상이 아닌 검사 [제안 11/18] |
 | 추가 | 409 | `ALREADY_RECHECKED` | 다른 결과로 이미 재확인된 검사 [제안 11/18] |
 | 추가 | 409 | `NOT_ACKNOWLEDGEABLE` | 재확인 FAIL이 아닌 건 관리자 확인함 [구현 11/18] |
+| 추가 | 409 | `NOT_REQUESTABLE` | 시스템 판정이 아닌 검사에 판정 확인 요청 [제안 11/23] |
+| 추가 | 409 | `REQUEST_ALREADY_OPEN` | 같은 검사에 처리 대기 요청이 이미 있음 [제안 11/23] |
+| 추가 | 409 | `REQUEST_ALREADY_RESOLVED` | 다른 결정으로 이미 처리된 요청 [제안 11/23] |
+| 추가 | 404 | `REQUEST_NOT_FOUND` | 없는 판정 확인 요청 [제안 11/23] |
 | 추가 | 400 | `INVALID_DEVICE_TOKEN` | 기기 토큰 형식 오류 |
 | 추가 | 502 | `AI_REQUEST_REJECTED` | AI 서버가 4xx로 요청을 거절 (검사는 FAILED, 재시도 안 함) |
 | 미사용 | 409 | `REQUEST_IN_PROGRESS` | 비동기 접수로 불필요 (6.2) [제안] |
@@ -978,5 +1108,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | TBD-15 | 과거 결과 재계산 설계 유지 여부 | **해소** | 제외 | — |
 | TBD-16 | 표본 재확인 구간 경계(0.4·0.8)·비율(1.0·0.3·0.1), 불확실성 표시 방법 | 공동시험값 확정 (11/18) | **공동시험은 경계 0.4·0.8, 100·30·10%로 수집하고 50·30·10%를 같은 기록으로 비교** [합의 11/18 김도현]. 장기 적용값은 시험 후 결정. 규칙은 `v1-b40-80-p100-30-10` 형식으로 자동 생성하고 시험 이름은 선택, 판정 당시 규칙을 검사에 남겨 재처리도 그 규칙으로(V9). 전체 불량률은 구간 AUTO_PASS 건수 비중으로 가중 [합의 11/18 김도현]. 기본 꺼 둠. 신뢰구간 표시는 다음 단계 (6.11) | 김도현 |
 | TBD-17 | 재확인 FAIL 시 알림·후속 조치 | 1차 합의 (11/18) | 원래 PASS·SYSTEM 유지, 상세에서 두 결과 함께 표시, 완료 목록 붉은색 + 관리자 안내, 관리자 "확인함"(해결 완료 아님) [합의 11/18 홍승인·김도현]. 푸시·자동 조치·해결 상태 기록은 팀 논의 후 (6.11) | 홍승인·전체 |
+| TBD-18 | 자동 불량(AUTO_FAIL)·관리자 날짜별 집계·기준 상세 | 범위 변경 합의 (11/23) | 10/14 개발계획서 제외 항목(자동 FAIL, 통계·관리자 분석 화면)을 **범위 변경으로 진행** [합의 11/23 김도현]. 근거: 1차 공동시험에서 작업자가 PASS한 불량 3건 중 INS-000146·149가 제안 기준이면 자동 불량 대상(151은 REVIEW, 검사 기준 표시로 보완). AUTO_FAIL은 부품 정책별 기본 꺼짐 → 새 자료 검증 → 부품별 활성화. 3.2·4장·정책 형식 변경과 V11은 별도 초안 (6.4·6.7.1·6.12 다음) | 김도현·홍승인·김남균 |
+| TBD-19 | 판정 확인 요청의 근거 사진, 재확인과의 집계 관계 | 제안 (11/23) | 1단계는 글(부위·사유)만 받고 사진 첨부는 다음 단계. "자동 통과 후 불량 확인" 집계는 `CORRECTED` 요청 기준 검사 ID당 1건으로 세고, 표본 재확인 FAIL은 재확인 요약(6.11)에 따로 표시해 같은 검사를 두 번 세지 않음 | 김도현·홍승인 |
 | — | Grad-CAM 0맵·상수맵 처리 | **해소** [합의 10/28] | `gradcamStatus = NO_ACTIVATION`, 이미지 없음, 분류·REVIEW 유지 (6.5, 7.2) | — |
 | — | `inferenceTimeMs` 측정 범위 | **해소** [합의 10/28] | AI handler 진입~응답 직렬화 직전, 모델 최초 로드 제외 (7.2) | — |
