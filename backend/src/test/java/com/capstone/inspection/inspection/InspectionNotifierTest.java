@@ -34,4 +34,14 @@ class InspectionNotifierTest {
         assertThat(notice.inspectionId()).isEqualTo("id");
         assertThat(InspectionNotifier.noticeFor(outcome(InspectionStatus.COMPLETED, RecommendedAction.AUTO_PASS))).isNull();
     }
+
+    @Test
+    @DisplayName("AUTO_FAILED 원격 푸시는 autoFailed를 켰을 때만, 나머지 알림은 기존대로 enabled만 봄")
+    void autoFailedRemotePushOffByDefault() {
+        assertThat(InspectionNotifier.sendsRemotely("AUTO_FAILED", true, false)).isFalse();
+        assertThat(InspectionNotifier.sendsRemotely("AUTO_FAILED", true, true)).isTrue();
+        assertThat(InspectionNotifier.sendsRemotely("AUTO_FAILED", false, true)).isFalse();
+        assertThat(InspectionNotifier.sendsRemotely("REVIEW_REQUIRED", true, false)).isTrue();
+        assertThat(InspectionNotifier.sendsRemotely("REVIEW_REQUIRED", false, false)).isFalse();
+    }
 }
