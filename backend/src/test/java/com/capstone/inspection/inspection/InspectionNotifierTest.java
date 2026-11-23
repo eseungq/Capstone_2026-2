@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// 알림 대상 (계약 8.2): REVIEW → REVIEW_REQUIRED, FAILED → ANALYSIS_FAILED, AUTO_PASS·AUTO_FAIL은 발송 안 함
+// 알림 대상 (계약 8.2): REVIEW → REVIEW_REQUIRED, FAILED → ANALYSIS_FAILED, AUTO_FAIL → AUTO_FAILED, AUTO_PASS는 발송 안 함
 class InspectionNotifierTest {
 
     private static AnalysisResultWriter.Outcome outcome(InspectionStatus status, RecommendedAction action) {
@@ -26,9 +26,12 @@ class InspectionNotifierTest {
     }
 
     @Test
-    @DisplayName("AUTO_PASS·AUTO_FAIL은 알림 없음")
-    void systemJudgementsNotNotified() {
+    @DisplayName("AUTO_FAIL은 REVIEW와 구분되는 자동 불량 알림, AUTO_PASS는 알림 없음")
+    void autoFailNotifiedSeparately() {
+        var notice = InspectionNotifier.noticeFor(outcome(InspectionStatus.COMPLETED, RecommendedAction.AUTO_FAIL));
+        assertThat(notice.type()).isEqualTo("AUTO_FAILED");
+        assertThat(notice.title()).isEqualTo("자동 불량");
+        assertThat(notice.inspectionId()).isEqualTo("id");
         assertThat(InspectionNotifier.noticeFor(outcome(InspectionStatus.COMPLETED, RecommendedAction.AUTO_PASS))).isNull();
-        assertThat(InspectionNotifier.noticeFor(outcome(InspectionStatus.COMPLETED, RecommendedAction.AUTO_FAIL))).isNull();
     }
 }

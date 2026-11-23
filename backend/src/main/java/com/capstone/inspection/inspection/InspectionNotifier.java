@@ -4,6 +4,7 @@ import com.capstone.inspection.common.time.Times;
 import com.capstone.inspection.config.AppProperties;
 import com.capstone.inspection.config.AsyncConfig;
 import com.capstone.inspection.domain.inspection.InspectionStatus;
+import com.capstone.inspection.domain.inspection.RecommendedAction;
 import com.capstone.inspection.notification.PushService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +13,8 @@ import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
-// 알림 발송 지점 (계약 v4 8장). REVIEW → REVIEW_REQUIRED, FAILED → ANALYSIS_FAILED, AUTO_PASS·AUTO_FAIL은 발송 안 함
+// 알림 발송 지점 (계약 v4 8장). REVIEW → REVIEW_REQUIRED, FAILED → ANALYSIS_FAILED, AUTO_FAIL → AUTO_FAILED, AUTO_PASS는 발송 안 함
+// 분석 결과를 저장할 때 검사당 한 번만 호출되므로 같은 검사에 같은 알림이 두 번 가지 않음
 // 결과 저장 커밋 후 호출됨. 발송은 전용 스레드에서 해서 분석 스레드를 잡지 않고, 실패해도 분석 결과에 영향 없음
 @Component
 public class InspectionNotifier {
@@ -61,10 +63,14 @@ public class InspectionNotifier {
         if (outcome.status() == InspectionStatus.FAILED) {
             return notice("ANALYSIS_FAILED", outcome, "분석 실패", "다시 검사가 필요합니다.");
         }
-        if (outcome.reviewRequired()) { // AUTO_PASS·AUTO_FAIL은 발송 안 함 (계약 8.2)
+        if (outcome.reviewRequired()) {
             return notice("REVIEW_REQUIRED", outcome, "확인 필요", "작업자 확인이 필요합니다.");
         }
-        return null;
+        // 자동 불량은 재판정 없이 발생 사실만 알림. 오판이 의심되면 판정 확인 요청(6.12) [제안 11/23 김도현]
+        if (outcome.action() == RecommendedAction.AUTO_FAIL) {
+            return notice("AUTO_FAILED", outcome, "자동 불량", "자동 불량으로 판정됐습니다.");
+        }
+        return null; // AUTO_PASS는 발송 안 함
     }
 
     private static PushService.Notice notice(String type, AnalysisResultWriter.Outcome o, String title, String message) {
