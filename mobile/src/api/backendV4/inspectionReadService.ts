@@ -10,7 +10,7 @@ import {
   imageNeedsDetailRefetchV4, makeHistoryQueryV4, makeQueueQueryV4,
 } from './inspectionReadCore';
 import type {
-  HistoryPageV4, HistoryRowV4, InspectionReadSourceV4, MonitoringPartV4, QueuePageV4, QueueTypeV4,
+  HistoryPageV4, HistoryRowV4, InspectionReadSourceV4, MonitoringPartV4, QueueItemV4, QueuePageV4, QueueTypeV4,
 } from './inspectionReadCore';
 import {
   contractDetailExamplesV4, contractHistoryExamplesV4,
