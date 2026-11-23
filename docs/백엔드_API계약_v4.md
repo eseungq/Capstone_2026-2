@@ -883,6 +883,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 | `inspection` 추가 (V9) [구현 11/18] | recheck_rule_id(FK, NULL 허용): AUTO_PASS 판정 당시 규칙. AUTO_PASS일 때만 값 (CHECK). 재처리가 이 규칙을 씀 |
 | `auto_pass_recheck` 추가 (V9) [구현 11/18] | 결정 규칙: rule_id(FK), ratio(r), draw_value (V8 행은 NULL, 셋은 함께 있거나 함께 없음) · 확인함: acknowledged_by(FK users), acknowledged_at, acknowledge_note (재확인 FAIL에만, 확인자·시각 짝) · 화면 체류 시간: screen_dwell_ms, first_opened_at, open_count (셋 다 있거나 없음, 재확인 결과가 있을 때만) |
 | `worker_confirmation` 추가 (V9) [구현 11/18] | screen_dwell_ms, first_opened_at, open_count (선택, 셋 다 있거나 없음) |
+| CHECK 보강 (V10) [구현 11/21, 김남균 검토] | V9 두 제약이 비교 대상 NULL이면 통과하던 구멍 수정: recheck_rule_id는 recommended_action이 있고 AUTO_PASS일 때만, 확인함은 result가 있고 FAIL일 때만. 같은 행 규칙 추가: 규칙이 있는 결정 행은 sampled = (sampling_rate > 0 AND draw_value < sampling_rate), rechecked_at ≥ sampled_at, acknowledged_at ≥ rechecked_at. 테이블 간 규칙(검사 완료 → 추출 결정 등)은 점검 SQL(`db/04_integrity_checks.sql`)로 확인. API 변경 없음 |
 
 적용 현황 [합의 10/28]
 - Flyway V1~V5 적용. V3 인증, V4 모니터링·비동기·Grad-CAM·정책 버전(위 표), **V5 무결성 제약**(김남균 작성, 이승규 수정: `gradcam_status`에 `NO_ACTIVATION` 추가, FAILED면 `predicted_quality` NULL)
