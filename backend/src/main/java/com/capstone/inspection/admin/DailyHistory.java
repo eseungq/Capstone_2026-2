@@ -82,7 +82,8 @@ final class DailyHistory {
                                        Map<String, RequestSummary> requests) {
         int autoPass = count(items, i -> isAction(i, RecommendedAction.AUTO_PASS));
         int autoFail = count(items, i -> isAction(i, RecommendedAction.AUTO_FAIL));
-        Progress review = progress(items, i -> isReview(i) && i.source() != InspectionSource.MANUAL);
+        // 수동 전환도 작업자에게 배정된 REVIEW라 review에 포함하고, 그중 몇 건인지 manual로 따로 (합의 11/23)
+        Progress review = progress(items, DailyHistory::isReview);
         Progress manual = progress(items, i -> isReview(i) && i.source() == InspectionSource.MANUAL);
         int failed = count(items, i -> i.status() == InspectionStatus.FAILED);
         ConfirmedOpposite opposite = new ConfirmedOpposite(

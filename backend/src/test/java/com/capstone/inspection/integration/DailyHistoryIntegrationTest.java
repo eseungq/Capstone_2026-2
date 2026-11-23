@@ -218,7 +218,8 @@ class DailyHistoryIntegrationTest extends IntegrationTestBase {
         assertCounts(noPolicyRow, 1, 0, 0, 0, 1, 0, 0, 0);
         JsonNode manualRow = row(rows, "2025-01-11", null, null);
         assertThat(manualRow.path("modelVersion").asText()).isEqualTo(MOCK_MODEL);
-        assertCounts(manualRow, 0, 0, 0, 0, 0, 1, 1, 0);
+        // 수동 전환은 total·REVIEW에 포함하고 그중 몇 건인지 manual로 따로 (합의 11/23 김도현·홍승인)
+        assertCounts(manualRow, 1, 0, 0, 1, 1, 1, 1, 0);
         assertOpposite(manualRow, 0, 0, 0, 0);
 
         // to는 포함하지 않음
