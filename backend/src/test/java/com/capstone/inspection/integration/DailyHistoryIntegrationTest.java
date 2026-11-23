@@ -1,13 +1,13 @@
 package com.capstone.inspection.integration;
 
+import com.capstone.inspection.common.time.Times;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,14 +20,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 // 관리자 날짜별 이력·기준 상세 (계약 6.13)
 //   검사는 실제 흐름(가짜 AI)으로 만든 뒤 received_at만 2025년 전용 날짜로 옮김 → 다른 테스트의 오늘 검사와 섞이지 않음
-//   received_at은 서버 기본 시간대 시각으로 저장되므로 KST 시각을 서버 시간대로 바꿔 넣음
+//   received_at은 서울 시각으로 저장되므로(Times.now) KST 시각을 그대로 넣음
 //   정책 적용 상태는 IntegrationTestBase가 테스트마다 예시 정책(example-door-p1)으로 되돌림
 class DailyHistoryIntegrationTest extends IntegrationTestBase {
 
     private static final String DAILY = "/api/v1/admin/automation/daily";
     private static final String DETAIL = DAILY + "/detail";
     private static final String POLICIES = "/api/v1/admin/policies";
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     // ---- 준비 도우미 ----
 
@@ -99,11 +98,9 @@ class DailyHistoryIntegrationTest extends IntegrationTestBase {
                 Map.of("decision", decision, "note", "확인함"), admin()).getResponse().getStatus()).isEqualTo(200);
     }
 
-    // 접수 시각을 KST 시각으로 옮김 (저장 값은 서버 기본 시간대)
+    // 접수 시각을 KST 시각으로 옮김 (저장 값은 서울 시각, Times)
     private void receivedAtKst(String id, String kstDateTime) {
-        LocalDateTime serverLocal = ZonedDateTime.of(LocalDateTime.parse(kstDateTime), KST)
-                .withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
-        jdbc.update("update inspection set received_at = ? where id = ?", serverLocal, id);
+        jdbc.update("update inspection set received_at = ? where id = ?", LocalDateTime.parse(kstDateTime), id);
     }
 
     private MvcResult daily(String from, String to) throws Exception {
@@ -239,6 +236,23 @@ class DailyHistoryIntegrationTest extends IntegrationTestBase {
         List<JsonNode> rows = rows("2025-03-01", "2025-03-03");
         assertThat(rows.stream().map(r -> r.path("date").asText() + ":" + r.path("autoPass").asInt()).toList())
                 .containsExactly("2025-03-02:1", "2025-03-01:1");
+    }
+
+    // JVM 시간대와 상관없이 같아야 함. CI(UTC)와 로컬(서울) 양쪽에서 돌고, 로컬은 TZ=UTC로도 확인
+    @Test
+    @DisplayName("저장 시각은 JVM 시간대와 상관없이 서울 시각이고 그 KST 날짜 행에 셈")
+    void storesSeoulTimeOnAnyJvmZone() throws Exception {
+        LocalDateTime seoulBefore = LocalDateTime.now(Times.ZONE).minusSeconds(1);
+        String id = inspect("GOOD", 0.021, "AUTO_PASS");
+        LocalDateTime seoulAfter = LocalDateTime.now(Times.ZONE).plusSeconds(1);
+
+        LocalDateTime stored = jdbc.queryForObject(
+                "select received_at from inspection where id = ?", LocalDateTime.class, id);
+        assertThat(stored).isBetween(seoulBefore, seoulAfter);
+
+        LocalDate today = LocalDate.now(Times.ZONE);
+        List<JsonNode> rows = rows(today.toString(), today.plusDays(1).toString());
+        assertThat(rows).extracting(r -> r.path("date").asText()).contains(today.toString());
     }
 
     // ---- 기준 상세 ----

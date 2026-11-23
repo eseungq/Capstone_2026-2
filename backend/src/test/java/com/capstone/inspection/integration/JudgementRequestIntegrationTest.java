@@ -444,7 +444,7 @@ class JudgementRequestIntegrationTest extends IntegrationTestBase {
         assertRejectedBy("chk_jreq_resolved", insert, UUID.randomUUID().toString(), id, userId("worker01"),
                 "PASS", "FAIL", "OPEN", adminId, null, null);
         assertRejectedBy("chk_jreq_resolved", insert, UUID.randomUUID().toString(), id, userId("worker01"),
-                "PASS", "FAIL", "KEPT", adminId, java.time.LocalDateTime.now().plusSeconds(1), null);
+                "PASS", "FAIL", "KEPT", adminId, com.capstone.inspection.common.time.Times.now().plusSeconds(1), null);
 
         // 처리된 요청은 여러 건 가능, 대기 요청은 1건만
         insertRow(id, "PASS", "FAIL", "KEPT", adminId, "메모");

@@ -25,14 +25,23 @@ public final class Times {
         return value == null ? null : value.atZoneSameInstant(ZONE).toLocalDateTime();
     }
 
-    // 저장된 시각(LocalDateTime.now(), 서버 기본 시간대)의 KST 날짜. 서버 시간대가 서울이 아니어도 KST로 셈 (계약 6.13)
-    public static LocalDate kstDate(LocalDateTime stored) {
-        return stored.atZone(ZoneId.systemDefault()).withZoneSameInstant(ZONE).toLocalDate();
+    // 저장 시각의 기준 시계. JVM 기본 시간대(UTC 서버 등)와 상관없이 서울 시각을 씀
+    public static LocalDateTime now() {
+        return LocalDateTime.now(ZONE);
     }
 
-    // KST 날짜 0시를 저장 시각(서버 기본 시간대)으로. 날짜 범위 조회의 경계
+    public static LocalDate today() {
+        return LocalDate.now(ZONE);
+    }
+
+    // 저장 시각(서울)의 KST 날짜. JVM 기본 시간대로 해석하지 않음 (계약 6.13)
+    public static LocalDate kstDate(LocalDateTime stored) {
+        return stored.toLocalDate();
+    }
+
+    // KST 날짜 0시를 저장 시각(서울)으로. 날짜 범위 조회의 경계
     public static LocalDateTime kstStartOfDay(LocalDate date) {
-        return date.atStartOfDay(ZONE).withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
+        return date.atStartOfDay();
     }
 
     // 요청 파라미터의 KST 날짜 (yyyy-MM-dd). 비어 있으면 null, 형식이 틀리면 400 INVALID_PARAMETER

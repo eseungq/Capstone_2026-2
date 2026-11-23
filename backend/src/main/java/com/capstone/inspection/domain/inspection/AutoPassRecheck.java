@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import com.capstone.inspection.common.time.Times;
 
 // AUTO_PASS 표본 재확인 (계약 6.11, V8). 시스템 판정은 inspection에 그대로 두고 재확인 결과만 따로 저장
 //   AUTO_PASS마다 추출 결정을 1행 남김. 행이 없으면 결정 전이거나 저장 실패 → RecheckSweeper가 다시 처리
@@ -89,7 +90,7 @@ public class AutoPassRecheck {
         this.sampled = sampled;
         this.stratum = stratum;
         this.samplingRate = samplingRate;
-        this.sampledAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
+        this.sampledAt = Times.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
         this.rule = rule;
         this.ratio = ratio;
         this.drawValue = drawValue;

@@ -17,6 +17,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import com.capstone.inspection.common.time.Times;
 
 // 판정 확인 요청·정정 (계약 6.12, V12). 최초 판정은 inspection에 그대로 두고 요청·처리 기록만 따로 저장
 //   open_key(검사당 대기 1건용 생성 컬럼)는 DB가 계산하므로 매핑하지 않음
@@ -77,7 +78,7 @@ public class JudgementRequest {
         this.id = UUID.randomUUID().toString();
         this.inspection = inspection;
         this.requestedBy = requestedBy;
-        this.requestedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
+        this.requestedAt = Times.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
         this.originalJudgement = inspection.getFinalJudgement();
         this.currentJudgement = currentJudgement;
         this.claimedJudgement = claimedJudgement;

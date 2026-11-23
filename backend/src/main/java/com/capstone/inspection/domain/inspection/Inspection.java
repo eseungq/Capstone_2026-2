@@ -20,6 +20,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.capstone.inspection.common.time.Times;
 
 // 검사 1건. AI 예측, 정책 적용 결과, 최종 판정을 함께 보관 (작업자 확인 기록은 WorkerConfirmation에 분리)
 // 상태 전이: RECEIVED → ANALYZING → COMPLETED(AUTO_PASS·AUTO_FAIL·REVIEW) 또는 FAILED (계약 v4 3장)
@@ -157,7 +158,7 @@ public class Inspection {
         this.traceId = traceId;
         this.status = InspectionStatus.RECEIVED;
         this.automationPolicyReady = false;
-        this.receivedAt = LocalDateTime.now();
+        this.receivedAt = Times.now();
         this.capturedAt = capturedAt != null ? capturedAt : this.receivedAt; // 없으면 접수 시각 (계약 6.2)
     }
 
@@ -180,7 +181,7 @@ public class Inspection {
 
     public void startAnalysis() {
         this.status = InspectionStatus.ANALYZING;
-        this.startedAt = LocalDateTime.now();
+        this.startedAt = Times.now();
     }
 
     // AI 결과 기록 (정책 적용 전 값)
@@ -214,7 +215,7 @@ public class Inspection {
             this.finalJudgement = Judgement.FAIL;
             this.judgedBy = JudgedBy.SYSTEM;
         }
-        this.completedAt = LocalDateTime.now();
+        this.completedAt = Times.now();
     }
 
     // AUTO_PASS 판정과 같은 트랜잭션에서 그때 적용 중인 재확인 규칙을 남김. 추출·재처리는 이 규칙으로 함 (계약 6.11)
@@ -234,7 +235,7 @@ public class Inspection {
         this.finalJudgement = null;
         this.judgedBy = null;
         this.reviewReason = null;
-        this.completedAt = LocalDateTime.now();
+        this.completedAt = Times.now();
     }
 
     public boolean isFinished() {

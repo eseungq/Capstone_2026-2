@@ -57,6 +57,5 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
-    // DB 시각은 서울 기준(LocalDateTime.now())이라 CI(UTC)에서도 같은 시간대로 실행
-    systemProperty 'user.timezone', 'Asia/Seoul'
+    // JVM 시간대를 고정하지 않음: 저장·조회는 Times(서울)로 하므로 CI(UTC)·로컬(서울) 어느 쪽이든 같아야 함
 }

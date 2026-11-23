@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import com.capstone.inspection.common.time.Times;
 
 // AUTO_PASS 표본 재확인 (계약 6.11). 작업자 확인(6.7)과 같은 재전송·동시 제출 규칙
 //   - 재확인 결과는 auto_pass_recheck에만 기록. inspection의 시스템 판정(PASS·SYSTEM)은 바꾸지 않음
@@ -88,7 +89,7 @@ public class RecheckService {
         if (r.getResult() != null) {
             return replayed(i, r, result);
         }
-        LocalDateTime at = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
+        LocalDateTime at = Times.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
         if (recheckRepository.markResult(inspectionId, result, comment,
                 userRepository.getReferenceById(worker.userId()), at,
                 timing == null ? null : timing.getScreenDwellMs(), timing == null ? null : timing.getFirstOpenedAt(),
@@ -118,7 +119,7 @@ public class RecheckService {
         if (r.getAcknowledgedAt() != null) {
             return response(i, r);
         }
-        LocalDateTime at = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
+        LocalDateTime at = Times.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
         if (recheckRepository.markAcknowledged(inspectionId, userRepository.getReferenceById(admin.userId()),
                 at, note) != 1) {
             return null;

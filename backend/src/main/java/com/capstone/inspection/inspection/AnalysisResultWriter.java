@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import com.capstone.inspection.common.time.Times;
 
 // 분석 단계별 DB 기록. AI 호출은 트랜잭션 밖에서 하고, 시작·완료·실패 기록만 짧은 트랜잭션으로 처리
 @Component
@@ -128,7 +129,7 @@ public class AnalysisResultWriter {
         }
         ImageInfo info = parsed.info();
         try {
-            String key = "gradcam/" + LocalDate.now().format(DATE_PATH) + "/" + i.getId() + "." + info.extension();
+            String key = "gradcam/" + Times.today().format(DATE_PATH) + "/" + i.getId() + "." + info.extension();
             storageService.save(key, parsed.bytes());
             imageRepository.save(new ImageStorage(i, ImageType.GRADCAM, key, info.contentType(), parsed.bytes().length,
                     info.width(), info.height(), Hashes.sha256(parsed.bytes())));

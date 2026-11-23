@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.capstone.inspection.common.time.Times;
 
 // 발급한 Refresh Token. 원문은 저장하지 않고 SHA-256 해시만 보관
 @Entity
@@ -45,7 +46,7 @@ public class RefreshToken {
         this.user = user;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Times.now();
     }
 
     public boolean isUsable(LocalDateTime now) {
@@ -54,7 +55,7 @@ public class RefreshToken {
 
     public void revoke() {
         if (revokedAt == null) {
-            revokedAt = LocalDateTime.now();
+            revokedAt = Times.now();
         }
     }
 }
