@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { API_BASE_URL } from '../api/backendV4/authRuntime';
+import { API_BASE_URL, authV4 } from '../api/backendV4/authRuntime';
 import { liveMonitoringReaderV4 } from '../api/backendV4/monitoringLiveReaderV4';
 import { useMonitoringPollV4 } from '../api/backendV4/useMonitoringPollV4';
 import type { MonitorAlertV4 } from '../api/backendV4/monitoringPollCore';
@@ -166,6 +166,14 @@ export default function MonitoringLiveDashboardV4({
   }, [controller, onNewAlerts]);
 
   const [partCode, setPartCode] = useState<MonitoredPart>('DOOR');
+  const [isAuthenticatedWorker, setIsAuthenticatedWorker] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    void authV4.restore().then((session) => {
+      if (mounted) setIsAuthenticatedWorker(session.signedIn && session.role === 'WORKER');
+    }).catch(() => { if (mounted) setIsAuthenticatedWorker(false); });
+    return () => { mounted = false; };
+  }, []);
   const [visibleQueueCount, setVisibleQueueCount] = useState(INITIAL_VISIBLE_QUEUE_COUNT);
   const vm = buildMonitoringViewModelV4(snapshot, partCode);
   const recent = vm.part?.recent[0] ?? null;
@@ -262,6 +270,12 @@ export default function MonitoringLiveDashboardV4({
 
       <View style={styles.card}>
         <Text style={styles.title}>처리 필요 검사 · {partCode}</Text>
+        {isAuthenticatedWorker && (
+          <Pressable accessibilityRole="button" style={styles.batchFailEntry}
+            onPress={() => router.push('/batch-fail-live')}>
+            <Text style={styles.batchFailEntryText}>REVIEW 상세 검토 후 일괄 FAIL 판정 ›</Text>
+          </Pressable>
+        )}
         {vm.queue.length === 0 ? (
           <Text style={styles.description}>
             {vm.hasSuccessfulRead ? '현재 처리할 검사가 없습니다.' : '검사 목록 조회 대기'}
@@ -321,6 +335,9 @@ export default function MonitoringLiveDashboardV4({
 const styles = StyleSheet.create({
   container: { gap: 12, paddingBottom: 16 },
   card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 14, padding: 16, gap: 10 },
+  batchFailEntry: {borderRadius: 9, backgroundColor: '#FFF0ED', borderWidth: 1,
+    borderColor: '#FECACA', padding: 12, alignItems: 'center'},
+  batchFailEntryText: {color: '#B42318', fontSize: 12, fontWeight: '700'},
   pressed: { opacity: 0.76 },
   headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   title: { fontSize: 17, fontWeight: '700', color: '#111827', flexShrink: 1 },
