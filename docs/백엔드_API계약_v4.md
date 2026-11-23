@@ -860,7 +860,7 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 **날짜별 이력** `GET /admin/automation/daily?partCode=COWL_COVER&from=2026-11-20&to=2026-11-24` (ADMIN)
 - `partCode` 필수, `from`·`to`는 KST 날짜(`from ≤ 날짜 < to`), 최대 92일. 응답은 최신 날짜부터
 - **날짜는 KST(Asia/Seoul) 고정**: 검사 `receivedAt`의 KST 날짜. 서버·DB 시간대와 무관. 수동 전환 검사는 새 REVIEW 검사가 생긴 날짜 [합의 11/23 김도현]
-- 한 날짜 안에서 판정 당시 정책·모델·보정기 조합별로 행을 나눔. 정책이 없어 REVIEW가 된 건과 수동 전환 건은 각각 정책 없는 행
+- 한 날짜 안에서 판정 당시 정책·모델·보정기 조합별로 행을 나눔(NULL도 한 값). 정책이 없어 REVIEW가 된 건과 수동 전환·FAILED 건은 정책 없는 행이며, 같은 날짜·모델·보정기면 한 행에 함께 들어감. 같은 날짜 안은 정책 버전·모델·보정기 순, 정책 없는 행이 마지막. 정책 없는 행의 `autoFailEnabled`는 false. 분석 중(RECEIVED·ANALYZING)은 세지 않음 [구현 11/23]
 
 ```json
 {
@@ -891,11 +891,12 @@ AI 결과를 받지 못한 FAILED 건을, 작업자가 원본 사진을 보고 �
 - 날짜 행 하나(같은 날짜·정책)의 기준 주변 REVIEW를 두 구간으로 나눔. `band`(기본 0.05, 0.001~0.5)는 기준에서 떨어진 정도(확률 차)
   - 통과 기준 위: GOOD 예측 REVIEW 중 `passThreshold < 확률 ≤ passThreshold + band`
   - 불량 기준 아래: DEFECT 예측 REVIEW 중 `failThreshold − band ≤ 확률 < failThreshold`. 정책에 `failThreshold`가 없으면 이 구간은 null
-- 구간마다 `{ from, to, total, pass, fail, pending, items: [{ inspectionId, inspectionNo, calibratedDefectProbability, finalJudgement, correctedJudgement }] }`. `pass + fail + pending = total`
+- 응답 `{ date, partCode, policyId, policyVersion, modelVersion, calibratorVersion, passThreshold, failThreshold, autoFailEnabled, band, passBand, failBand, reference }` [구현 11/23]
+- 구간마다 `{ from, to, total, pass, fail, pending, items: [{ inspectionId, inspectionNo, calibratedDefectProbability, finalJudgement, correctedJudgement }] }`. `pass + fail + pending = total`. items는 확률 오름차순, 구간 경계는 소수 오차 없이 계산
 - 기준 라벨·실물 확인 결과는 서버에 저장하는 곳이 없어 `reference: null`("자료 없음") [TBD-20]
 - 같은 날짜 행과 같은 정책 조건만 씀 (다른 버전 점수가 섞이지 않음)
 
-오류: 없는 `partCode` `400 INVALID_PART_CODE`, 날짜 형식·범위·`band` 오류 `400 INVALID_PARAMETER`, 없는 `policyId` `404 POLICY_NOT_FOUND`
+오류: 없는 `partCode` `400 INVALID_PART_CODE`, 날짜 형식·범위·`band` 오류 `400 INVALID_PARAMETER`, 없는 `policyId`·다른 부품의 정책 `404 POLICY_NOT_FOUND`
 
 ## 7. AI 연동 규격 [합의 10/15]
 
