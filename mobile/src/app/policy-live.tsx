@@ -13,9 +13,12 @@ import {
   parsePolicyPercentInputV4, percentageTextV4, rootPolicyForV4,
 } from '../api/backendV4/adminPolicyServiceV4';
 import type { AdminPolicyV4 } from '../api/backendV4/adminPolicyServiceV4';
+import {createAutoFailPolicyServiceV4} from '../api/backendV4/autoFailPolicyServiceV4';
+import {ensureAutoFailToggleV4,makeAutoFailThresholdEditV4} from '../api/backendV4/autoFailPolicyCoreV4';
 
 const service = createAdminPolicyServiceV4(authV4);
-type WriteAction = 'save' | 'activate';
+const autoFailService = createAutoFailPolicyServiceV4(authV4);
+type WriteAction = 'save' | 'activate' | 'fail-threshold' | 'auto-fail';
 
 const C = {
   bg: '#F5F7FB', white: '#FFFFFF', ink: '#111827', muted: '#64748B',
@@ -65,6 +68,11 @@ export default function PolicyLiveScreen() {
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [percentInput, setPercentInput] = useState('1.00');
   const [savedPolicy, setSavedPolicy] = useState<AdminPolicyV4 | null>(null);
+  const [failPercent, setFailPercent] = useState('');
+  const [failMinPercent, setFailMinPercent] = useState('');
+  const [failMaxPercent, setFailMaxPercent] = useState('');
+  const [evidenceConfirmed, setEvidenceConfirmed] = useState(false);
+  const editedFailInput = useRef(false);
   const [writing, setWriting] = useState<WriteAction | null>(null);
   const refreshSerial = useRef(0);
   const writeLock = useRef(false);
@@ -87,6 +95,12 @@ export default function PolicyLiveScreen() {
       const result = await service.list();
       if (refreshSerial.current !== serial) return;
       setPolicies(result);
+      const serverActive = result.find((p) => p.active);
+      if (!editedFailInput.current && serverActive) {
+        setFailPercent(serverActive.failThreshold == null ? '' : (serverActive.failThreshold * 100).toFixed(4));
+        setFailMinPercent(serverActive.failValidatedMin == null ? '' : (serverActive.failValidatedMin * 100).toFixed(4));
+        setFailMaxPercent(serverActive.failValidatedMax == null ? '' : (serverActive.failValidatedMax * 100).toFixed(4));
+      }
       if (!editedInput.current) {
         const active = result.find((item) => item.active);
         // 최초 입력값만 서버 기준에 따라 채우며, 사용자가 편집 중이면 덮어쓰지 않습니다.
@@ -137,6 +151,28 @@ export default function PolicyLiveScreen() {
   }
   // 목록 재조회가 실패했다면 오래된 정책 정보로 POST하지 않습니다.
   const canWrite = access === 'admin' && !loading && !refreshing && writing === null && error === null;
+
+  let failEditValid = false;
+  let failEditHint = '실제 서버의 활성 정책과 AI 검증된 불량 기준·범위를 확인해 주세요.';
+  if (active && active.autoFailEnabled !== null) {
+    try {
+      const value=makeAutoFailThresholdEditV4(active,failPercent,failMinPercent,failMaxPercent);
+      if (active.failThreshold===value.failThreshold &&
+        active.failValidatedMin===value.failValidatedMin &&
+        active.failValidatedMax===value.failValidatedMax) {
+        failEditHint='현재 불량 기준과 동일합니다. 불필요한 버전을 생성하지 않습니다.';
+      } else {
+        failEditValid=true;
+        failEditHint='불량 기준은 자동 통과 기준보다 높고 AI 검증 범위 안에 있습니다. 저장 시 비활성 버전이 생성됩니다.';
+      }
+    } catch(cause) {failEditHint=errorText(cause);}
+  }
+  const evidencePresent = !!active?.metrics && !!active.metrics.autoFail &&
+    typeof active.metrics.autoFail === 'object';
+  const canToggleOn = active?.autoFailEnabled===false &&
+    active.failThreshold!=null && active.failValidatedMin!=null &&
+    active.failValidatedMax!=null && evidencePresent && evidenceConfirmed;
+  const canToggleOff = active?.autoFailEnabled===true;
 
   /** 다른 관리자의 동시 변경을 확인해 이전 화면 상태로 POST하지 않습니다. */
   const assertLatest = async (expectedActive: AdminPolicyV4 | null): Promise<AdminPolicyV4[]> => {
@@ -221,6 +257,59 @@ export default function PolicyLiveScreen() {
     );
   };
 
+  const confirmSaveFail = () => {
+    if (!active || !canWrite || !failEditValid) return;
+    const base=active;
+    const args=[failPercent,failMinPercent,failMaxPercent] as const;
+    const expected=makeAutoFailThresholdEditV4(base,...args);
+    Alert.alert('자동 불량 기준 새 버전 저장',
+      `${base.policyVersion}\n불량 기준 ${percentageTextV4(expected.failThreshold)}\n검증 범위 ${percentageTextV4(expected.failValidatedMin)}~${percentageTextV4(expected.failValidatedMax)}\n\n저장해도 자동 불량은 즉시 적용되지 않습니다.`,
+      [{text:'취소',style:'cancel'},{text:'새 비활성 버전 저장',onPress:()=>{
+        void runWrite('fail-threshold',async()=>{
+          const current=(await assertLatest(base)).find(p=>p.policyId===base.policyId);
+          if(!current?.active || current.autoFailEnabled===null)
+            throw new Error('활성 정책/서버 AUTO_FAIL 지원 상태가 변경됐습니다.');
+          const latestEdit=makeAutoFailThresholdEditV4(current,...args);
+          if(latestEdit.failThreshold!==expected.failThreshold ||
+            latestEdit.failValidatedMin!==expected.failValidatedMin ||
+            latestEdit.failValidatedMax!==expected.failValidatedMax)
+            throw new Error('정책 검증 범위가 변경됐습니다. 최신 값을 확인해 주세요.');
+          const saved=await autoFailService.saveThreshold(current,...args);
+          setSavedPolicy(saved);
+          setActionNotice(`${saved.policyVersion} 불량 기준 새 비활성 버전을 저장했습니다. 별도 적용 전까지 현재 정책은 그대로입니다.`);
+          await load(false);
+        });
+      }}]);
+  };
+
+  const confirmAutoFailToggle = (enabled:boolean) => {
+    if (!active || !canWrite) return;
+    const base=active;
+    try {ensureAutoFailToggleV4(base,enabled);}catch(cause){setActionError(errorText(cause));return;}
+    if(enabled && (!evidencePresent || !evidenceConfirmed)){
+      setActionError('자동 불량 켜기는 AI 검증 자료 등록 및 팀 승인 확인 후에만 진행할 수 있습니다.');
+      return;
+    }
+    Alert.alert(enabled?'자동 불량 켜기 · 새 버전':'자동 불량 끄기 · 새 버전',
+      `${base.policyVersion}에서 자동 불량을 ${enabled?'켜는':'끄는'} 새 비활성 버전을 만들까요?\n\n실제 적용은 생성된 버전을 관리자가 별도로 활성화할 때만 변경됩니다.`,
+      [{text:'취소',style:'cancel'},{text:'새 비활성 버전 저장',onPress:()=>{
+        void runWrite('auto-fail',async()=>{
+          const current=(await assertLatest(base)).find(p=>p.policyId===base.policyId);
+          if(!current?.active || current.autoFailEnabled!==base.autoFailEnabled ||
+            current.failThreshold!==base.failThreshold)
+            throw new Error('활성 정책의 자동 불량 상태가 변경됐습니다. 다시 확인해 주세요.');
+          ensureAutoFailToggleV4(current,enabled);
+          if(enabled && (!current.metrics?.autoFail || !evidenceConfirmed))
+            throw new Error('AI 검증 근거 또는 승인 확인이 누락됐습니다.');
+          const saved=await autoFailService.saveToggle(current,enabled);
+          setSavedPolicy(saved);
+          setEvidenceConfirmed(false);
+          setActionNotice(`${saved.policyVersion} 자동 불량 ${enabled?'켜기':'끄기'} 버전을 비활성 상태로 저장했습니다. 기존 활성 정책은 변경되지 않았습니다.`);
+          await load(false);
+        });
+      }}]);
+  };
+
   return (
     <SafeAreaView style={s.screen} edges={['top', 'bottom']}>
       <Stack.Screen options={{headerShown: false}} />
@@ -267,10 +356,63 @@ export default function PolicyLiveScreen() {
                   <Row label="활성 기준치" value={percentageTextV4(active.passThreshold)} />
                   <Row label="검증 범위" value={`${percentageTextV4(active.validatedMin)} ~ ${percentageTextV4(active.validatedMax)}`} />
                   <Row label="ready / active" value={`${active.ready ? '준비됨' : '미준비'} / 적용 중`} />
+                  <Row label="자동 불량" value={active.autoFailEnabled===null?'미지원':active.autoFailEnabled?'켜짐':'꺼짐'} />
                 </>
               )}
               <Button title="실서버 정책 새로고침" secondary onPress={() => { void load(false); }}
                 disabled={!canWrite} />
+            </Card>
+
+            <Card title="자동 불량 정책 · 별도 검증·적용">
+              <Text style={s.muted}>
+                자동 불량 기본값은 꺼짐입니다. 기준 등록/켜기/끄기는 각각 새 비활성 정책 버전을 만듭니다.
+                활성화는 아래 정책 목록에서 별도로 선택해야 하며, 시험 승인 전에는 적용하지 마세요.
+              </Text>
+              {!active ? <Text style={s.errorText}>활성 정책을 확인한 뒤 사용할 수 있습니다.</Text> : <>
+                <Row label="현재 자동 불량" value={active.autoFailEnabled===null?'서버 미지원 / 배포 전':active.autoFailEnabled?'켜짐':'꺼짐'} />
+                <Row label="불량 기준" value={percentageTextV4(active.failThreshold,4)} />
+                <Row label="불량 검증 범위" value={`${percentageTextV4(active.failValidatedMin,4)} ~ ${percentageTextV4(active.failValidatedMax,4)}`} />
+                <Row label="AI 검증 근거" value={evidencePresent?'정책 metrics.autoFail 있음':'정책 metrics.autoFail 미등록'} />
+                {active.autoFailEnabled===null && (
+                  <Text style={s.errorText}>서버가 AUTO_FAIL 정책 필드를 아직 제공하지 않습니다. 신규 설정 요청을 보내지 않습니다.</Text>
+                )}
+                {active.autoFailEnabled!==null && <>
+                  <Text style={s.label}>불량 기준 입력 (%)</Text>
+                  <TextInput style={s.input} value={failPercent} placeholder="서버/AI 검증 기준 (%)"
+                    onChangeText={x=>{editedFailInput.current=true;setFailPercent(x);}}
+                    keyboardType="decimal-pad" maxLength={9} editable={canWrite}
+                    accessibilityLabel="자동 불량 기준 백분율" />
+                  <Text style={s.label}>검증 최솟값 (%)</Text>
+                  <TextInput style={s.input} value={failMinPercent} placeholder="AI 검증 최소 (%)"
+                    onChangeText={x=>{editedFailInput.current=true;setFailMinPercent(x);}}
+                    keyboardType="decimal-pad" maxLength={9} editable={canWrite}
+                    accessibilityLabel="불량 기준 AI 검증 범위 최솟값" />
+                  <Text style={s.label}>검증 최댓값 (%)</Text>
+                  <TextInput style={s.input} value={failMaxPercent} placeholder="AI 검증 최대 (%)"
+                    onChangeText={x=>{editedFailInput.current=true;setFailMaxPercent(x);}}
+                    keyboardType="decimal-pad" maxLength={9} editable={canWrite}
+                    accessibilityLabel="불량 기준 AI 검증 범위 최댓값" />
+                  <Text style={[s.hint,!failEditValid&&s.errorText]}>{failEditHint}</Text>
+                  <Button title="불량 기준 새 비활성 버전 저장" onPress={confirmSaveFail}
+                    disabled={!canWrite||!failEditValid}/>
+                  <Pressable accessibilityRole="checkbox" accessibilityState={{checked:evidenceConfirmed}}
+                    disabled={!canWrite} onPress={()=>setEvidenceConfirmed(v=>!v)}
+                    style={s.evidenceCheck}>
+                    <Text style={s.muted}>
+                      {evidenceConfirmed?'☑':'□'} 김도현 AI 검증 결과와 팀의 자동 불량 켜기 승인 여부를 별도로 확인했습니다.
+                    </Text>
+                  </Pressable>
+                  <Button title="자동 불량 켜기 버전 저장 · 적용 아님"
+                    onPress={()=>confirmAutoFailToggle(true)}
+                    disabled={!canWrite||!canToggleOn}/>
+                  <Button title="자동 불량 끄기 버전 저장 · 적용 아님" secondary
+                    onPress={()=>confirmAutoFailToggle(false)}
+                    disabled={!canWrite||!canToggleOff}/>
+                  <Text style={s.muted}>
+                    근거가 없으면 켜기 버튼이 비활성화됩니다. 저장된 모든 새 버전은 기존 정책 적용 기능에서 별도 검토합니다.
+                  </Text>
+                </>}
+              </>}
             </Card>
 
             <Card title="2. 기준치 조정 · 새 버전 저장">
@@ -319,6 +461,8 @@ export default function PolicyLiveScreen() {
                     </Text>
                     <Row label="기준치" value={percentageTextV4(policy.passThreshold)} />
                     <Row label="상태" value={`${policy.ready ? 'ready' : '미준비'} · ${policy.active ? 'active' : '비활성'}`} />
+                    <Row label="자동 불량" value={policy.autoFailEnabled===null?'미지원':policy.autoFailEnabled?'켜짐':'꺼짐'} />
+                    <Row label="불량 기준" value={percentageTextV4(policy.failThreshold,4)} />
                     {isOriginal && <Text style={s.muted}>원본 정책 버전</Text>}
                     {canActivate && (
                       <Button secondary
@@ -361,6 +505,7 @@ const s = StyleSheet.create({
   label: { color: C.muted, fontSize: 12, lineHeight: 18, flex: 0.46 },
   value: { color: C.ink, fontSize: 12, lineHeight: 18, textAlign: 'right', flex: 0.54, fontWeight: '600' },
   muted: { color: C.muted, fontSize: 12, lineHeight: 19 },
+  evidenceCheck: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, padding: 12 },
   input: { borderWidth: 1, borderColor: '#D5DCE8', borderRadius: 10, minHeight: 46,
     backgroundColor: '#F8FAFC', color: C.ink, paddingHorizontal: 14, fontSize: 16 },
   hint: { fontSize: 12, lineHeight: 19, color: C.green },

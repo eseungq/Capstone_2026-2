@@ -22,6 +22,10 @@ import type { ManualReplyV4, RetryReplyV4 } from '../api/backendV4/inspectionWri
 import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
 import type { FinalJudgementV4, InspectionViewV4 } from '../api/backendV4/types';
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
+import { inspectionDwellV4 } from '../api/backendV4/inspectionDwellV4';
+import { createRecheckServiceV4 } from '../api/backendV4/recheckServiceV4';
+
+const recheckService = createRecheckServiceV4(authV4);
 
 const inspectionReader = createInspectionReadServiceV4({
   mode: 'api',
@@ -105,7 +109,9 @@ export default function InspectionLiveScreen() {
   const [role, setRole] = useState<BackendRole | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
   const [comment, setComment] = useState('');
-  const [submitting, setSubmitting] = useState<'confirm' | 'retry' | 'manual' | null>(null);
+  const [submitting, setSubmitting] = useState<'confirm' | 'retry' | 'manual' | 'recheck' | 'acknowledge' | null>(null);
+  const [recheckComment, setRecheckComment] = useState('');
+  const [acknowledgeNote, setAcknowledgeNote] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [retryResult, setRetryResult] = useState<RetryReplyV4 | null>(null);
@@ -136,7 +142,23 @@ export default function InspectionLiveScreen() {
     setManualResult(null);
     setModelAvailable(null);
     setComment('');
+    setRecheckComment('');
+    setAcknowledgeNote('');
   }, [id]);
+
+  // 실서버 상세가 화면 앞에 보이는 시간만 누적. 사진 확대·다른 화면·백그라운드에서는 정지.
+  useFocusEffect(useCallback(() => {
+    if (!id) return;
+    const foreground = AppState.currentState === 'active' || AppState.currentState == null;
+    inspectionDwellV4.focus(id, foreground);
+    const sub = AppState.addEventListener('change', (state) => {
+      inspectionDwellV4.setForeground(id, state === 'active');
+    });
+    return () => {
+      sub.remove();
+      inspectionDwellV4.blur(id);
+    };
+  }, [id]));
 
   // 화면 이탈이나 앱 백그라운드 진입 시 자동 이미지 갱신을 정지합니다.
   useFocusEffect(useCallback(() => {
@@ -299,7 +321,9 @@ export default function InspectionLiveScreen() {
         const reply = await writer.confirm(origin, {
           finalJudgement: judgement,
           comment,
+          ...(inspectionDwellV4.snapshot(submittedId) ?? {}),
         });
+        inspectionDwellV4.clear(submittedId);
         if (currentIdRef.current !== submittedId) return;
         setActionMessage(`${reply.value.inspectionNo}: ${reply.value.finalJudgement} 판정이 서버에 저장됐습니다. (${formatTime(reply.value.confirmedAt)})`);
       } else if (action === 'retry') {
@@ -377,6 +401,89 @@ export default function InspectionLiveScreen() {
       [
         { text: '취소', style: 'cancel' },
         { text: '수동 판정으로 전환', onPress: () => { void submitAction('manual'); } },
+      ],
+    );
+  };
+
+  const submitRecheckAction = async (action: 'recheck' | 'acknowledge', result?: FinalJudgementV4) => {
+    if (submitLock.current || !visibleDetail || !id || submitting) return;
+    const submittedId = id;
+    submitLock.current = true;
+    setSubmitting(action);
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const session = await authV4.restore();
+      if (!session.signedIn || !session.role) throw new Error('실제 서버 계정으로 다시 로그인해 주세요.');
+      if (action === 'recheck' && session.role !== 'WORKER') {
+        throw new Error('표본 재확인 제출은 WORKER만 가능합니다.');
+      }
+      if (action === 'acknowledge' && session.role !== 'ADMIN') {
+        throw new Error('재확인 FAIL 확인함 처리는 ADMIN만 가능합니다.');
+      }
+      const latest = (await inspectionReader.detail(submittedId)).value;
+      if (currentIdRef.current !== submittedId) return;
+      setDetail(latest);
+      if (latest.displayState !== 'AUTO_PASS' || latest.finalJudgement !== 'PASS' ||
+          latest.judgedBy !== 'SYSTEM' || !latest.recheck) {
+        throw new Error('현재 검사는 AUTO_PASS 재확인 표본이 아닙니다.');
+      }
+      if (action === 'recheck') {
+        if (latest.recheck.result !== null || !result) {
+          throw new Error('이미 재확인했거나 제출할 수 없는 검사입니다.');
+        }
+        const reply = await recheckService.recheck(submittedId, result,
+          recheckComment, inspectionDwellV4.snapshot(submittedId));
+        if (currentIdRef.current !== submittedId) return;
+        inspectionDwellV4.clear(submittedId);
+        setActionMessage(
+          reply.inspectionNo + ': 재확인 ' + reply.recheck.result +
+          '이 별도로 저장됐습니다. 원래 PASS · SYSTEM 판정은 유지됩니다.',
+        );
+      } else {
+        if (latest.recheck.result !== 'FAIL' || latest.recheck.acknowledgedAt !== null) {
+          throw new Error('관리자 확인함은 아직 확인하지 않은 재확인 FAIL에만 가능합니다.');
+        }
+        const reply = await recheckService.acknowledge(submittedId, acknowledgeNote);
+        if (currentIdRef.current !== submittedId) return;
+        setActionMessage(
+          reply.inspectionNo + ': 관리자가 확인함으로 기록했습니다. 문제 해결 완료를 뜻하지 않습니다.',
+        );
+      }
+      await load(false);
+    } catch (cause) {
+      if (currentIdRef.current === submittedId) {
+        setActionError(actionErrorMessage(cause));
+        // 오류에서는 체류 시간과 메모를 유지하며 POST를 자동 재시도하지 않습니다.
+      }
+    } finally {
+      submitLock.current = false;
+      if (currentIdRef.current === submittedId) setSubmitting(null);
+    }
+  };
+
+  const requestRecheck = (result: FinalJudgementV4) => {
+    if (!visibleDetail?.recheck || visibleDetail.recheck.result !== null || submitting) return;
+    Alert.alert(
+      'AUTO_PASS 표본 재확인 제출',
+      visibleDetail.inspectionNo + '의 재확인 결과를 ' + result +
+        '로 제출할까요? 원래 PASS · SYSTEM은 바뀌지 않습니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        { text: result + ' 제출', onPress: () => { void submitRecheckAction('recheck', result); } },
+      ],
+    );
+  };
+
+  const requestAcknowledge = () => {
+    if (!visibleDetail?.recheck || visibleDetail.recheck.result !== 'FAIL' ||
+        visibleDetail.recheck.acknowledgedAt !== null || submitting) return;
+    Alert.alert(
+      '재확인 FAIL · 관리자 확인함',
+      '이 결과를 확인했다는 사실만 기록할까요? 문제 해결 완료나 원래 판정 변경은 아닙니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '확인함 기록', onPress: () => { void submitRecheckAction('acknowledge'); } },
       ],
     );
   };
@@ -569,13 +676,141 @@ export default function InspectionLiveScreen() {
                   <Field label="REVIEW 사유" value={visibleDetail.reviewReasonText ?? '해당 없음'} />
                 </>
               )}
-              <Field label="최종 작업자 판정" value={visibleDetail.finalJudgement ?? '미확정'} />
+              <Field label={visibleDetail.judgedBy === 'SYSTEM' ? '최초 시스템 판정' : '최종 작업자 판정'}
+                value={visibleDetail.finalJudgement ?? '미확정'} />
+              {visibleDetail.correction && (
+                <>
+                  <Field label="최종 정정 판정" value={visibleDetail.correction.correctedJudgement} />
+                  <Field label="관리자 정정자" value={visibleDetail.correction.correctedBy} />
+                  <Field label="정정 시각" value={formatTime(visibleDetail.correction.correctedAt)} />
+                  <Text style={styles.muted}>정정 근거: {visibleDetail.correction.note}</Text>
+                </>
+              )}
               <Field label="판정 주체" value={visibleDetail.judgedBy ?? '미제공'} />
               <Field label="판정 시각" value={formatTime(visibleDetail.confirmedAt)} />
               {visibleDetail.errorCode && <Field label="오류 코드" value={visibleDetail.errorCode} />}
               {visibleDetail.errorMessage && <Text style={styles.errorText}>{visibleDetail.errorMessage}</Text>}
             </View>
 
+
+            {visibleDetail.recheck && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>AUTO_PASS 표본 재확인</Text>
+                <Text style={styles.muted}>
+                  원래 검사 판정: PASS · SYSTEM (변경하지 않음). 재확인 결과는 별도 기록입니다.
+                </Text>
+                <Field label="표본 구간" value={visibleDetail.recheck.stratum} />
+                <Field label="표본 추출 비율" value={(visibleDetail.recheck.samplingRate * 100).toFixed(0) + '%'} />
+                <Field label="규칙 버전" value={visibleDetail.recheck.ruleVersion ?? '구버전 기록 / 미제공'} />
+                <Field label="시험 이름" value={visibleDetail.recheck.trialName ?? '미지정'} />
+                <Field label="선정 시각" value={formatTime(visibleDetail.recheck.sampledAt)} />
+                <Field label="재확인 결과" value={visibleDetail.recheck.result ?? '작업자 재확인 대기'} />
+                <Field label="재확인자" value={visibleDetail.recheck.recheckedBy ?? '미완료'} />
+                <Field label="재확인 시각" value={formatTime(visibleDetail.recheck.recheckedAt)} />
+                {visibleDetail.recheck.comment && <Field label="재확인 메모" value={visibleDetail.recheck.comment} />}
+                {visibleDetail.recheck.result === 'FAIL' && (
+                  <View style={styles.staleCard}>
+                    <Text style={styles.errorText}>{visibleDetail.recheck.acknowledgedAt
+                      ? '재확인 불량 · 관리자 확인함 (해결 완료 아님)'
+                      : '재확인 불량 · 관리자의 추가 확인이 필요합니다.'}</Text>
+                    <Text style={styles.muted}>원래 AUTO_PASS 상태와 PASS · SYSTEM 판정은 유지됩니다.</Text>
+                  </View>
+                )}
+                {visibleDetail.recheck.result === 'FAIL' && (
+                  <Field label="관리자 확인" value={
+                    visibleDetail.recheck.acknowledgedAt ? '확인함 (해결 완료 아님)' : '미확인'
+                  } />
+                )}
+                {visibleDetail.recheck.acknowledgedAt && (
+                  <>
+                    <Field label="확인한 관리자" value={visibleDetail.recheck.acknowledgedBy ?? '미제공'} />
+                    <Field label="확인 시각" value={formatTime(visibleDetail.recheck.acknowledgedAt)} />
+                    {visibleDetail.recheck.acknowledgeNote && (
+                      <Field label="확인 메모" value={visibleDetail.recheck.acknowledgeNote} />
+                    )}
+                  </>
+                )}
+                {!roleLoading && role === 'WORKER' && visibleDetail.recheck.result === null && (
+                  <>
+                    <Text style={styles.label}>재확인 메모 (선택, 200자 이내)</Text>
+                    <TextInput style={styles.commentInput} maxLength={200} multiline
+                      placeholder="재확인 결과에 대한 설명을 남겨주세요."
+                      placeholderTextColor="#64748B"
+                      value={recheckComment} onChangeText={setRecheckComment} editable={!submitting} />
+                    <View style={styles.buttonRow}>
+                      <Pressable accessibilityRole="button"
+                        disabled={submitting !== null}
+                        style={({ pressed }) => [styles.button, styles.buttonFlex,
+                          pressed && styles.buttonPressed, submitting && styles.disabledButton]}
+                        onPress={() => requestRecheck('PASS')}>
+                        <Text style={styles.buttonText}>재확인 PASS</Text>
+                      </Pressable>
+                      <Pressable accessibilityRole="button"
+                        disabled={submitting !== null}
+                        style={({ pressed }) => [styles.button, styles.buttonFlex, styles.failButton,
+                          pressed && styles.failButtonPressed, submitting && styles.disabledButton]}
+                        onPress={() => requestRecheck('FAIL')}>
+                        <Text style={styles.buttonText}>재확인 FAIL</Text>
+                      </Pressable>
+                    </View>
+                  </>
+                )}
+                {!roleLoading && role === 'ADMIN' && visibleDetail.recheck.result === null && (
+                  <Text style={styles.muted}>재확인 PASS/FAIL 제출은 WORKER 전용입니다.</Text>
+                )}
+                {!roleLoading && role === 'ADMIN' && visibleDetail.recheck.result === 'FAIL' &&
+                  visibleDetail.recheck.acknowledgedAt === null && (
+                  <>
+                    <Text style={styles.label}>관리자 확인 메모 (선택, 200자 이내)</Text>
+                    <TextInput style={styles.commentInput} maxLength={200} multiline
+                      placeholder="예: 라인 담당자에게 전달"
+                      placeholderTextColor="#64748B"
+                      value={acknowledgeNote} onChangeText={setAcknowledgeNote} editable={!submitting} />
+                    <Pressable accessibilityRole="button" disabled={submitting !== null}
+                      style={({ pressed }) => [styles.button, pressed && styles.buttonPressed,
+                        submitting && styles.disabledButton]}
+                      onPress={requestAcknowledge}>
+                      <Text style={styles.buttonText}>확인함 기록 (해결 완료 아님)</Text>
+                    </Pressable>
+                  </>
+                )}
+                {submitting === 'recheck' || submitting === 'acknowledge' ? (
+                  <Text style={styles.muted}>서버 기록 처리 중… 중복 제출하지 마세요.</Text>
+                ) : null}
+              </View>
+            )}
+
+            {visibleDetail.judgedBy === 'SYSTEM' && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>시스템 판정 확인 요청 · 정정 이력</Text>
+                <Text style={styles.muted}>
+                  최초 시스템 판정은 변경하지 않고, 확인 요청과 관리자 정정을 별도로 기록합니다.
+                </Text>
+                <Field label="현재 판정" value={visibleDetail.correctedJudgement ?? visibleDetail.finalJudgement ?? '미제공'} />
+                {visibleDetail.judgementRequests.length === 0 ? (
+                  <Text style={styles.muted}>판정 확인 요청 기록이 없습니다.</Text>
+                ) : visibleDetail.judgementRequests.map(request => (
+                  <View key={request.requestId} style={styles.field}>
+                    <Text style={styles.muted}>
+                      {request.status === 'OPEN' ? '검토 대기' : request.status === 'KEPT' ? '유지 처리' : '정정 완료'}
+                      {' · '}작업자 주장 {request.claimedJudgement}
+                    </Text>
+                    <Text style={styles.muted}>근거: {request.reason}</Text>
+                    {request.resolveNote && <Text style={styles.muted}>관리자 판단: {request.resolveNote}</Text>}
+                  </View>
+                ))}
+                {!roleLoading && role === 'WORKER' && !visibleDetail.judgementRequests.some(r => r.status === 'OPEN') && (
+                  <Pressable style={({pressed}) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed]}
+                    accessibilityRole="button"
+                    onPress={() => router.push({
+                      pathname: '/judgement-request-live',
+                      params: { inspectionId: visibleDetail.inspectionId },
+                    })}>
+                    <Text style={styles.secondaryButtonText}>시스템 판정 확인 요청 ›</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>작업자 판정 · 후속 처리</Text>
               <Text style={styles.muted}>요청 전 내용을 확인해 주세요. 중복 제출은 하지 않습니다.</Text>
@@ -632,7 +867,13 @@ export default function InspectionLiveScreen() {
                 <>{manualButton}{retryButton}</>
               )}
               {!visibleDetail.canOfferConfirm && !visibleDetail.canOfferRetry && !visibleDetail.canOfferManual && !visibleDetail.followUp && (
-                <Text style={styles.muted}>현재 서버 상태에서는 제출 가능한 판정 또는 후속 검사 요청이 없습니다.</Text>
+                <Text style={styles.muted}>{visibleDetail.recheck?.result === null
+                    ? (role === 'ADMIN'
+                      ? '관리자 계정은 표본 재확인 상태를 조회만 할 수 있습니다. 재확인 PASS/FAIL은 WORKER 전용입니다.'
+                      : role === 'WORKER'
+                        ? '일반 REVIEW 판정이나 FAILED 후속 요청은 없습니다. 표본 재확인은 위 카드에서 제출해 주세요.'
+                        : '재확인 PASS/FAIL 제출은 WORKER 계정에서만 가능합니다.')
+                    : '현재 서버 상태에서는 제출 가능한 일반 판정 또는 후속 검사 요청이 없습니다.'}</Text>
               )}
               {!roleLoading && role === 'ADMIN' && visibleDetail.canOfferManual && (
                 <Text style={styles.muted}>수동 판정으로 전환하려면 WORKER 계정으로 로그인해 주세요.</Text>

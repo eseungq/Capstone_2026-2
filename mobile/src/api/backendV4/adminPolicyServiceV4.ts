@@ -15,6 +15,11 @@ export interface AdminPolicyV4 {
   modelVersion: string;
   calibratorVersion: string | null;
   passThreshold: number | null;
+  /** null when server predates the AUTO_FAIL policy schema; never treat missing as enabled. */
+  autoFailEnabled: boolean | null;
+  failThreshold: number | null;
+  failValidatedMin: number | null;
+  failValidatedMax: number | null;
   validatedMin: number | null;
   validatedMax: number | null;
   ready: boolean;
@@ -55,6 +60,9 @@ export function decodeAdminPolicyV4(raw: unknown): AdminPolicyV4 {
       !nonblank(raw.partCode) || !nonblank(raw.modelVersion) ||
       !nullableText(raw.calibratorVersion) || !nullableText(raw.basedOnPolicyId) ||
       !nullableText(raw.createdAt) || !nullableText(raw.activatedAt) ||
+      (raw.autoFailEnabled != null && typeof raw.autoFailEnabled !== 'boolean') ||
+      !nullableUnit(raw.failThreshold) || !nullableUnit(raw.failValidatedMin) ||
+      !nullableUnit(raw.failValidatedMax) ||
       !nullableUnit(raw.passThreshold) || !nullableUnit(raw.validatedMin) ||
       !nullableUnit(raw.validatedMax) || typeof raw.ready !== 'boolean' ||
       typeof raw.active !== 'boolean' || (raw.metrics != null && !record(raw.metrics))) {
@@ -64,6 +72,20 @@ export function decodeAdminPolicyV4(raw: unknown): AdminPolicyV4 {
     throw new PolicyAdminContractErrorV4('validatedMin이 validatedMax보다 큽니다.');
   }
   if (raw.active && !raw.ready) throw new PolicyAdminContractErrorV4('미준비 정책이 활성 상태입니다.');
+  const failValues=[raw.failThreshold,raw.failValidatedMin,raw.failValidatedMax];
+  const present=failValues.filter(x=>x!=null).length;
+  if(present!==0&&present!==3)
+    throw new PolicyAdminContractErrorV4('자동 불량 기준과 검증 범위 3개 필드는 함께 제공되어야 합니다.');
+  if(present===3) {
+    const threshold=raw.failThreshold as number;
+    const min=raw.failValidatedMin as number;
+    const max=raw.failValidatedMax as number;
+    if(min>max||threshold<min||threshold>max||
+      raw.passThreshold==null||threshold<=raw.passThreshold)
+      throw new PolicyAdminContractErrorV4('자동 불량 기준·검증 범위·통과 기준 간의 관계가 잘못됐습니다.');
+  }
+  if(raw.autoFailEnabled===true&&present!==3)
+    throw new PolicyAdminContractErrorV4('자동 불량 활성화에 필요한 불량 기준이 없습니다.');
   return {
     policyId: raw.policyId,
     policyVersion: raw.policyVersion,
@@ -71,6 +93,10 @@ export function decodeAdminPolicyV4(raw: unknown): AdminPolicyV4 {
     modelVersion: raw.modelVersion,
     calibratorVersion: raw.calibratorVersion ?? null,
     passThreshold: raw.passThreshold ?? null,
+    autoFailEnabled: raw.autoFailEnabled ?? null,
+    failThreshold: raw.failThreshold ?? null,
+    failValidatedMin: raw.failValidatedMin ?? null,
+    failValidatedMax: raw.failValidatedMax ?? null,
     validatedMin: raw.validatedMin ?? null,
     validatedMax: raw.validatedMax ?? null,
     ready: raw.ready,

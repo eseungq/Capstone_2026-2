@@ -31,6 +31,7 @@ const states: { value: StateFilter; label: string }[] = [
   { value: 'REVIEW_DONE', label: '판정 완료' },
   { value: 'FAILED', label: '분석 실패' },
   { value: 'AUTO_PASS', label: '자동 통과' },
+  { value: 'AUTO_FAIL', label: '자동 불량' },
 ];
 const periods: { value: PeriodFilter; label: string }[] = [
   { value: 0, label: '전체 기간' },
@@ -43,6 +44,7 @@ const stateLabels: Record<DisplayStateV4, string> = {
   REVIEW_DONE: '판정 완료',
   FAILED: '분석 실패',
   AUTO_PASS: '자동 통과',
+  AUTO_FAIL: '자동 불량',
 };
 
 
@@ -52,6 +54,7 @@ const badgeTone: Record<DisplayStateV4, { bg: string; fg: string }> = {
   REVIEW_DONE: { bg: '#F0F3F8', fg: '#334155' },
   FAILED: { bg: '#FFF0ED', fg: '#B42318' },
   AUTO_PASS: { bg: '#EAFBF2', fg: '#067647' },
+  AUTO_FAIL: { bg: '#FFF0ED', fg: '#B42318' },
 };
 
 function dateText(value: string | null): string {

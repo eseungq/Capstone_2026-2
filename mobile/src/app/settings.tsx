@@ -129,6 +129,28 @@ export default function SettingsScreen() {
           </Text>
         </Card>
 
+        {mode === 'live' && (
+          <Pressable
+            style={[styles.button, styles.secondary]}
+            onPress={() => router.push('/rechecks-live')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.buttonText}>
+              AUTO_PASS 표본 재확인 · {isAdmin ? '관리자 결과 확인' : '작업자 확인'}
+            </Text>
+          </Pressable>
+        )}
+
+        {isAdmin && mode === 'live' && (
+          <Pressable style={[styles.button, styles.primary]}
+            accessibilityRole="button"
+            onPress={() => router.push('/judgement-requests-admin-live')}>
+            <Text style={[styles.buttonText, { color: color.white }]}>
+              판정 확인 요청 관리 · SERVER
+            </Text>
+          </Pressable>
+        )}
+
         {isAdmin && (
           <Pressable style={[styles.button, styles.primary]} 
 onPress={() => {
@@ -143,6 +165,15 @@ onPress={() => {
             <Text style={[styles.buttonText, { color: color.white }]}>{mode === 'live' ? 'COWL_COVER 실서버 정책 관리' : '자동 통과 기준 관리 · Mock'}</Text>
           </Pressable>
         )}
+
+{isAdmin && mode === 'live' && (
+  <Pressable style={[styles.button, styles.primary]} accessibilityRole="button"
+    onPress={() => router.push('/admin-daily-live')}>
+    <Text style={[styles.buttonText, {color: color.white}]}>
+      날짜별 자동 판정 통계 · SERVER
+    </Text>
+  </Pressable>
+)}
 
 {isAdmin && (
   <Pressable
