@@ -13,11 +13,16 @@ import com.capstone.inspection.domain.inspection.InspectionRepository;
 import com.capstone.inspection.domain.inspection.InspectionSource;
 import com.capstone.inspection.domain.inspection.InspectionStatus;
 import com.capstone.inspection.domain.inspection.JudgedBy;
+import com.capstone.inspection.domain.inspection.JudgementRequest;
+import com.capstone.inspection.domain.inspection.JudgementRequestRepository;
+import com.capstone.inspection.domain.inspection.JudgementRequestStatus;
 import com.capstone.inspection.domain.inspection.WorkerConfirmation;
 import com.capstone.inspection.domain.inspection.WorkerConfirmationRepository;
 import com.capstone.inspection.domain.part.Part;
 import com.capstone.inspection.domain.part.PartRepository;
+import com.capstone.inspection.inspection.dto.CorrectionBlock;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse;
+import com.capstone.inspection.inspection.dto.JudgementRequestResponse;
 import com.capstone.inspection.inspection.dto.InspectionHistoryItem;
 import com.capstone.inspection.inspection.dto.RecheckBlock;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse.Ai;
@@ -59,6 +64,7 @@ public class InspectionQueryService {
     private final WorkerConfirmationRepository confirmationRepository;
     private final ImageUrlSigner signer;
     private final AutoPassRecheckRepository recheckRepository;
+    private final JudgementRequestRepository judgementRequestRepository;
 
     public InspectionDetailResponse getDetail(String inspectionId) {
         Inspection i = inspectionRepository.findDetailById(inspectionId)
@@ -98,12 +104,17 @@ public class InspectionQueryService {
                     .map(f -> new FollowUp(f.getId(), f.getInspectionNo(), f.getSource())).orElse(null)
                 : null;
         String retryOf = i.getSource() == InspectionSource.RETRY ? i.getRetryOfInspectionId() : null;
+        // 판정 확인 요청 (계약 6.12): 최신순 전체와 마지막 정정
+        List<JudgementRequest> judgementRequests = judgementRequestRepository.findByInspectionIdLatestFirst(i.getId());
 
         return new InspectionDetailResponse(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(),
                 i.getLineCode(), i.getStatus(), DisplayState.of(i), Times.toOffset(i.getReceivedAt()),
                 Times.toOffset(i.getCompletedAt()), i.getSource(), retryOf, manualOf, followUp, ai, policy,
                 judgement, images(i), error,
-                recheckRepository.findSampledByInspectionIdWithUser(i.getId()).map(RecheckBlock::of).orElse(null));
+                recheckRepository.findSampledByInspectionIdWithUser(i.getId()).map(RecheckBlock::of).orElse(null),
+                judgementRequests.stream().map(JudgementRequestResponse::of).toList(),
+                CorrectionBlock.of(JudgementCorrections.latest(judgementRequests.stream()
+                        .filter(r -> r.getStatus() == JudgementRequestStatus.CORRECTED).toList())));
     }
 
     // 검사 이력 (계약 v4 6.6). 작업자도 전체 검사 조회. 기간은 receivedAt 기준 from ≤ receivedAt < to
@@ -153,10 +164,17 @@ public class InspectionQueryService {
         Map<String, LocalDateTime> confirmedAt = reviewedIds.isEmpty() ? Map.of()
                 : confirmationRepository.findByInspectionIds(reviewedIds).stream()
                 .collect(Collectors.toMap(c -> c.getInspection().getId(), WorkerConfirmation::getConfirmedAt));
+        // 정정 판정: 요청 대상(시스템 판정) 건만 한 번에 읽음
+        List<String> systemIds = inspections.stream()
+                .filter(i -> i.getJudgedBy() == JudgedBy.SYSTEM)
+                .map(Inspection::getId).toList();
+        Map<String, JudgementRequest> corrections = systemIds.isEmpty() ? Map.of()
+                : JudgementCorrections.latestByInspection(judgementRequestRepository.findCorrectedByInspectionIds(systemIds));
         return inspections.stream().map(i -> new InspectionHistoryItem(i.getId(), i.getInspectionNo(),
                 i.getPart().getPartCode(), i.getSource(), DisplayState.of(i), i.getPredictedQuality(), i.getReviewReason(),
                 errorCodeOf(i), Times.toOffset(i.getReceivedAt()), urls.get(i.getId()), i.getFinalJudgement(),
-                i.getJudgedBy(), Times.toOffset(confirmedAt.get(i.getId())))).toList();
+                i.getJudgedBy(), Times.toOffset(confirmedAt.get(i.getId())),
+                corrections.containsKey(i.getId()) ? corrections.get(i.getId()).getClaimedJudgement() : null)).toList();
     }
 
     // 목록에 보여 줄 오류 코드 (FAILED일 때만)
