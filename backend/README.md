@@ -12,6 +12,7 @@
 - 재검사: `POST /api/v1/inspections/{id}/retry` (FAILED만, 새 검사 생성)
 - 수동 판정 전환: `POST /api/v1/inspections/{id}/manual` (WORKER, 모든 FAILED, AI 상태 확인 안 함) → 새 검사(`source=MANUAL`, `AI_UNAVAILABLE`)를 기존 confirm으로 판정. FAILED 1건당 재검사·수동 전환 중 1건 (V6, 계약 6.10)
 - 후보 기준치 비교: `GET /api/v1/admin/policies/{id}/simulation` (같은 모델·보정기 기록에 현재·후보 기준치 대입, 바뀌는 건의 작업자 PASS·FAIL·미확인, 조회만, 계약 6.9.1)
+- 날짜별 이력·기준 상세: `GET /api/v1/admin/automation/daily?partCode&from&to` (KST 날짜 × 판정 당시 정책·모델·보정기 행, 최대 92일, 수동 전환·분석 실패 따로, 판정 확인 요청 집계), `GET /api/v1/admin/automation/daily/detail?partCode&date&policyId&band` (기준 주변 REVIEW 두 구간, 계약 6.13 [제안])
 - AUTO_PASS 표본 재확인: AUTO_PASS 뒤 보정 확률 구간별 비율로 표본 추출(V8 `auto_pass_recheck`), `GET /api/v1/rechecks`, `POST /api/v1/inspections/{id}/recheck` (WORKER, 시스템 판정은 그대로), 상세 `recheck` 블록 (계약 6.11 [제안]). **기본 꺼 둠**: `APP_RECHECK_ENABLED=true`로 켬
 - 공동시험 기록 (V9, 계약 6.11 [합의 11/18 김도현·홍승인]): 추출 규칙(`recheck_rule`, 버전 `v1-b40-80-p100-30-10` 자동 생성, 시험 이름 `APP_RECHECK_TRIAL_NAME` 선택)을 AUTO_PASS 판정 때 검사에 남기고 재처리도 그 규칙을 씀 · 관리자 확인함 `POST /api/v1/admin/rechecks/{id}/acknowledge` (재확인 FAIL만, 해결 완료 아님) · 요약 `GET /api/v1/admin/rechecks/summary` (규칙·구간별 건수, 결정 누락, 가중 추정, 가상 비교 비율, REVIEW·재확인 대기 시간, 화면 체류 시간) · REVIEW 확인·재확인 제출의 화면 체류 시간(`screenDwellMs`·`firstOpenedAt`·`openCount`, 선택) · 후보 기준치 비교에 예상 재확인 건수·재확인 라벨
 - 부품 목록: `GET /api/v1/parts` (모델 사용 가능·정책 적용 여부)

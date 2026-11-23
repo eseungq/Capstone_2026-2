@@ -76,6 +76,24 @@ public interface InspectionRepository extends JpaRepository<Inspection, String>,
             + "and (:from is null or i.receivedAt >= :from) and (:to is null or i.receivedAt < :to)")
     List<ScoredInspection> findScored(String modelId, String calibratorVersion, LocalDateTime from, LocalDateTime to);
 
+    // ---- 날짜별 이력·기준 상세 (계약 6.13). 한 부품의 기간(최대 92일) 검사를 필요한 값만 읽어 서비스에서 묶음 ----
+    //   진행 중(RECEIVED·ANALYZING)은 판정 경로가 정해지지 않아 빼고 COMPLETED·FAILED만
+
+    record DailyInspection(String id, String inspectionNo, LocalDateTime receivedAt, InspectionStatus status,
+                           InspectionSource source, RecommendedAction recommendedAction,
+                           PredictedQuality predictedQuality, Double calibratedDefectProbability,
+                           Judgement finalJudgement, String policyId, String modelVersion, String calibratorVersion) {
+    }
+
+    @Query("select new com.capstone.inspection.domain.inspection.InspectionRepository$DailyInspection("
+            + "i.id, i.inspectionNo, i.receivedAt, i.status, i.source, i.recommendedAction, i.predictedQuality, "
+            + "i.calibratedDefectProbability, i.finalJudgement, p.id, m.modelVersion, i.calibratorVersion) "
+            + "from Inspection i join i.model m left join i.policy p "
+            + "where i.part.id = :partId and i.receivedAt >= :from and i.receivedAt < :to "
+            + "and i.status in (com.capstone.inspection.domain.inspection.InspectionStatus.COMPLETED, "
+            + "com.capstone.inspection.domain.inspection.InspectionStatus.FAILED)")
+    List<DailyInspection> findDaily(String partId, LocalDateTime from, LocalDateTime to);
+
     // 작업자 판정 기록. 아직 판정 전인 REVIEW 건일 때만 갱신되므로 동시 제출 중 1건만 1을 받음 (계약 6.7)
     @Modifying(flushAutomatically = true)
     @Query("update Inspection i set i.finalJudgement = :judgement, i.judgedBy = com.capstone.inspection.domain.inspection.JudgedBy.WORKER "
