@@ -6,10 +6,11 @@
 import type { QueueItemV4, QueuePageV4, InspectionReadSourceV4 } from './inspectionReadCore';
 import type { QueueRequestV4, SourcedV4 } from './inspectionReadService';
 
+export const MONITORED_PARTS = ['DOOR', 'FRAME', 'COWL_COVER'] as const;
 export const REVIEW_BROWSE_PAGE_SIZE_V4 = 20;
 export type ReviewQueueSortV4 = 'RECEIVED' | 'PRIORITY';
 export interface ReviewQueueFiltersV4 {
-  partCode: string;
+  partCode: string | null;
   sort: ReviewQueueSortV4;
   aiDefectOnly: boolean;
 }
@@ -26,12 +27,14 @@ export interface ReviewQueueBrowseSnapshotV4 {
 export interface ReviewQueueReaderV4 {
   queue(request?: QueueRequestV4): Promise<SourcedV4<QueuePageV4>>;
 }
-export function reviewQueueRequestV4(filters: ReviewQueueFiltersV4, cursor: string | null = null): QueueRequestV4 {
-  if (!filters.partCode.trim()) throw new Error('부품 코드를 지정해야 합니다.');
+export function reviewQueueRequestV4(
+  filters: ReviewQueueFiltersV4, cursor: string | null = null, reviewOnly = false,
+): QueueRequestV4 {
+  if (filters.partCode !== null && !filters.partCode.trim()) throw new Error('부품 코드를 지정해야 합니다.');
   if (filters.sort !== 'RECEIVED' && filters.sort !== 'PRIORITY') throw new Error('지원하지 않는 대기열 정렬입니다.');
   return {
-    type: filters.aiDefectOnly ? 'REVIEW' : 'ALL',
-    partCode: filters.partCode,
+    type: reviewOnly || filters.aiDefectOnly ? 'REVIEW' : 'ALL',
+    ...(filters.partCode === null ? {} : {partCode: filters.partCode}),
     size: REVIEW_BROWSE_PAGE_SIZE_V4,
     sort: filters.sort,
     ...(filters.aiDefectOnly ? { predictedQuality: 'DEFECT' as const } : {}),
@@ -50,7 +53,7 @@ function validatePage(result: SourcedV4<QueuePageV4>, request: QueueRequestV4): 
   }
   const ids = new Set<string>();
   for (const item of page.items) {
-    if (item.partCode !== request.partCode ||
+    if ((request.partCode !== undefined && item.partCode !== request.partCode) ||
       (item.displayState !== 'REVIEW_PENDING' && item.displayState !== 'FAILED') ||
       (request.type === 'REVIEW' && item.displayState !== 'REVIEW_PENDING') ||
       (request.predictedQuality && item.predictedQuality !== request.predictedQuality)) {
@@ -64,7 +67,7 @@ function validatePage(result: SourcedV4<QueuePageV4>, request: QueueRequestV4): 
   }
   return page;
 }
-export function createReviewQueueBrowserV4(reader: ReviewQueueReaderV4) {
+export function createReviewQueueBrowserV4(reader: ReviewQueueReaderV4, { reviewOnly = false } = {}) {
   let revision = 0;
   let seenCursors = new Set<string>();
   let state: ReviewQueueBrowseSnapshotV4 = {
@@ -103,7 +106,7 @@ export function createReviewQueueBrowserV4(reader: ReviewQueueReaderV4) {
     const current = revision;
     update({ status: 'loading', error: null, loadingNext: append,
       ...(!append ? { items: [], nextCursor: null, loaded: false } : {}) });
-    const request = reviewQueueRequestV4(filters, cursor);
+    const request = reviewQueueRequestV4(filters, cursor, reviewOnly);
     try {
       const response = await reader.queue(request);
       if (current !== revision) return;

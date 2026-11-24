@@ -5,7 +5,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { API_BASE_URL, authV4 } from '../api/backendV4/authRuntime';
 import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
 import {
-  createReviewQueueBrowserV4, type ReviewQueueSortV4,
+  createReviewQueueBrowserV4, MONITORED_PARTS, type ReviewQueueSortV4,
   type ReviewQueueBrowseSnapshotV4,
 } from '../api/backendV4/reviewQueueBrowseCoreV4';
 import { liveMonitoringReaderV4 } from '../api/backendV4/monitoringLiveReaderV4';
@@ -14,7 +14,6 @@ import type { MonitorAlertV4 } from '../api/backendV4/monitoringPollCore';
 import { buildMonitoringViewModelV4 } from '../api/backendV4/monitoringViewModelV4';
 import { monitoringThumbnailNeedsReloadV4, resolveMonitoringThumbnailUrlV4 } from '../api/backendV4/monitoringThumbnailUrlV4';
 
-const MONITORED_PARTS = ['DOOR', 'FRAME', 'COWL_COVER'] as const;
 const INITIAL_VISIBLE_QUEUE_COUNT = 3;
 const reviewQueueReaderV4 = createInspectionReadServiceV4({ mode: 'api', transport: authV4 });
 function probabilityLabelV4(value: number | null | undefined): string {
@@ -302,7 +301,10 @@ export default function MonitoringLiveDashboardV4({
         <Text style={styles.title}>처리 필요 검사 · {partCode}</Text>
         {isAuthenticatedWorker && (
           <Pressable accessibilityRole="button" style={styles.batchFailEntry}
-            onPress={() => router.push('/batch-fail-live')}>
+            onPress={() => router.push({
+              pathname: '/batch-fail-live',
+              params: {partCode, sort: queueSort, aiDefectOnly: String(aiDefectOnly)},
+            })}>
             <Text style={styles.batchFailEntryText}>REVIEW 상세 검토 후 일괄 FAIL 판정 ›</Text>
           </Pressable>
         )}

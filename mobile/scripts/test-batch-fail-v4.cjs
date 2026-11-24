@@ -16,7 +16,7 @@ Module._extensions['.ts'] = (module,filename) => {
 };
 const root=path.join(__dirname,'../src/api/backendV4');
 const {MAX_BATCH_FAIL_V4,selectableReviewForBatchV4,prepareBatchFailBodyV4,
-  decodeBatchFailReplyV4,batchFailResultLabelV4,canReviewBatchImagesV4} = require(path.join(root,'batchFailCoreV4.ts'));
+  decodeBatchFailReplyV4,batchFailResultLabelV4,canReviewBatchImagesV4,batchQueueFiltersFromRouteV4,createBatchConfirmationGuardV4} = require(path.join(root,'batchFailCoreV4.ts'));
 const {createBatchFailServiceV4}=require(path.join(root,'batchFailServiceV4.ts'));
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const item=n=>({inspectionId:id(n),inspectionNo:`INS-${String(n).padStart(6,'0')}`,partCode:'COWL_COVER'});
@@ -146,4 +146,40 @@ test('batch review requires successful image loading rather than URL presence',(
  assert.equal(canReviewBatchImagesV4(null,'loaded',null,'loaded'),false);
  assert.equal(canReviewBatchImagesV4(url,'loaded',cam,'loaded'),true);
  assert.equal(canReviewBatchImagesV4(url,'loaded',null,'loading'),true);
+});
+
+test('monitoring route passes the selected part, server sort and prediction filter; direct entry keeps all REVIEW', ()=>{
+  assert.deepEqual(batchQueueFiltersFromRouteV4({}), {partCode:null, sort:'RECEIVED', aiDefectOnly:false});
+  for (const partCode of ['DOOR','FRAME','COWL_COVER']) {
+    assert.deepEqual(batchQueueFiltersFromRouteV4({partCode, sort:'PRIORITY', aiDefectOnly:'true'}),
+      {partCode, sort:'PRIORITY', aiDefectOnly:true});
+  }
+  assert.deepEqual(batchQueueFiltersFromRouteV4({partCode:'FRAME', aiDefectOnly:'false'}),
+    {partCode:'FRAME', sort:'RECEIVED', aiDefectOnly:false});
+});
+
+test('invalid or repeated route filters cannot silently open a broader set of batch candidates', ()=>{
+  for (const params of [
+    {partCode:''}, {partCode:'OTHER'}, {partCode:['DOOR','FRAME']},
+    {sort:'LATEST'}, {sort:['PRIORITY']}, {aiDefectOnly:'1'}, {aiDefectOnly:['true','false']},
+  ]) assert.equal(batchQueueFiltersFromRouteV4(params), null);
+});
+
+test('late batch confirmation is invalid after a different draft, navigation, or account change during restore', async()=>{
+  let epoch=4;
+  const guard=createBatchConfirmationGuardV4(()=>epoch);
+  const oldPrompt=guard.capture();
+  const newerPrompt=guard.capture();
+  assert.equal(oldPrompt(), false);
+  assert.equal(newerPrompt(), true);
+  guard.invalidate();
+  assert.equal(newerPrompt(), false);
+  const beforeRestore=guard.capture();
+  const restoring=deferred();
+  const checkedAfterRestore=restoring.promise.then(()=>beforeRestore());
+  epoch++;
+  restoring.resolve();
+  assert.equal(await checkedAfterRestore, false);
+  assert.equal(guard.capture()(), false);
+  assert.equal(createBatchConfirmationGuardV4(()=>epoch).capture()(), true);
 });

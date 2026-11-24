@@ -3,8 +3,37 @@
  * 실서버 요청과 화면 표시를 분리하고, 실제 판정 저장은 사용자의 명시적 제출만 허용.
  */
 import type { InspectionViewV4 } from './types';
+import { MONITORED_PARTS, type ReviewQueueFiltersV4 } from './reviewQueueBrowseCoreV4';
 import type { BackendRole } from './authCore';
 import { assertWriteUuidV4, WriteV4ValidationError } from './inspectionWriteCore';
+
+/** A link without any scope keeps the original all-parts REVIEW queue. */
+export function batchQueueFiltersFromRouteV4(params: {
+  partCode?: string | string[]; sort?: string | string[]; aiDefectOnly?: string | string[];
+}): ReviewQueueFiltersV4 | null {
+  const {partCode, sort, aiDefectOnly} = params;
+  if (partCode !== undefined && !MONITORED_PARTS.some(part => part === partCode)) return null;
+  if (sort !== undefined && sort !== 'RECEIVED' && sort !== 'PRIORITY') return null;
+  if (aiDefectOnly !== undefined && aiDefectOnly !== 'true' && aiDefectOnly !== 'false') return null;
+  return {
+    partCode: typeof partCode === 'string' ? partCode : null,
+    sort: sort ?? 'RECEIVED',
+    aiDefectOnly: aiDefectOnly === 'true',
+  };
+}
+
+/** Native confirmations can outlive a draft, its screen, or the account that reviewed it. */
+export function createBatchConfirmationGuardV4(currentEpoch: () => number) {
+  const entryEpoch = currentEpoch();
+  let revision = 0;
+  return {
+    invalidate() { revision++; },
+    capture() {
+      const atConfirmation = ++revision;
+      return () => revision === atConfirmation && currentEpoch() === entryEpoch;
+    },
+  };
+}
 
 export const MAX_BATCH_FAIL_V4 = 50;
 export type BatchReviewImageStateV4 = 'loading' | 'loaded' | 'failed';

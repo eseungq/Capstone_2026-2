@@ -39,7 +39,7 @@ function deferred() {
   const promise = new Promise((ok, fail)=>{resolve=ok;reject=fail;});
   return {promise,resolve,reject};
 }
-function harness(initialPages=[]) {
+function harness(initialPages=[], options) {
   const calls=[], replies=[...initialPages];
   const reader={async queue(request){calls.push(request);const reply=replies.shift();
     if (reply instanceof Error) throw reply;
@@ -47,7 +47,7 @@ function harness(initialPages=[]) {
     if (!reply) throw new Error('test fixture depleted');
     return reply;
   }};
-  const b=createReviewQueueBrowserV4(reader);
+  const b=createReviewQueueBrowserV4(reader, options);
   const events=[];
   b.subscribe(s=>events.push(s));
   return {b,calls,replies,events};
@@ -191,4 +191,56 @@ test('clear aborts stale response and restores default mode without network writ
   assert.equal(h.b.getSnapshot().filters,null);
   assert.equal(h.b.getSnapshot().status,'idle');
   assert.deepEqual(h.b.getSnapshot().items,[]);
+});
+
+test('unscoped batch entry reads pending REVIEW across parts and omits part and prediction parameters', async()=>{
+  const h=harness([page([item(1, {part:'DOOR'}), item(2, {part:'FRAME'})])], {reviewOnly:true});
+  h.b.setFilters(filters('RECEIVED', false, null));
+  await h.b.refresh();
+  assert.deepEqual(h.calls, [{type:'REVIEW', size:20, sort:'RECEIVED'}]);
+  assert.deepEqual(h.b.getSnapshot().items.map(row=>row.partCode), ['DOOR', 'FRAME']);
+});
+
+test('batch browse fails closed for a wrong part, non-review state, or an ignored defect filter', async()=>{
+  for (const [row, aiDefectOnly] of [
+    [item(1, {part:'FRAME'}), false], [item(2, {state:'FAILED'}), false], [item(3), true],
+  ]) {
+    const h=harness([page([row])], {reviewOnly:true});
+    h.b.setFilters(filters('PRIORITY', aiDefectOnly));
+    await h.b.refresh();
+    assert.equal(h.calls[0].type, 'REVIEW');
+    assert.equal(h.b.getSnapshot().status, 'error');
+    assert.deepEqual(h.b.getSnapshot().items, []);
+  }
+});
+
+test('changing batch filters discards the previous cursor and pending page until the new server query resolves', async()=>{
+  const oldPage=deferred();
+  const h=harness([page([item(1)], 'old-cursor'), oldPage.promise, page([item(3, {part:'DOOR', quality:'DEFECT'})])], {reviewOnly:true});
+  h.b.setFilters(filters('RECEIVED'));
+  await h.b.refresh();
+  const pending=h.b.loadNext();
+  h.b.setFilters(filters('PRIORITY', true, 'DOOR'));
+  assert.equal(h.b.getSnapshot().nextCursor, null);
+  await h.b.refresh();
+  oldPage.resolve(page([item(2)], 'ignored'));
+  await pending;
+  assert.deepEqual(h.calls[2], {type:'REVIEW', size:20, sort:'PRIORITY', partCode:'DOOR', predictedQuality:'DEFECT'});
+  assert.deepEqual(h.b.getSnapshot().items.map(row=>row.inspectionId), [item(3).inspectionId]);
+  assert.equal(h.b.getSnapshot().nextCursor, null);
+});
+
+test('refresh after a batch clears old pages and can retry the same first page on read failure', async()=>{
+  const h=harness([page([item(1)], 'before-judgement'), new Error('offline'), page([])], {reviewOnly:true});
+  h.b.setFilters(filters('PRIORITY'));
+  await h.b.refresh();
+  await h.b.refresh();
+  assert.equal(h.b.getSnapshot().status, 'error');
+  assert.deepEqual(h.b.getSnapshot().items, []);
+  assert.equal(h.b.getSnapshot().nextCursor, null);
+  await h.b.loadNext();
+  assert.equal(h.calls.length, 2);
+  await h.b.refresh();
+  assert.deepEqual(h.calls, Array(3).fill({type:'REVIEW', partCode:'COWL_COVER', size:20, sort:'PRIORITY'}));
+  assert.equal(h.b.getSnapshot().status, 'ready');
 });

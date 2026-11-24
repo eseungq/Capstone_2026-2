@@ -1,17 +1,19 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet,
   Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { authV4 } from '../api/backendV4/authRuntime';
+import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
+import { createReviewQueueBrowserV4, type ReviewQueueFiltersV4 } from '../api/backendV4/reviewQueueBrowseCoreV4';
 import type { BackendRole } from '../api/backendV4/authCore';
 import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
 import type { QueueItemV4 } from '../api/backendV4/inspectionReadCore';
 import type { InspectionViewV4 } from '../api/backendV4/types';
 import {
-  batchFailResultLabelV4, MAX_BATCH_FAIL_V4,
+  batchFailResultLabelV4, batchQueueFiltersFromRouteV4, createBatchConfirmationGuardV4, MAX_BATCH_FAIL_V4,
   selectableReviewForBatchV4, canReviewBatchImagesV4, type BatchReviewImageStateV4,
   type BatchFailReplyV4, type BatchFailSelectionV4,
 } from '../api/backendV4/batchFailCoreV4';
@@ -19,7 +21,6 @@ import { createBatchFailServiceV4 } from '../api/backendV4/batchFailServiceV4';
 
 const reader = createInspectionReadServiceV4({mode: 'api', transport: authV4});
 const writer = createBatchFailServiceV4(authV4);
-const PAGE_SIZE = 20;
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : '요청 처리 중 오류가 발생했습니다.';
@@ -29,13 +30,33 @@ function percent(value: number | null): string {
 }
 
 export default function BatchFailLiveScreen() {
+  const filters = batchQueueFiltersFromRouteV4(useLocalSearchParams());
+  if (!filters) {
+    return (
+      <SafeAreaView style={s.screen}>
+        <Stack.Screen options={{headerShown:false}} />
+        <View style={s.heading}>
+          <Text style={s.title}>대기열 조회 조건을 확인할 수 없습니다.</Text>
+          <Pressable accessibilityRole="button" onPress={()=>router.back()}>
+            <Text style={s.back}>‹ 돌아가기</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  const routeKey = [filters.partCode, filters.sort, filters.aiDefectOnly].join('|');
+  return <BatchFailQueue key={routeKey} initialFilters={filters} />;
+}
+
+function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}) {
+  const [browser] = useState(() => createReviewQueueBrowserV4(reader, {reviewOnly:true}));
+  const [entryFilters] = useState(initialFilters);
+  const [confirmation] = useState(() => createBatchConfirmationGuardV4(authV4.sessionEpoch));
+  useFocusEffect(useCallback(() => () => confirmation.invalidate(), [confirmation]));
+  const [browse, setBrowse] = useState(browser.getSnapshot);
+  const filters = browse.filters ?? entryFilters;
   const [role, setRole] = useState<BackendRole | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [queue, setQueue] = useState<QueueItemV4[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const [queueLoading, setQueueLoading] = useState(false);
-  const [queueError, setQueueError] = useState<string | null>(null);
   const [preview, setPreview] = useState<InspectionViewV4 | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -48,8 +69,6 @@ export default function BatchFailLiveScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [reply, setReply] = useState<BatchFailReplyV4 | null>(null);
-  const loadingRef = useRef(false);
-  const requestId = useRef(0);
   const detailRequestId = useRef(0);
   const mountedRef = useRef(true);
   const submitLock = useRef(false);
@@ -57,48 +76,25 @@ export default function BatchFailLiveScreen() {
   useEffect(() => {
     mountedRef.current = true;
     let cancelled = false;
+    const unsubscribe = browser.subscribe(setBrowse);
     void authV4.restore().then(session => {
-      if (!cancelled) setRole(session.signedIn ? session.role : null);
+      if (cancelled) return;
+      setRole(session.signedIn ? session.role : null);
+      if (session.signedIn && session.role === 'WORKER') {
+        browser.setFilters(entryFilters);
+        void browser.refresh();
+      }
     }).catch(() => { if (!cancelled) setRole(null); })
       .finally(() => { if (!cancelled) setAuthLoading(false); });
-    return () => { cancelled = true; mountedRef.current = false; requestId.current += 1; detailRequestId.current += 1; };
-  }, []);
-
-  const loadQueue = useCallback(async (append: boolean) => {
-    if (loadingRef.current) return;
-    const nextCursor = append ? cursor : null;
-    if (append && !nextCursor) return;
-    loadingRef.current = true;
-    const serial = ++requestId.current;
-    setQueueLoading(true);
-    setQueueError(null);
-    try {
-      const result = await reader.queue({type:'REVIEW',size:PAGE_SIZE,...(nextCursor ? {cursor:nextCursor} : {})});
-      if (!mountedRef.current || serial !== requestId.current) return;
-      if (result.source !== 'SERVER') throw new Error('실제 서버 응답이 아닙니다.');
-      if (result.value.items.some(row => row.displayState !== 'REVIEW_PENDING')) {
-        throw new Error('REVIEW가 아닌 검사가 포함됐습니다.');
-      }
-      setQueue(old => {
-        const before = append ? old : [];
-        const seen = new Set(before.map(row => row.inspectionId));
-        return [...before, ...result.value.items.filter(row => !seen.has(row.inspectionId))];
-      });
-      setCursor(result.value.nextCursor);
-      setLoaded(true);
-    } catch (cause) {
-      if (mountedRef.current && serial === requestId.current) setQueueError(errorText(cause));
-    } finally {
-      loadingRef.current = false;
-      if (mountedRef.current && serial === requestId.current) setQueueLoading(false);
-    }
-  }, [cursor]);
-
-  useEffect(() => {
-    if (!authLoading && role === 'WORKER') void loadQueue(false);
-    // 최초 로그인 확인 직후에만 실행. 이후 새로고침은 사용자가 명시적으로 선택합니다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, role]);
+    return () => {
+      cancelled = true;
+      mountedRef.current = false;
+      confirmation.invalidate();
+      detailRequestId.current++;
+      unsubscribe();
+      browser.clear();
+    };
+  }, [browser, entryFilters, confirmation]);
 
   // 상세 검토는 별도 모달에 표시해 검사 목록의 현재 스크롤 위치를 보존합니다.
   // 닫은 뒤 늦게 도착한 서버 응답이 모달을 다시 열지 않도록 요청 세대를 무효화합니다.
@@ -109,6 +105,31 @@ export default function BatchFailLiveScreen() {
     setPreviewError(null);
     setReviewed(false);
     setPreviewLoading(false);
+  };
+
+  const changeFilters = (next: ReviewQueueFiltersV4) => {
+    if (submitLock.current || (filters.sort === next.sort && filters.aiDefectOnly === next.aiDefectOnly)) return;
+    const changesScope = filters.aiDefectOnly !== next.aiDefectOnly;
+    const stillCurrent = confirmation.capture();
+    const apply = () => {
+      if (!mountedRef.current || !stillCurrent() || submitLock.current) return;
+      confirmation.invalidate();
+      closeDetail();
+      if (changesScope) {
+        setSelected([]);
+        setComment('');
+        setSubmitError(null);
+      }
+      browser.setFilters(next);
+      void browser.refresh();
+    };
+    if (changesScope && (selected.length > 0 || comment.trim())) {
+      Alert.alert('조회 조건을 바꿀까요?', '선택한 검사와 작성한 공통 판정 사유가 지워집니다.', [
+        {text:'취소',style:'cancel'}, {text:'조건 변경',onPress:apply},
+      ]);
+    } else {
+      apply();
+    }
   };
 
   const openDetail = async (item: QueueItemV4) => {
@@ -125,7 +146,12 @@ export default function BatchFailLiveScreen() {
       const result = await reader.detail(item.inspectionId);
       if (!mountedRef.current || serial !== detailRequestId.current) return;
       if (result.source !== 'SERVER') throw new Error('실제 서버 검사 상세가 아닙니다.');
-      setPreview(result.value);
+      const detail = result.value;
+      if (detail.inspectionId !== item.inspectionId || detail.partCode !== item.partCode ||
+          (filters.aiDefectOnly && detail.prediction !== 'DEFECT')) {
+        throw new Error('검사 정보가 목록과 달라졌습니다. 대기열을 새로고침해 주세요.');
+      }
+      setPreview(detail);
     } catch(cause) {
       if (mountedRef.current && serial === detailRequestId.current) setPreviewError(errorText(cause));
     } finally {
@@ -148,6 +174,7 @@ export default function BatchFailLiveScreen() {
     if (!preview || !reviewed || role !== 'WORKER' || !imagesReady) return;
     try {
       const item = selectableReviewForBatchV4(preview);
+      confirmation.invalidate();
       setSelected(old => {
         if (old.some(x => x.inspectionId === item.inspectionId)) return old;
         if (old.length >= MAX_BATCH_FAIL_V4) return old;
@@ -157,25 +184,27 @@ export default function BatchFailLiveScreen() {
     } catch(cause) { Alert.alert('선택 불가', errorText(cause)); }
   };
 
-  const submit = async () => {
-    if (submitLock.current || submitting || role !== 'WORKER') return;
+  const submit = async (stillCurrent: () => boolean) => {
+    if (!mountedRef.current || !stillCurrent() || submitLock.current || submitting || role !== 'WORKER') return;
     submitLock.current = true;
     setSubmitting(true);
     setSubmitError(null);
-    setReply(null);
     try {
       // 서버가 최종 권위: 경쟁 제출·상태 변경은 건별 CONFLICT/NOT_REVIEWABLE로 응답.
       const session = await authV4.restore();
-      if (!session.signedIn || session.role !== 'WORKER') throw new Error('WORKER 로그인 상태를 다시 확인해 주세요.');
+      if (!mountedRef.current || !stillCurrent()) return;
+      if (!session.signedIn || session.role !== 'WORKER') throw new Error('작업자 계정으로 다시 로그인해 주세요.');
       const response = await writer.submit(session.role, selected, comment);
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || !stillCurrent()) return;
       setReply(response.value);
       setSelected([]);
       setComment('');
-      // 기존 서버 대기열은 추후 수동 새로고침에서 상태를 확인합니다.
+      // Refresh reports read failures through browse.error; the submitted result remains available.
+      await browser.refresh();
     } catch(cause) {
-      if (mountedRef.current) setSubmitError(errorText(cause));
+      if (mountedRef.current && stillCurrent()) setSubmitError(errorText(cause));
     } finally {
+      confirmation.invalidate();
       submitLock.current = false;
       if (mountedRef.current) setSubmitting(false);
     }
@@ -183,6 +212,7 @@ export default function BatchFailLiveScreen() {
 
   const confirmSubmit = () => {
     if (role !== 'WORKER' || selected.length === 0 || submitting) return;
+    const stillCurrent = confirmation.capture();
     Alert.alert(
       `선택한 ${selected.length}건을 FAIL로 확정할까요?`,
       '아래 화면에 표시된 검사번호와 원본 사진을 다시 확인해 주세요.\n' +
@@ -191,7 +221,7 @@ export default function BatchFailLiveScreen() {
         '\n이 작업은 실제 서버 판정 기록을 변경합니다. 개별 실패 건은 따로 표시됩니다.',
       [
         {text:'취소',style:'cancel'},
-        {text:'선택 검사 FAIL 제출',style:'destructive',onPress:()=>{void submit();}},
+        {text:'선택 검사 FAIL 제출',style:'destructive',onPress:()=>{void submit(stillCurrent);}},
       ],
     );
   };
@@ -210,20 +240,37 @@ export default function BatchFailLiveScreen() {
       </View>
       <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
         {authLoading ? <ActivityIndicator /> : role !== 'WORKER' ? (
-          <View style={s.card}><Text style={s.error}>WORKER 로그인 계정만 사용할 수 있습니다.</Text></View>
+          <View style={s.card}><Text style={s.error}>작업자 계정으로 로그인하면 일괄 판정을 사용할 수 있습니다.</Text></View>
         ) : (
           <>
             <View style={s.card}>
-              <Text style={s.cardTitle}>확인 대기 REVIEW 검사</Text>
-              <Text style={s.muted}>조회 전용 목록입니다. 상세 검토 없이 일괄 선택할 수 없습니다.</Text>
-              <Pressable accessibilityRole="button" style={s.outline} disabled={queueLoading}
-                onPress={()=>{void loadQueue(false);}}>
+              <Text style={s.cardTitle}>확인 대기 검사 · {filters.partCode ?? '전체 부품'}</Text>
+              <View style={s.choices}>
+                {(['RECEIVED', 'PRIORITY'] as const).map(sort => (
+                  <Pressable key={sort} accessibilityRole="button"
+                    accessibilityState={{selected:filters.sort===sort}} disabled={submitting}
+                    style={[s.outline, filters.sort===sort && s.activeChoice]}
+                    onPress={()=>changeFilters({...filters, sort})}>
+                    <Text style={[s.outlineText, filters.sort===sort && s.activeChoiceText]}>
+                      {sort==='RECEIVED' ? '접수순' : '우선 검토'}
+                    </Text>
+                  </Pressable>
+                ))}
+                <Pressable accessibilityRole="checkbox"
+                  accessibilityState={{checked:filters.aiDefectOnly}} disabled={submitting}
+                  style={[s.outline, filters.aiDefectOnly && s.activeChoice]}
+                  onPress={()=>changeFilters({...filters, aiDefectOnly:!filters.aiDefectOnly})}>
+                  <Text style={[s.outlineText, filters.aiDefectOnly && s.activeChoiceText]}>AI 불량 의심만</Text>
+                </Pressable>
+              </View>
+              <Pressable accessibilityRole="button" style={s.outline} disabled={browse.status==='loading' || submitting}
+                onPress={()=>{void browser.refresh();}}>
                 <Text style={s.outlineText}>대기열 새로고침</Text>
               </Pressable>
-              {queueLoading && <ActivityIndicator />}
-              {queueError && <Text style={s.error}>목록 조회 실패: {queueError}</Text>}
-              {loaded && queue.length === 0 && <Text style={s.muted}>확인 대기 검사가 없습니다.</Text>}
-              {queue.map(item=>(
+              {browse.status==='loading' && <ActivityIndicator />}
+              {browse.error && <Text style={s.error}>대기열을 불러오지 못했습니다. 다시 조회해 주세요.</Text>}
+              {browse.status==='ready' && browse.items.length===0 && <Text style={s.muted}>이 조건에 해당하는 확인 대기 검사가 없습니다.</Text>}
+              {browse.items.map(item=>(
                 <View key={item.inspectionId} style={s.line}>
                   <View style={s.rowText}>
                     <Text style={s.strong}>{item.inspectionNo ?? '검사번호 미제공'} · {item.partCode}</Text>
@@ -235,9 +282,9 @@ export default function BatchFailLiveScreen() {
                   </Pressable>
                 </View>
               ))}
-              {cursor && (
+              {browse.nextCursor && (
                 <Pressable accessibilityRole="button" style={s.outline}
-                  disabled={queueLoading} onPress={()=>{void loadQueue(true);}}>
+                  disabled={browse.status==='loading' || submitting} onPress={()=>{void browser.loadNext();}}>
                   <Text style={s.outlineText}>다음 20건 조회</Text>
                 </Pressable>
               )}
@@ -249,14 +296,17 @@ export default function BatchFailLiveScreen() {
               {selected.map((item,index)=>(
                 <View key={item.inspectionId} style={s.line}>
                   <Text style={s.strong}>{index+1}. {item.inspectionNo} · {item.partCode}</Text>
-                  <Pressable accessibilityRole="button"
-                    onPress={()=>setSelected(old=>old.filter(x=>x.inspectionId!==item.inspectionId))}>
+                  <Pressable accessibilityRole="button" disabled={submitting}
+                    onPress={()=>{
+                      confirmation.invalidate();
+                      setSelected(old=>old.filter(x=>x.inspectionId!==item.inspectionId));
+                    }}>
                     <Text style={s.remove}>제외</Text>
                   </Pressable>
                 </View>
               ))}
               <Text style={s.strong}>공통 판정 사유 (선택, 최대 200자)</Text>
-              <TextInput value={comment} onChangeText={setComment} style={s.input}
+              <TextInput value={comment} editable={!submitting} onChangeText={value=>{confirmation.invalidate();setComment(value);}} style={s.input}
                 placeholder="예: 고정핀 들뜸" placeholderTextColor="#94A3B8"
                 maxLength={200} multiline />
               <Text style={s.muted}>제출 후에는 정상 처리·기존 FAIL·충돌·서버 오류가 검사별로 구분됩니다.</Text>
@@ -272,13 +322,13 @@ export default function BatchFailLiveScreen() {
             {reply && (
               <View style={s.card}>
                 <Text style={s.cardTitle}>일괄 FAIL 제출 결과 · {reply.results.length}건</Text>
-                <Text style={s.muted}>batchId: {reply.batchId}</Text>
+                <Text style={s.muted}>일괄 판정 번호 · {reply.batchId}</Text>
                 {reply.results.map(row=>(
                   <View key={row.inspectionId} style={s.result}>
                     <Text style={s.strong}>{row.inspectionNo ?? row.inspectionId}</Text>
                     <Text style={s.muted}>{batchFailResultLabelV4(row.result)}</Text>
                     <Text style={s.muted}>
-                      현재 기록: {row.finalJudgement ?? '미판정'} · {row.judgedBy ?? '미제공'}
+                      현재 기록: {row.finalJudgement ?? '미판정'} · {actorLabelV4(row.judgedBy)}
                       {row.errorCode ? ` · ${row.errorCode}` : ''}
                     </Text>
                   </View>
@@ -394,6 +444,9 @@ const s = StyleSheet.create({
   rowText:{flex:1,gap:5},
   outline:{borderColor:'#CBD5E1',borderWidth:1,borderRadius:8,paddingHorizontal:10,paddingVertical:9,
     alignSelf:'flex-start',backgroundColor:'#FFFFFF'},
+  choices:{flexDirection:'row',flexWrap:'wrap',gap:6},
+  activeChoice:{backgroundColor:'#2054D8',borderColor:'#2054D8'},
+  activeChoiceText:{color:'#FFFFFF'},
   outlineText:{color:'#2054D8',fontSize:12,fontWeight:'700'},
   photo:{width:'100%',height:250,backgroundColor:'#EEF2F8',borderRadius:8},
   action:{backgroundColor:'#2054D8',borderRadius:9,padding:12,alignItems:'center'},
