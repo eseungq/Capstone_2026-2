@@ -81,7 +81,9 @@ export default function JudgementRequestLiveScreen(){
       <Text style={s.title}>시스템 판정 확인 요청</Text>
       <Text style={s.muted}>실물·추가 자료와 다른 시스템 판정이 의심될 때만 요청합니다. 최초 판정은 그대로 보존됩니다.</Text>
     </View>
-    <ScrollView contentContainerStyle={s.body}>
+    <ScrollView style={{flex:1}} contentContainerStyle={s.body}
+      automaticallyAdjustKeyboardInsets={true}
+      keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
       {loading&&<ActivityIndicator/>}
       {error&&<Text style={s.error}>{error}</Text>}
       {!loading&&<Pressable style={s.outline} onPress={()=>{void refresh();}}><Text style={s.link}>최신 검사 다시 조회</Text></Pressable>}
@@ -111,10 +113,10 @@ export default function JudgementRequestLiveScreen(){
         </View>
         <Text style={s.strong}>확인 부위 (선택, 최대 100자)</Text>
         <TextInput value={area} onChangeText={setArea} maxLength={100}
-          placeholder="예: 고정핀" style={s.input}/>
+          placeholder="예: 고정핀" placeholderTextColor="#64748B" style={s.input}/>
         <Text style={s.strong}>판정 확인 근거 (필수, 1~500자)</Text>
         <TextInput value={reason} onChangeText={setReason} maxLength={500} multiline
-          placeholder="실물 관찰 근거를 구체적으로 작성하세요." style={[s.input,s.multi]}/>
+          placeholder="실물 관찰 근거를 구체적으로 작성하세요." placeholderTextColor="#64748B" style={[s.input,s.multi]}/>
         <Text style={s.muted}>근거 사진 첨부는 이번 버전의 지원 범위 밖입니다.</Text>
         <Pressable disabled={submitting} style={[s.submit,submitting&&s.disabled]} onPress={confirm}>
           <Text style={s.submitText}>{submitting?'요청 제출 중…':'관리자 판정 확인 요청'}</Text>

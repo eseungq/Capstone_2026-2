@@ -90,7 +90,9 @@ export default function JudgementRequestsAdminLiveScreen(){
       <Text style={s.title}>판정 확인 요청 관리</Text>
       <Text style={s.muted}>요청별 유지·정정 근거를 남깁니다. 최초 판정은 보존됩니다.</Text>
     </View>
-    <ScrollView contentContainerStyle={s.body}>
+    <ScrollView style={{flex:1}} contentContainerStyle={s.body}
+      automaticallyAdjustKeyboardInsets={true}
+      keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
       {authLoading?<ActivityIndicator/>:!admin?<Text style={s.error}>ADMIN 실제 서버 계정만 접근할 수 있습니다.</Text>:<>
         <View style={s.card}>
           <Text style={s.strong}>조회 상태</Text>
@@ -158,7 +160,7 @@ export default function JudgementRequestsAdminLiveScreen(){
             </View>
             <Text style={s.strong}>관리자 처리 근거 (필수, 1~500자)</Text>
             <TextInput style={s.input} value={note} onChangeText={setNote} multiline
-              maxLength={500} placeholder="검토 근거를 입력해 주세요." />
+              maxLength={500} placeholder="검토 근거를 입력해 주세요." placeholderTextColor="#64748B" />
             <Pressable style={[s.submit,processing&&s.disabled]} disabled={processing}
               onPress={confirm}><Text style={s.submitText}>
                 {processing?'처리 중…':decision==='KEEP'?'판정 유지 전 최종 확인':'정정 기록 전 최종 확인'}
@@ -189,7 +191,7 @@ const s=StyleSheet.create({
  outline:{borderColor:'#2054D8',borderWidth:1,borderRadius:9,padding:12,alignItems:'center'},
  entry:{borderTopWidth:1,borderTopColor:'#E4E7EC',paddingVertical:12,gap:6},
  input:{borderWidth:1,borderColor:'#CBD5E1',borderRadius:10,padding:12,minHeight:90,
-   fontSize:13,textAlignVertical:'top'},
+   fontSize:13,color:'#111827',textAlignVertical:'top'},
  submit:{backgroundColor:'#2054D8',borderRadius:10,padding:14,alignItems:'center'},
  submitText:{color:'#FFFFFF',fontWeight:'700',fontSize:13},disabled:{opacity:.5},
 });

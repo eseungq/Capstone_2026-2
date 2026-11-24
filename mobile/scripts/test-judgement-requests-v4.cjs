@@ -150,3 +150,12 @@ test('detail parser accepts absent request fields as empty, correction as null',
   assert.equal(changed.correctedJudgement,'FAIL');
   assert.equal(changed.judgementRequests.length,1);
 });
+
+test('WORKER and ADMIN judgement forms keep iOS keyboard insets and handled taps enabled',()=>{
+ for(const filename of ['judgement-request-live.tsx','judgement-requests-admin-live.tsx']){
+   const source=fs.readFileSync(path.join(__dirname,'../src/app',filename),'utf8');
+   assert.match(source,/automaticallyAdjustKeyboardInsets=\{true\}/);
+   assert.match(source,/keyboardShouldPersistTaps="handled"/);
+   assert.match(source,/placeholderTextColor="#64748B"/);
+ }
+});
