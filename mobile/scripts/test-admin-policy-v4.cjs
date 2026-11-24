@@ -23,6 +23,7 @@ Module._extensions['.ts'] = (module, filename) => {
 const {
   COWL_PART_CODE_V4,
   createAdminPolicyServiceV4,
+  createPolicyVisitV4,
   findEquivalentPolicyVersionV4,
   decodeAdminPolicyV4,
   decodeCowlPolicyListV4,
@@ -137,6 +138,75 @@ test('a pass threshold at or above the automatic FAIL threshold is rejected befo
     await assert.rejects(createAdminPolicyServiceV4(transport).saveNewVersion(base, percent), /자동 불량 기준보다 낮아야/);
   }
   assert.equal(calls.length, 0);
+});
+
+test('four-decimal percent matches exact server bounds and rejects equality with automatic FAIL', async () => {
+  const boundary = 0.009005;
+  const base = { ...ORIGINAL, passThreshold: 0.009006, validatedMin: boundary, validatedMax: 0.009007,
+    failThreshold: 0.009007, failValidatedMin: 0.009007, failValidatedMax: 0.009007 };
+  const reply = { ...base, policyId: 'new-boundary', basedOnPolicyId: base.policyId,
+    active: false, passThreshold: boundary };
+  const { transport, calls } = fakeTransport({ thresholdReply: reply });
+  const service = createAdminPolicyServiceV4(transport);
+
+  const saved = await service.saveNewVersion(base, '0.9005');
+  assert.equal(calls[0].options.body.passThreshold, boundary);
+  assert.equal(percentageTextV4(saved.passThreshold, 4), '0.9005%');
+  assert.throws(() => parsePolicyPercentInputV4('0.9004', base), /0\.9005%~0\.9007%/);
+  assert.equal(parsePolicyPercentInputV4('0.9007', { ...base, failThreshold: null }), base.validatedMax);
+  const touchingFail = { ...base, passThreshold: 0.009004, validatedMin: 0.009003,
+    failThreshold: boundary, failValidatedMin: boundary };
+  await assert.rejects(service.saveNewVersion(touchingFail, '0.9005'), /자동 불량 기준보다 낮아야/);
+  assert.equal(calls.length, 1);
+});
+
+test('a confirmation from a closed policy screen cannot submit after refocus or re-login', async () => {
+  const { transport, calls } = fakeTransport({ activateReply: { ...EXISTING_T1, active: true } });
+  let epoch = 1;
+  const auth = { ...transport, sessionEpoch: () => epoch };
+  const oldVisit = createPolicyVisitV4(auth);
+  const oldService = createAdminPolicyServiceV4(oldVisit.transport);
+  oldVisit.close();
+  const currentVisit = createPolicyVisitV4(auth);
+  await assert.rejects(oldService.activate(EXISTING_T1), /정책 화면/);
+  assert.equal(calls.length, 0);
+  const nextService = createAdminPolicyServiceV4(currentVisit.transport);
+  await nextService.activate(EXISTING_T1);
+  epoch++;
+  await assert.rejects(nextService.activate(EXISTING_T1), /정책 화면/);
+  assert.equal(calls.length, 1);
+});
+
+test('a delayed policy preflight and the last role check before POST stay bound to the initiating visit', async () => {
+  let epoch = 1;
+  let finishList;
+  let posts = 0;
+  const auth = {
+    sessionEpoch: () => epoch,
+    async restore() { return { signedIn: true, role: 'ADMIN', loginId: 'admin' }; },
+    authorizedRequest(path, options) {
+      if (options.method === 'GET') return new Promise(resolve => { finishList = resolve; });
+      posts++;
+      return Promise.resolve({ ...EXISTING_T1, active: true });
+    },
+  };
+  const oldVisit = createPolicyVisitV4(auth);
+  const oldService = createAdminPolicyServiceV4(oldVisit.transport);
+  const oldFlow = oldService.list().then(() => oldService.activate(EXISTING_T1));
+  await new Promise(resolve => setImmediate(resolve));
+  oldVisit.close();
+  finishList([ORIGINAL, EXISTING_T1]);
+  await assert.rejects(oldFlow, /정책 화면/);
+
+  const newVisit = createPolicyVisitV4(auth);
+  const newService = createAdminPolicyServiceV4(newVisit.transport);
+  let finishRestore;
+  auth.restore = () => new Promise(resolve => { finishRestore = resolve; });
+  const pendingPost = newService.activate(EXISTING_T1);
+  epoch++;
+  finishRestore({ signedIn: true, role: 'ADMIN', loginId: 'next-admin' });
+  await assert.rejects(pendingPost, /정책 화면/);
+  assert.equal(posts, 0);
 });
 
 test('refresh before POST detects a policy version created since the initial screen load', () => {

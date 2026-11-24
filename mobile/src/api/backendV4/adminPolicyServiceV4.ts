@@ -35,6 +35,30 @@ export interface PolicyAdminTransportV4 {
   restore(): Promise<AuthPublicState>;
 }
 
+export function createPolicyVisitV4(auth: PolicyAdminTransportV4 & { sessionEpoch(): number }) {
+  const epoch = auth.sessionEpoch();
+  let focused = true;
+  const isCurrent = () => focused && auth.sessionEpoch() === epoch;
+  function assertCurrent() {
+    if (!isCurrent()) throw new Error('정책 화면의 로그인 상태가 변경됐습니다.');
+  }
+  const transport: PolicyAdminTransportV4 = {
+    async restore() {
+      assertCurrent();
+      const session = await auth.restore();
+      assertCurrent();
+      return session;
+    },
+    async authorizedRequest<T>(path: string, options?: {method?: 'GET' | 'POST'; body?: unknown}) {
+      assertCurrent();
+      const result = await auth.authorizedRequest<T>(path, options);
+      assertCurrent();
+      return result;
+    },
+  };
+  return { transport, isCurrent, assertCurrent, close: () => { focused = false; } };
+}
+
 export class PolicyAdminContractErrorV4 extends Error {
   constructor(message: string) {
     super('정책 API 응답 오류: ' + message);
@@ -179,7 +203,9 @@ export function parsePolicyPercentInputV4(input: string, policy: AdminPolicyV4):
   if (!Number.isFinite(number) || number < 0 || number > 100) {
     throw new Error('백분율은 0~100 사이여야 합니다.');
   }
-  const result = validateThresholdEditV4(String(number / 100), {
+  // 백분율의 소수점 네 자리는 서버 비율의 여섯 자리와 정확히 대응합니다.
+  const fractionText = (number / 100).toFixed(6);
+  const result = validateThresholdEditV4(fractionText, {
     validatedMin: policy.validatedMin,
     validatedMax: policy.validatedMax,
     evidenceVerified: policy.ready,
@@ -189,7 +215,7 @@ export function parsePolicyPercentInputV4(input: string, policy: AdminPolicyV4):
       UNVERIFIED: '준비 완료된 정책과 서버 검증 범위가 있어야 조정할 수 있습니다.',
       BAD_RANGE: '서버가 제공한 허용 범위가 올바르지 않습니다.',
       INVALID_VALUE: '기준치 숫자를 확인해 주세요.',
-      OUT_OF_RANGE: `허용 범위(${percentageTextV4(policy.validatedMin)}~${percentageTextV4(policy.validatedMax)}) 밖입니다.`,
+      OUT_OF_RANGE: `허용 범위(${percentageTextV4(policy.validatedMin, 4)}~${percentageTextV4(policy.validatedMax, 4)}) 밖입니다.`,
     };
     throw new Error(messages[result.reason]);
   }

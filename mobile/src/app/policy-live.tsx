@@ -9,15 +9,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { authV4 } from '../api/backendV4/authRuntime';
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
 import {
-  createAdminPolicyServiceV4, PolicyAdminContractErrorV4, findEquivalentPolicyVersionV4,
+  createAdminPolicyServiceV4, createPolicyVisitV4, PolicyAdminContractErrorV4, findEquivalentPolicyVersionV4,
   parsePolicyPercentInputV4, percentageTextV4, rootPolicyForV4,
 } from '../api/backendV4/adminPolicyServiceV4';
 import type { AdminPolicyV4 } from '../api/backendV4/adminPolicyServiceV4';
 import {createAutoFailPolicyServiceV4} from '../api/backendV4/autoFailPolicyServiceV4';
 import {ensureAutoFailToggleV4,makeAutoFailThresholdEditV4,autoFailRangeLabelV4} from '../api/backendV4/autoFailPolicyCoreV4';
 
-const service = createAdminPolicyServiceV4(authV4);
-const autoFailService = createAutoFailPolicyServiceV4(authV4);
+function openPolicyVisit() {
+  const visit = createPolicyVisitV4(authV4);
+  return {
+    ...visit,
+    service: createAdminPolicyServiceV4(visit.transport),
+    autoFailService: createAutoFailPolicyServiceV4(visit.transport),
+  };
+}
+type PolicyVisit = ReturnType<typeof openPolicyVisit>;
 type WriteAction = 'save' | 'activate' | 'fail-threshold' | 'auto-fail';
 
 const C = {
@@ -87,25 +94,29 @@ export default function PolicyLiveScreen() {
   const editedFailInput = useRef(false);
   const [writing, setWriting] = useState<WriteAction | null>(null);
   const refreshSerial = useRef(0);
-  const writeLock = useRef(false);
+  const focusedVisit = useRef<PolicyVisit | null>(null);
+  const writeLock = useRef<PolicyVisit | null>(null);
   const editedInput = useRef(false);
 
   const load = useCallback(async (initial = false): Promise<void> => {
+    const visit = focusedVisit.current;
+    if (!visit?.isCurrent()) return;
     const serial = ++refreshSerial.current;
+    const currentRead = () => refreshSerial.current === serial && visit.isCurrent();
     if (initial) setLoading(true);
     else setRefreshing(true);
     setError(null);
     try {
-      const session = await authV4.restore();
-      if (refreshSerial.current !== serial) return;
+      const session = await visit.transport.restore();
+      if (!currentRead()) return;
       if (!session.signedIn || session.role !== 'ADMIN') {
         setAccess('denied');
         setPolicies([]);
         throw new Error('정책을 조회하거나 변경하려면 관리자 계정으로 로그인해 주세요.');
       }
       setAccess('admin');
-      const result = await service.list();
-      if (refreshSerial.current !== serial) return;
+      const result = await visit.service.list();
+      if (!currentRead()) return;
       setPolicies(result);
       const serverActive = result.find((p) => p.active);
       if (!editedFailInput.current && serverActive) {
@@ -117,9 +128,9 @@ export default function PolicyLiveScreen() {
         setPercentInput(String(Number((serverActive.passThreshold * 100).toFixed(4))));
       }
     } catch (cause) {
-      if (refreshSerial.current === serial) setError(errorText(cause));
+      if (currentRead()) setError(errorText(cause));
     } finally {
-      if (refreshSerial.current === serial) {
+      if (currentRead()) {
         setLoading(false);
         setRefreshing(false);
       }
@@ -127,8 +138,16 @@ export default function PolicyLiveScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => {
+    const visit = openPolicyVisit();
+    focusedVisit.current = visit;
+    setWriting(null);
+    setActionError(null);
+    setActionNotice(null);
     void load(true);
-    return () => { refreshSerial.current += 1; };
+    return () => {
+      visit.close();
+      focusedVisit.current = null;
+    };
   }, [load]));
 
   const active = policies.find((item) => item.active) ?? null;
@@ -180,8 +199,9 @@ export default function PolicyLiveScreen() {
   const canToggleOff = active?.autoFailEnabled===true;
 
   /** 다른 관리자의 동시 변경을 확인해 이전 화면 상태로 POST하지 않습니다. */
-  const assertLatest = async (expectedActive: AdminPolicyV4 | null): Promise<AdminPolicyV4[]> => {
-    const latest = await service.list();
+  const assertLatest = async (visit: PolicyVisit, expectedActive: AdminPolicyV4 | null): Promise<AdminPolicyV4[]> => {
+    const latest = await visit.service.list();
+    visit.assertCurrent();
     const current = latest.find((p) => p.active) ?? null;
     if ((expectedActive?.policyId ?? null) !== (current?.policyId ?? null)) {
       setPolicies(latest);
@@ -190,20 +210,24 @@ export default function PolicyLiveScreen() {
     return latest;
   };
 
-  const runWrite = async (action: WriteAction, operation: () => Promise<void>) => {
-    if (writeLock.current) return;
-    writeLock.current = true;
-    setWriting(action);
-    setActionError(null);
-    setActionNotice(null);
-    try {
-      await operation();
-    } catch (cause) {
-      setActionError(errorText(cause) + '\n다시 시도하기 전에 목록을 새로고침해 변경 사항을 확인해 주세요.');
-    } finally {
-      writeLock.current = false;
-      setWriting(null);
-    }
+  // Capture the visit when opening the native dialog. A delayed tap belongs to that visit.
+  const confirmedWrite = (action: WriteAction, operation: (visit: PolicyVisit) => Promise<void>) => {
+    const visit = focusedVisit.current;
+    return async () => {
+      if (!visit?.isCurrent() || writeLock.current === visit) return;
+      writeLock.current = visit;
+      setWriting(action);
+      setActionError(null);
+      setActionNotice(null);
+      try {
+        await operation(visit);
+      } catch (cause) {
+        if (visit.isCurrent()) setActionError(errorText(cause) + '\n다시 시도하기 전에 목록을 새로고침해 변경 사항을 확인해 주세요.');
+      } finally {
+        if (writeLock.current === visit) writeLock.current = null;
+        if (visit.isCurrent()) setWriting(null);
+      }
+    };
   };
 
   const confirmSave = () => {
@@ -212,25 +236,25 @@ export default function PolicyLiveScreen() {
     const input = percentInput;
     const value = parsePolicyPercentInputV4(input, base);
     Alert.alert('새 정책 버전 저장',
-      `${base.policyVersion}의 기준치를 ${percentageTextV4(value)}로 조정해 새 비활성 버전을 생성할까요?\n\n원래 적용 중인 정책은 그대로 유지됩니다.`,
+      `${base.policyVersion}의 기준치를 ${percentageTextV4(value, 4)}로 조정해 새 비활성 버전을 생성할까요?\n\n원래 적용 중인 정책은 그대로 유지됩니다.`,
       [
         { text: '취소', style: 'cancel' },
-        { text: '저장', onPress: () => {
-          void runWrite('save', async () => {
-            const latest = await assertLatest(base);
-            const current = latest.find((p) => p.policyId === base.policyId);
-            if (!current?.active) throw new Error('원래 정책이 더 이상 활성 상태가 아닙니다.');
-            const matching = findEquivalentPolicyVersionV4(latest, current, value);
-            if (matching) {
-              setPolicies(latest);
-              throw new Error(`같은 설정의 ${matching.policyVersion} 정책이 이미 있습니다. 기존 버전을 사용해 주세요.`);
-            }
-            const result = await service.saveNewVersion(current, input);
-            setSavedPolicy(result);
-            setActionNotice(`새 정책 ${result.policyVersion} 저장 완료. 아직 적용되지 않았습니다.\n다음 단계에서 새 버전 적용을 눌러야 합니다.`);
-            await load(false);
-          });
-        } },
+        { text: '저장', onPress: confirmedWrite('save', async (visit) => {
+          const latest = await assertLatest(visit, base);
+          visit.assertCurrent();
+          const current = latest.find((p) => p.policyId === base.policyId);
+          if (!current?.active) throw new Error('원래 정책이 더 이상 활성 상태가 아닙니다.');
+          const matching = findEquivalentPolicyVersionV4(latest, current, value);
+          if (matching) {
+            setPolicies(latest);
+            throw new Error(`같은 설정의 ${matching.policyVersion} 정책이 이미 있습니다. 기존 버전을 사용해 주세요.`);
+          }
+          const result = await visit.service.saveNewVersion(current, input);
+          visit.assertCurrent();
+          setSavedPolicy(result);
+          setActionNotice(`새 정책 ${result.policyVersion} 저장 완료. 아직 적용되지 않았습니다.\n다음 단계에서 새 버전 적용을 눌러야 합니다.`);
+          await load(false);
+        }) },
       ],
     );
   };
@@ -243,21 +267,21 @@ export default function PolicyLiveScreen() {
       `현재 적용 중\n${expectedActive ? activationDetails(expectedActive) : '활성 정책 없음'}\n\n적용할 정책\n${activationDetails(target)}\n\n적용 이후 접수하는 검사부터 새 정책을 사용합니다.${target.autoFailEnabled && !target.metrics?.autoFail ? '\n자동 불량 검증 자료가 없습니다. 승인된 시험 범위를 확인해 주세요.' : ''}`,
       [
         { text: '취소', style: 'cancel' },
-        { text: '적용', onPress: () => {
-          void runWrite('activate', async () => {
-            const latest = await assertLatest(expectedActive);
-            const current = latest.find((p) => p.policyId === target.policyId);
-            if (!current || !current.ready || current.partCode !== 'COWL_COVER') {
-              throw new Error('대상 정책의 준비 상태가 달라졌습니다. 목록을 확인해 주세요.');
-            }
-            if (expectedActive && current.modelVersion !== expectedActive.modelVersion) {
-              throw new Error('현재 활성 정책과 모델이 다른 버전은 이 화면에서 적용할 수 없습니다.');
-            }
-            const result = await service.activate(current);
-            setActionNotice(`${result.policyVersion} 정책 적용 응답을 받았습니다. 아래 서버 목록에서 활성 상태를 확인해 주세요.`);
-            await load(false);
-          });
-        } },
+        { text: '적용', onPress: confirmedWrite('activate', async (visit) => {
+          const latest = await assertLatest(visit, expectedActive);
+          visit.assertCurrent();
+          const current = latest.find((p) => p.policyId === target.policyId);
+          if (!current || !current.ready || current.partCode !== 'COWL_COVER') {
+            throw new Error('대상 정책의 준비 상태가 달라졌습니다. 목록을 확인해 주세요.');
+          }
+          if (expectedActive && current.modelVersion !== expectedActive.modelVersion) {
+            throw new Error('현재 활성 정책과 모델이 다른 버전은 이 화면에서 적용할 수 없습니다.');
+          }
+          const result = await visit.service.activate(current);
+          visit.assertCurrent();
+          setActionNotice(`${result.policyVersion} 정책 적용 응답을 받았습니다. 아래 서버 목록에서 활성 상태를 확인해 주세요.`);
+          await load(false);
+        }) },
       ],
     );
   };
@@ -269,22 +293,23 @@ export default function PolicyLiveScreen() {
     const expected=makeAutoFailThresholdEditV4(base,...args);
     Alert.alert('자동 불량 기준 새 버전 저장',
       `${base.policyVersion}\n불량 기준 ${percentageTextV4(expected.failThreshold,4)}\n불량 기준 범위: ${autoFailRangeLabelV4(expected.failValidatedMin,expected.failValidatedMax)}\n\n저장해도 자동 불량은 즉시 적용되지 않습니다.`,
-      [{text:'취소',style:'cancel'},{text:'새 비활성 버전 저장',onPress:()=>{
-        void runWrite('fail-threshold',async()=>{
-          const current=(await assertLatest(base)).find(p=>p.policyId===base.policyId);
-          if(!current?.active || current.autoFailEnabled===null)
-            throw new Error('적용 중인 정책 또는 자동 불량 기능의 사용 가능 여부가 변경됐습니다.');
-          const latestEdit=makeAutoFailThresholdEditV4(current,...args);
-          if(latestEdit.failThreshold!==expected.failThreshold ||
-            latestEdit.failValidatedMin!==expected.failValidatedMin ||
-            latestEdit.failValidatedMax!==expected.failValidatedMax)
-            throw new Error('정책 검증 범위가 변경됐습니다. 최신 값을 확인해 주세요.');
-          const saved=await autoFailService.saveThreshold(current,...args);
-          setSavedPolicy(saved);
-          setActionNotice(`${saved.policyVersion} 불량 기준 새 비활성 버전을 저장했습니다. 별도 적용 전까지 현재 정책은 그대로입니다.`);
-          await load(false);
-        });
-      }}]);
+      [{text:'취소',style:'cancel'},{text:'새 비활성 버전 저장',onPress:confirmedWrite('fail-threshold', async (visit) => {
+        const latest = await assertLatest(visit, base);
+        visit.assertCurrent();
+        const current = latest.find(p => p.policyId === base.policyId);
+        if(!current?.active || current.autoFailEnabled===null)
+          throw new Error('적용 중인 정책 또는 자동 불량 기능의 사용 가능 여부가 변경됐습니다.');
+        const latestEdit=makeAutoFailThresholdEditV4(current,...args);
+        if(latestEdit.failThreshold!==expected.failThreshold ||
+          latestEdit.failValidatedMin!==expected.failValidatedMin ||
+          latestEdit.failValidatedMax!==expected.failValidatedMax)
+          throw new Error('정책 검증 범위가 변경됐습니다. 최신 값을 확인해 주세요.');
+        const saved=await visit.autoFailService.saveThreshold(current,...args);
+        visit.assertCurrent();
+        setSavedPolicy(saved);
+        setActionNotice(`${saved.policyVersion} 불량 기준 새 비활성 버전을 저장했습니다. 별도 적용 전까지 현재 정책은 그대로입니다.`);
+        await load(false);
+      })}]);
   };
 
   const confirmAutoFailToggle = (enabled:boolean, target?:AdminPolicyV4) => {
@@ -296,20 +321,21 @@ export default function PolicyLiveScreen() {
     const warning=enabled&&!hasEvidence?'\n\n검증 자료 없음: 품질 정확도나 미검출률이 검증되었다는 뜻이 아닙니다. 팀 승인 시험 범위에서만 사용하세요.':'';
     Alert.alert(enabled?'자동 불량 켜기 · 새 버전':'자동 불량 끄기 · 새 버전',
       `${base.policyVersion}에서 자동 불량을 ${enabled?'켜는':'끄는'} 새 비활성 버전을 만들까요?\n\n실제 적용은 생성된 버전을 관리자가 별도로 활성화할 때만 변경됩니다.${warning}`,
-      [{text:'취소',style:'cancel'},{text:'새 비활성 버전 저장',onPress:()=>{
-        void runWrite('auto-fail',async()=>{
-          const current=(await assertLatest(expectedActive)).find(p=>p.policyId===base.policyId);
-          if(!current || current.modelVersion!==expectedActive.modelVersion ||
-            current.autoFailEnabled!==base.autoFailEnabled || current.failThreshold!==base.failThreshold ||
-            current.failValidatedMin!==base.failValidatedMin || current.failValidatedMax!==base.failValidatedMax)
-            throw new Error('대상 정책의 자동 불량 상태가 변경됐습니다. 다시 확인해 주세요.');
-          ensureAutoFailToggleV4(current,enabled);
-          const saved=await autoFailService.saveToggle(current,enabled);
-          setSavedPolicy(saved);
-          setActionNotice(`${saved.policyVersion} 자동 불량 ${enabled?'켜기':'끄기'} 버전을 비활성 상태로 저장했습니다. 기존 활성 정책은 변경되지 않았습니다.`);
-          await load(false);
-        });
-      }}]);
+      [{text:'취소',style:'cancel'},{text:'새 비활성 버전 저장',onPress:confirmedWrite('auto-fail', async (visit) => {
+        const latest = await assertLatest(visit, expectedActive);
+        visit.assertCurrent();
+        const current = latest.find(p => p.policyId === base.policyId);
+        if(!current || current.modelVersion!==expectedActive.modelVersion ||
+          current.autoFailEnabled!==base.autoFailEnabled || current.failThreshold!==base.failThreshold ||
+          current.failValidatedMin!==base.failValidatedMin || current.failValidatedMax!==base.failValidatedMax)
+          throw new Error('대상 정책의 자동 불량 상태가 변경됐습니다. 다시 확인해 주세요.');
+        ensureAutoFailToggleV4(current,enabled);
+        const saved=await visit.autoFailService.saveToggle(current,enabled);
+        visit.assertCurrent();
+        setSavedPolicy(saved);
+        setActionNotice(`${saved.policyVersion} 자동 불량 ${enabled?'켜기':'끄기'} 버전을 비활성 상태로 저장했습니다. 기존 활성 정책은 변경되지 않았습니다.`);
+        await load(false);
+      })}]);
   };
 
   return (
@@ -355,8 +381,8 @@ export default function PolicyLiveScreen() {
                   <Row label="정책 버전" value={active.policyVersion} />
                   <Row label="AI 모델" value={active.modelVersion} />
                   <Row label="보정기" value={active.calibratorVersion ?? '미제공'} />
-                  <Row label="활성 기준치" value={percentageTextV4(active.passThreshold)} />
-                  <Row label="검증 범위" value={`${percentageTextV4(active.validatedMin)} ~ ${percentageTextV4(active.validatedMax)}`} />
+                  <Row label="활성 기준치" value={percentageTextV4(active.passThreshold, 4)} />
+                  <Row label="검증 범위" value={`${percentageTextV4(active.validatedMin, 4)} ~ ${percentageTextV4(active.validatedMax, 4)}`} />
                   <Row label="정책 상태" value={`${active.ready ? '준비됨' : '미준비'} / 적용 중`} />
                   <Row label="자동 불량" value={active.autoFailEnabled===null?'미지원':active.autoFailEnabled?'켜짐':'꺼짐'} />
                 </>
@@ -431,7 +457,7 @@ export default function PolicyLiveScreen() {
             {currentSaved && (
               <Card title="3. 마지막으로 저장한 새 버전">
                 <Row label="정책 버전" value={currentSaved.policyVersion} />
-                <Row label="자동 통과 기준" value={percentageTextV4(currentSaved.passThreshold)} />
+                <Row label="자동 통과 기준" value={percentageTextV4(currentSaved.passThreshold, 4)} />
                 <Row label="불량 기준" value={percentageTextV4(currentSaved.failThreshold,4)} />
                 <Row label="불량 검증 범위" value={autoFailRangeLabelV4(currentSaved.failValidatedMin,currentSaved.failValidatedMax)} />
                 <Row label="현재 상태" value={currentSaved.active ? '적용 중' : '비활성 (별도 적용 필요)'} />
@@ -458,7 +484,7 @@ export default function PolicyLiveScreen() {
                     <Text style={s.policyName}>
                       {policy.policyVersion}{policy.active ? ' · 적용 중' : ''}
                     </Text>
-                    <Row label="기준치" value={percentageTextV4(policy.passThreshold)} />
+                    <Row label="기준치" value={percentageTextV4(policy.passThreshold, 4)} />
                     <Row label="상태" value={`${policy.ready ? '준비됨' : '미준비'} · ${policy.active ? '적용 중' : '비활성'}`} />
                     <Row label="자동 불량" value={policy.autoFailEnabled===null?'미지원':policy.autoFailEnabled?'켜짐':'꺼짐'} />
                     <Row label="불량 기준" value={percentageTextV4(policy.failThreshold,4)} />
