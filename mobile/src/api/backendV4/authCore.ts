@@ -177,7 +177,9 @@ export function createAuthV4(config: AuthV4Config) {
         requireCurrent(generation);
         return next;
       } catch (err) {
-        if (err instanceof ApiV4RequestError && err.httpStatus === 401 && generation === epoch) {
+        const expiredOrLocked = err instanceof ApiV4RequestError &&
+          (err.httpStatus === 401 || (err.httpStatus === 423 && err.code === 'AUTH_ACCOUNT_LOCKED'));
+        if (expiredOrLocked && generation === epoch) {
           const expired = beginChange();
           try { await withVault(() => config.vault.clear()); }
           finally { finishChange(expired); }

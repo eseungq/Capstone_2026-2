@@ -187,3 +187,16 @@ test('저장 정보 읽기에 실패해도 기기 세션 삭제 결과를 정확
   assert.deepEqual(await auth.logout(), {remoteRevoked: false});
   assert.equal(cleared, true);
 });
+
+test('계정 잠금은 세션을 종료하고 일시적인 갱신 실패는 세션을 유지한다', async () => {
+  for (const [status, code, signedIn] of [[423, 'AUTH_ACCOUNT_LOCKED', false], [503, 'TEMPORARY', true]]) {
+    const vault = makeMemoryAuthVault();
+    await vault.write(token);
+    const changes = [];
+    const auth = makeAuth(vault, async () => Response.json({error: {code}}, {status}));
+    auth.subscribeSessionChange(() => changes.push(auth.sessionEpoch()));
+    await assert.rejects(auth.refreshAccessToken(), err => err.code === code);
+    assert.equal((await auth.restore()).signedIn, signedIn);
+    assert.equal(changes.length, signedIn ? 0 : 1);
+  }
+});
