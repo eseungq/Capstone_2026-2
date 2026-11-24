@@ -98,3 +98,80 @@ test('failure to clear local secure tokens must not be reported as completed log
   const auth = makeAuth(vault, async () => new Response(null, { status: 204 }));
   await assert.rejects(() => auth.logout(), /storage failure/);
 });
+
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return {promise, resolve};
+}
+
+for (const status of [200, 401]) {
+  test('계정 전환 전 시작한 조회의 응답과 재시도를 폐기한다: HTTP ' + status, async () => {
+    const firstRead = deferred();
+    const response = deferred();
+    let reads = 0;
+    const vault = makeMemoryAuthVault();
+    await vault.write(token);
+    const auth = makeAuth(vault, async url => {
+      if (url.endsWith('/auth/login')) {
+        return Response.json({data: {...token, loginId: 'second', accessToken: 'new-access'}});
+      }
+      reads++;
+      firstRead.resolve();
+      return response.promise;
+    });
+    const oldRead = auth.authorizedRequest('/inspections');
+    await firstRead.promise;
+    await auth.login('second', 'test-only');
+    response.resolve(status === 200 ? Response.json({data: []}) : new Response(null, {status}));
+    await assert.rejects(oldRead, err => err.code === 'SESSION_CHANGED');
+    assert.equal(reads, 1);
+    assert.equal((await auth.restore()).loginId, 'second');
+  });
+}
+
+test('서버 응답 전에 로컬 로그아웃을 알리고 다음 로그인 세션을 보존한다', async () => {
+  const reachedServer = deferred();
+  const remote = deferred();
+  const vault = makeMemoryAuthVault();
+  await vault.write(token);
+  const auth = makeAuth(vault, async url => {
+    if (url.endsWith('/auth/logout')) { reachedServer.resolve(); return remote.promise; }
+    if (url.endsWith('/auth/login')) return Response.json({data: {...token, loginId: 'next'}});
+    throw new Error('unexpected request');
+  });
+  const seen = [];
+  const off = auth.subscribeSessionChange(() => seen.push(auth.sessionEpoch()));
+  const logout = auth.logout();
+  await reachedServer.promise;
+  assert.equal((await auth.restore()).signedIn, false);
+  assert.equal(seen.length, 1);
+  await auth.login('next', 'test-only');
+  remote.resolve(new Response(null, {status: 204}));
+  assert.deepEqual(await logout, {remoteRevoked: true});
+  assert.equal((await auth.restore()).loginId, 'next');
+  assert.equal(seen.length, 2);
+  off();
+});
+
+test('같은 세션의 동시 조회는 토큰을 한 번만 갱신한다', async () => {
+  const firstRefresh = deferred();
+  const refresh = deferred();
+  const vault = makeMemoryAuthVault();
+  await vault.write(token);
+  let refreshCount = 0;
+  const auth = makeAuth(vault, async (url, options) => {
+    if (url.endsWith('/auth/refresh')) {
+      refreshCount++;
+      firstRefresh.resolve();
+      return refresh.promise;
+    }
+    return options.headers.Authorization === 'Bearer renewed'
+      ? Response.json({data: 'ok'}) : new Response(null, {status: 401});
+  });
+  const pending = Promise.all([auth.authorizedRequest('/a'), auth.authorizedRequest('/b')]);
+  await firstRefresh.promise;
+  refresh.resolve(Response.json({data: {...token, accessToken: 'renewed'}}));
+  assert.deepEqual(await pending, ['ok', 'ok']);
+  assert.equal(refreshCount, 1);
+});

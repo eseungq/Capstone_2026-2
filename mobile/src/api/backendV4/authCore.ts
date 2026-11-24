@@ -102,42 +102,85 @@ function publicState(s: AuthSessionV4 | null): AuthPublicState {
 
 export function createAuthV4(config: AuthV4Config) {
   let refreshInFlight: Promise<AuthSessionV4> | null = null;
-  let epoch = 0; // 로그아웃 중 기존 비동기 갱신이 토큰을 되살리지 못하도록 차단
+  let epoch = 0;
+  let changingSession = false;
+  let vaultTail = Promise.resolve();
+  const listeners = new Set<() => void>();
 
-  const api = <T>(path: string, method: 'GET' | 'POST', body: unknown, token: string | null, mode: BodyMode = 'data') =>
-    requestApiV4<T>(config.baseUrl, { path, method, body, token, mode, fetchImpl: config.fetchImpl });
+  // Serialize storage operations so a delayed write cannot undo a later clear.
+  function withVault<T>(operation: () => Promise<T>): Promise<T> {
+    const result = vaultTail.then(operation);
+    vaultTail = result.then(() => {}, () => {});
+    return result;
+  }
+
+  function beginChange() {
+    changingSession = true;
+    refreshInFlight = null;
+    return ++epoch;
+  }
+
+  function finishChange(generation: number) {
+    if (generation !== epoch) return;
+    changingSession = false;
+    listeners.forEach(listener => listener());
+  }
+
+  function requireCurrent(generation: number) {
+    if (generation !== epoch || changingSession) {
+      throw new ApiV4RequestError(401, 'SESSION_CHANGED', '로그인 상태가 변경됐습니다. 현재 계정에서 다시 시도해 주세요.', null);
+    }
+  }
+
+  const api = <T>(path: string, method: 'GET' | 'POST', body: unknown, token: string | null, mode: BodyMode = 'data', signal?: AbortSignal) =>
+    requestApiV4<T>(config.baseUrl, { path, method, body, token, mode, signal, fetchImpl: config.fetchImpl });
 
   async function login(loginId: string, password: string): Promise<AuthPublicState> {
-    const startedEpoch = ++epoch;
-    const data = await api<unknown>('/auth/login', 'POST', makeLoginBody(loginId, password), null);
-    const parsed = parseTokenReply(data, null, loginId.trim());
-    if (startedEpoch !== epoch) throw new Error('다른 인증 작업이 진행되어 이전 로그인 응답을 폐기했습니다.');
-    await config.vault.write(parsed);
-    return publicState(parsed);
+    const generation = beginChange();
+    try {
+      const data = await api<unknown>('/auth/login', 'POST', makeLoginBody(loginId, password), null);
+      const parsed = parseTokenReply(data, null, loginId.trim());
+      await withVault(async () => {
+        if (generation !== epoch) throw new Error('이전 로그인 요청이 취소됐습니다.');
+        await config.vault.write(parsed);
+      });
+      if (generation !== epoch) throw new Error('이전 로그인 요청이 취소됐습니다.');
+      return publicState(parsed);
+    } finally {
+      finishChange(generation);
+    }
   }
 
   async function restore(): Promise<AuthPublicState> {
-    return publicState(await config.vault.read());
+    const generation = epoch;
+    if (changingSession) return publicState(null);
+    const session = await withVault(() => config.vault.read());
+    return publicState(generation === epoch && !changingSession ? session : null);
   }
 
   async function refreshAccessToken(): Promise<AuthSessionV4> {
+    const generation = epoch;
+    requireCurrent(generation);
     if (refreshInFlight) return refreshInFlight;
-    const startedEpoch = epoch;
     const work = (async () => {
-      const before = await config.vault.read();
+      const before = await withVault(() => config.vault.read());
+      requireCurrent(generation);
       if (!before) throw new ApiV4RequestError(401, 'NOT_LOGGED_IN', '로그인이 필요합니다.', null);
-      if (!config.refreshBody) {
-        throw new AuthContractPendingError('백엔드 /auth/refresh 요청 본문을 확인한 후 refreshBody를 지정해 주세요.');
-      }
+      if (!config.refreshBody) throw new AuthContractPendingError('인증 갱신 설정이 필요합니다.');
       try {
         const data = await api<unknown>('/auth/refresh', 'POST', config.refreshBody(before.refreshToken), null);
         const next = parseTokenReply(data, before);
-        if (startedEpoch !== epoch) throw new Error('로그아웃 이후 도착한 토큰 갱신 결과를 폐기했습니다.');
-        await config.vault.write(next);
+        await withVault(async () => {
+          requireCurrent(generation);
+          await config.vault.write(next);
+        });
+        requireCurrent(generation);
         return next;
       } catch (err) {
-        if (err instanceof ApiV4RequestError && err.httpStatus === 401 && startedEpoch === epoch) {
-          await config.vault.clear();
+        if (err instanceof ApiV4RequestError && err.httpStatus === 401 && generation === epoch) {
+          const expired = beginChange();
+          try { await withVault(() => config.vault.clear()); }
+          finally { finishChange(expired); }
         }
         throw err;
       }
@@ -151,41 +194,62 @@ export function createAuthV4(config: AuthV4Config) {
     path: string,
     opts: { method?: 'GET' | 'POST'; body?: unknown; mode?: BodyMode } = {},
   ): Promise<T> {
-    const current = await config.vault.read();
+    const generation = epoch;
+    requireCurrent(generation);
+    const current = await withVault(() => config.vault.read());
+    requireCurrent(generation);
     if (!current) throw new ApiV4RequestError(401, 'NOT_LOGGED_IN', '로그인이 필요합니다.', null);
-    const method = opts.method ?? 'GET';
-    const mode = opts.mode ?? 'data';
+    const send = (token: string) => api<T>(path, opts.method ?? 'GET', opts.body, token, opts.mode ?? 'data');
+    let response: T;
     try {
-      return await api<T>(path, method, opts.body, current.accessToken, mode);
+      response = await send(current.accessToken);
     } catch (err) {
+      requireCurrent(generation);
       if (!(err instanceof ApiV4RequestError) || err.httpStatus !== 401) throw err;
-      // 동일한 세션의 동시 요청에 401이 발생하면 이미 갱신된 토큰을 재사용
-      const stored = await config.vault.read();
-      if (!stored) throw err;
+      const stored = await withVault(() => config.vault.read());
+      requireCurrent(generation);
+      if (!stored || stored.loginId !== current.loginId || stored.role !== current.role) throw err;
       const after = stored.accessToken !== current.accessToken ? stored : await refreshAccessToken();
-      // 1회만 재시도하며 401 재귀 갱신은 금지
-      return api<T>(path, method, opts.body, after.accessToken, mode);
+      requireCurrent(generation);
+      response = await send(after.accessToken);
     }
+    requireCurrent(generation);
+    return response;
   }
 
   async function logout(): Promise<{ remoteRevoked: boolean }> {
-    ++epoch;
-    const active = await config.vault.read();
-    let remoteRevoked = false;
+    const generation = beginChange();
+    let active: AuthSessionV4 | null;
     try {
-      if (active && config.logoutBody) {
-        await api<void>('/auth/logout', 'POST', config.logoutBody(active.refreshToken), active.accessToken, 'empty');
-        remoteRevoked = true;
-      }
-    } catch {
-      // 네트워크 실패여도 기기 토큰은 즉시 삭제. 서버 토큰 폐기를 성공했다고 표시하지 않음.
+      active = await withVault(async () => {
+        // Forget the device session before waiting for the network.
+        let session: AuthSessionV4 | null = null;
+        try { session = await config.vault.read(); }
+        finally { await config.vault.clear(); }
+        return session;
+      });
     } finally {
-      await config.vault.clear();
+      finishChange(generation);
     }
-    return { remoteRevoked };
+    if (!active || !config.logoutBody) return { remoteRevoked: false };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      await api<void>('/auth/logout', 'POST', config.logoutBody(active.refreshToken), active.accessToken, 'empty', controller.signal);
+      return { remoteRevoked: true };
+    } catch {
+      return { remoteRevoked: false };
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
-  return { login, restore, refreshAccessToken, authorizedRequest, logout };
+  function subscribeSessionChange(listener: () => void) {
+    listeners.add(listener);
+    return () => { listeners.delete(listener); };
+  }
+
+  return { login, restore, refreshAccessToken, authorizedRequest, logout, sessionEpoch: () => epoch, subscribeSessionChange };
 }
 
 /** 테스트에서만 사용: 실제 JWT 보관에는 사용하지 마세요. */
