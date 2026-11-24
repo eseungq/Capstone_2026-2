@@ -14,7 +14,7 @@ import {
 } from '../api/backendV4/adminPolicyServiceV4';
 import type { AdminPolicyV4 } from '../api/backendV4/adminPolicyServiceV4';
 import {createAutoFailPolicyServiceV4} from '../api/backendV4/autoFailPolicyServiceV4';
-import {ensureAutoFailToggleV4,makeAutoFailThresholdEditV4} from '../api/backendV4/autoFailPolicyCoreV4';
+import {ensureAutoFailToggleV4,makeAutoFailThresholdEditV4,autoFailRangeLabelV4} from '../api/backendV4/autoFailPolicyCoreV4';
 
 const service = createAdminPolicyServiceV4(authV4);
 const autoFailService = createAutoFailPolicyServiceV4(authV4);
@@ -152,7 +152,7 @@ export default function PolicyLiveScreen() {
   const canWrite = access === 'admin' && !loading && !refreshing && writing === null && error === null;
 
   let failEditValid = false;
-  let failEditHint = '실제 서버의 활성 정책과 AI 검증된 불량 기준·범위를 확인해 주세요.';
+  let failEditHint = '실제 서버의 활성 정책과 팀에서 합의한 불량 기준·min·max 값을 확인해 주세요.';
   if (active && active.autoFailEnabled !== null) {
     try {
       const value=makeAutoFailThresholdEditV4(active,failPercent,failMinPercent,failMaxPercent);
@@ -162,7 +162,9 @@ export default function PolicyLiveScreen() {
         failEditHint='현재 불량 기준과 동일합니다. 불필요한 버전을 생성하지 않습니다.';
       } else {
         failEditValid=true;
-        failEditHint='불량 기준은 자동 통과 기준보다 높고 AI 검증 범위 안에 있습니다. 저장 시 비활성 버전이 생성됩니다.';
+        failEditHint=value.failValidatedMin===value.failValidatedMax
+          ? '검증 범위 없음(고정값) · 시험값 고정용입니다. 저장 시 비활성 버전이 생성됩니다.'
+          : '불량 기준이 입력한 min·max 범위 안에 있습니다. 저장 시 비활성 버전이 생성됩니다.';
       }
     } catch(cause) {failEditHint=errorText(cause);}
   }
@@ -260,7 +262,7 @@ export default function PolicyLiveScreen() {
     const args=[failPercent,failMinPercent,failMaxPercent] as const;
     const expected=makeAutoFailThresholdEditV4(base,...args);
     Alert.alert('자동 불량 기준 새 버전 저장',
-      `${base.policyVersion}\n불량 기준 ${percentageTextV4(expected.failThreshold)}\n검증 범위 ${percentageTextV4(expected.failValidatedMin)}~${percentageTextV4(expected.failValidatedMax)}\n\n저장해도 자동 불량은 즉시 적용되지 않습니다.`,
+      `${base.policyVersion}\n불량 기준 ${percentageTextV4(expected.failThreshold,4)}\n불량 기준 범위: ${autoFailRangeLabelV4(expected.failValidatedMin,expected.failValidatedMax)}\n\n저장해도 자동 불량은 즉시 적용되지 않습니다.`,
       [{text:'취소',style:'cancel'},{text:'새 비활성 버전 저장',onPress:()=>{
         void runWrite('fail-threshold',async()=>{
           const current=(await assertLatest(base)).find(p=>p.policyId===base.policyId);
@@ -365,27 +367,28 @@ export default function PolicyLiveScreen() {
               {!active ? <Text style={s.errorText}>활성 정책을 확인한 뒤 사용할 수 있습니다.</Text> : <>
                 <Row label="현재 자동 불량" value={active.autoFailEnabled===null?'서버 미지원 / 배포 전':active.autoFailEnabled?'켜짐':'꺼짐'} />
                 <Row label="불량 기준" value={percentageTextV4(active.failThreshold,4)} />
-                <Row label="불량 검증 범위" value={`${percentageTextV4(active.failValidatedMin,4)} ~ ${percentageTextV4(active.failValidatedMax,4)}`} />
-                <Row label="AI 검증 근거" value={evidencePresent?'정책 metrics.autoFail 있음':'검증 자료 없음'} />
+                <Row label="불량 검증 범위" value={autoFailRangeLabelV4(active.failValidatedMin,active.failValidatedMax)} />
+                <Row label="AI 검증 근거" value={evidencePresent?'정책 자료 등록됨 (독립 검증 여부 별도)':'검증 자료 없음'} />
                 {active.autoFailEnabled===null && (
                   <Text style={s.errorText}>서버가 AUTO_FAIL 정책 필드를 아직 제공하지 않습니다. 신규 설정 요청을 보내지 않습니다.</Text>
                 )}
                 {active.autoFailEnabled!==null && <>
                   <Text style={s.label}>불량 기준 입력 (%)</Text>
-                  <TextInput style={s.input} value={failPercent} placeholder="서버/AI 검증 기준 (%)"
+                  <TextInput style={s.input} value={failPercent} placeholder="팀 합의 불량 기준 (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
                     accessibilityLabel="자동 불량 기준 백분율" />
-                  <Text style={s.label}>검증 최솟값 (%)</Text>
-                  <TextInput style={s.input} value={failMinPercent} placeholder="AI 검증 최소 (%)"
+                  <Text style={s.muted}>min·max는 API 설정값입니다. 두 값이 같으면 검증 범위가 아니라 시험 고정값을 뜻합니다.</Text>
+                  <Text style={s.label}>불량 기준 최솟값 (min, %)</Text>
+                  <TextInput style={s.input} value={failMinPercent} placeholder="min (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailMinPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
-                    accessibilityLabel="불량 기준 AI 검증 범위 최솟값" />
-                  <Text style={s.label}>검증 최댓값 (%)</Text>
-                  <TextInput style={s.input} value={failMaxPercent} placeholder="AI 검증 최대 (%)"
+                    accessibilityLabel="불량 기준 최솟값" />
+                  <Text style={s.label}>불량 기준 최댓값 (max, %)</Text>
+                  <TextInput style={s.input} value={failMaxPercent} placeholder="max (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailMaxPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
-                    accessibilityLabel="불량 기준 AI 검증 범위 최댓값" />
+                    accessibilityLabel="불량 기준 최댓값" />
                   <Text style={[s.hint,!failEditValid&&s.errorText]}>{failEditHint}</Text>
                   <Button title="불량 기준 새 비활성 버전 저장" onPress={confirmSaveFail}
                     disabled={!canWrite||!failEditValid}/>
@@ -422,7 +425,9 @@ export default function PolicyLiveScreen() {
             {currentSaved && (
               <Card title="3. 마지막으로 저장한 새 버전">
                 <Row label="정책 버전" value={currentSaved.policyVersion} />
-                <Row label="새 기준치" value={percentageTextV4(currentSaved.passThreshold)} />
+                <Row label="자동 통과 기준" value={percentageTextV4(currentSaved.passThreshold)} />
+                <Row label="불량 기준" value={percentageTextV4(currentSaved.failThreshold,4)} />
+                <Row label="불량 검증 범위" value={autoFailRangeLabelV4(currentSaved.failValidatedMin,currentSaved.failValidatedMax)} />
                 <Row label="현재 상태" value={currentSaved.active ? '적용 중' : '비활성 (별도 적용 필요)'} />
                 {!currentSaved.active && (
                   <Button title="새 버전 적용 · 실서버"
@@ -451,7 +456,8 @@ export default function PolicyLiveScreen() {
                     <Row label="상태" value={`${policy.ready ? 'ready' : '미준비'} · ${policy.active ? 'active' : '비활성'}`} />
                     <Row label="자동 불량" value={policy.autoFailEnabled===null?'미지원':policy.autoFailEnabled?'켜짐':'꺼짐'} />
                     <Row label="불량 기준" value={percentageTextV4(policy.failThreshold,4)} />
-                    {policy.failThreshold!=null && <Row label="AI 검증 근거" value={policy.metrics?.autoFail && typeof policy.metrics.autoFail==='object'?'등록됨':'검증 자료 없음'}/>}
+                    <Row label="불량 검증 범위" value={autoFailRangeLabelV4(policy.failValidatedMin,policy.failValidatedMax)} />
+                    {policy.failThreshold!=null && <Row label="AI 검증 근거" value={policy.metrics?.autoFail && typeof policy.metrics.autoFail==='object'?'자료 등록됨 (독립 검증 여부 별도)':'검증 자료 없음'}/>}
                     {canActivate && policy.autoFailEnabled!==null && policy.failThreshold!=null && (
                       <Button secondary title={policy.autoFailEnabled?'이 버전에서 자동 불량 끄기 버전 저장':'이 버전에서 자동 불량 켜기 버전 저장'}
                         onPress={()=>confirmAutoFailToggle(!policy.autoFailEnabled,policy)} disabled={!canWrite}/>
