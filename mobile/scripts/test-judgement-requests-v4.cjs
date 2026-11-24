@@ -42,6 +42,18 @@ test('last correction is current verdict but original SYSTEM PASS unchanged',()=
   assert.equal(core.makeJudgementRequestBodyV4('WORKER',inspection(correction),'PASS','','근거').claimedJudgement,'PASS');
   assert.throws(()=>core.makeJudgementRequestBodyV4('WORKER',inspection(correction),'FAIL','','근거'),/다른/);
 });
+test('history shows both correction directions and the original SYSTEM decision',()=>{
+  for(const [original,corrected] of [['PASS','FAIL'],['FAIL','PASS']]){
+    assert.equal(core.historyJudgementLabelV4({
+      finalJudgement:original,correctedJudgement:corrected,judgedBy:'SYSTEM',
+    }),`현재 판정 ${corrected} · 관리자 정정\n최초 판정 ${original} · SYSTEM`);
+  }
+});
+test('history keeps ordinary, older and undecided rows readable',()=>{
+  assert.equal(core.historyJudgementLabelV4({finalJudgement:'PASS',judgedBy:'WORKER'}),'최종 판정 PASS · WORKER');
+  assert.equal(core.historyJudgementLabelV4({finalJudgement:'FAIL',correctedJudgement:null,judgedBy:'SYSTEM'}),'최종 판정 FAIL · SYSTEM');
+  assert.equal(core.historyJudgementLabelV4({finalJudgement:null,judgedBy:null}),null);
+});
 test('one existing OPEN request blocks a second selection',()=>{
   assert.throws(()=>core.makeJudgementRequestBodyV4('WORKER',
     inspection(null,[entry()]),'FAIL','','근거'),/대기/);

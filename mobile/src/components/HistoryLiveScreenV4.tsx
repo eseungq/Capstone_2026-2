@@ -16,6 +16,7 @@ import { authV4 } from '../api/backendV4/authRuntime';
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
 import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
 import type { HistoryPageV4, HistoryRowV4 } from '../api/backendV4/inspectionReadCore';
+import { historyJudgementLabelV4 } from '../api/backendV4/judgementRequestCoreV4';
 import type { DisplayStateV4 } from '../api/backendV4/types';
 
 const reader = createInspectionReadServiceV4({ mode: 'api', transport: authV4 });
@@ -281,9 +282,9 @@ export default function HistoryLiveScreenV4() {
                     : 'AI 예측 ' + (item.predictedQuality ?? '미제공')}
                 {' · 접수 '}{dateText(item.receivedAt)}
               </Text>
-              {item.finalJudgement && (
+              {(item.correctedJudgement || item.finalJudgement) && (
                 <Text style={styles.recordOutcome}>
-                  최종 판정 {item.finalJudgement} · {item.judgedBy ?? '미제공'}
+                  {historyJudgementLabelV4(item)}
                 </Text>
               )}
               {item.errorCode && <Text style={styles.errorText}>오류 코드: {item.errorCode}</Text>}

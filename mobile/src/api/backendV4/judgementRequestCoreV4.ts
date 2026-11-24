@@ -3,6 +3,7 @@
  * 최초 시스템 판정은 변경하지 않고 요청과 별도 정정 이력만 표시합니다.
  */
 import type { FinalJudgementV4, JudgedByV4 } from './types';
+import type { HistoryRowV4 } from './inspectionReadCore';
 import type { BackendRole } from './authCore';
 import { assertWriteUuidV4, WriteV4ValidationError } from './inspectionWriteCore';
 
@@ -69,6 +70,16 @@ export function currentJudgementV4(
   original: FinalJudgementV4 | null,
   correction: JudgementCorrectionV4 | null,
 ): FinalJudgementV4 | null { return correction?.correctedJudgement ?? original; }
+
+export function historyJudgementLabelV4(
+  row: Pick<HistoryRowV4, 'finalJudgement' | 'correctedJudgement' | 'judgedBy'>,
+): string | null {
+  const source = row.judgedBy ?? '미제공';
+  if (row.correctedJudgement) {
+    return `현재 판정 ${row.correctedJudgement} · 관리자 정정\n최초 판정 ${row.finalJudgement ?? '미제공'} · ${source}`;
+  }
+  return row.finalJudgement ? `최종 판정 ${row.finalJudgement} · ${source}` : null;
+}
 
 export function makeJudgementRequestBodyV4(
   role: BackendRole | null,
