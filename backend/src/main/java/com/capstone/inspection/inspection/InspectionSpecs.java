@@ -6,6 +6,7 @@ import com.capstone.inspection.domain.inspection.InspectionStatus;
 import com.capstone.inspection.domain.inspection.Judgement;
 import com.capstone.inspection.domain.inspection.PredictedQuality;
 import com.capstone.inspection.domain.inspection.RecommendedAction;
+import com.capstone.inspection.domain.inspection.ReviewReason;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
@@ -92,6 +93,23 @@ public final class InspectionSpecs {
             retried.select(r.get("id")).where(cb.equal(r.get("retryOfInspectionId"), root.get("id")));
             return cb.and(cb.equal(root.get("status"), InspectionStatus.FAILED), cb.not(cb.exists(retried)));
         };
+    }
+
+    // 확인 필요 목록 우선 그룹: 정상 예측인데 기준을 넘은 REVIEW (계약 6.4 sort=PRIORITY)
+    public static Specification<Inspection> priorityReview() {
+        return (root, query, cb) -> cb.and(cb.equal(root.get("predictedQuality"), PredictedQuality.GOOD),
+                cb.equal(root.get("reviewReason"), ReviewReason.ABOVE_THRESHOLD));
+    }
+
+    // 우선 그룹이 아닌 나머지. 예측·사유가 NULL인 FAILED·수동 판정도 포함되도록 NULL을 따로 검사
+    public static Specification<Inspection> notPriorityReview() {
+        return (root, query, cb) -> cb.or(cb.isNull(root.get("predictedQuality")), cb.isNull(root.get("reviewReason")),
+                cb.notEqual(root.get("predictedQuality"), PredictedQuality.GOOD),
+                cb.notEqual(root.get("reviewReason"), ReviewReason.ABOVE_THRESHOLD));
+    }
+
+    public static Specification<Inspection> predictedQuality(PredictedQuality quality) {
+        return (root, query, cb) -> cb.equal(root.get("predictedQuality"), quality);
     }
 
     // 커서 이후 (receivedAt, id) 오름차순

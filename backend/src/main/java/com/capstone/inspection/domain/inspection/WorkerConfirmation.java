@@ -52,14 +52,18 @@ public class WorkerConfirmation {
     @Embedded
     private ScreenTiming screenTiming; // 화면 체류 시간 (선택, V9). 보내지 않았으면 null
 
+    @Column(length = 36)
+    private String batchId;            // 일괄 FAIL 묶음 ID (V11, 계약 6.7.1). 단건 확인이면 null
+
     public WorkerConfirmation(Inspection inspection, User worker, Judgement finalJudgement, String comment,
-                              ScreenTiming screenTiming) {
+                              ScreenTiming screenTiming, String batchId) {
         this.id = UUID.randomUUID().toString();
         this.inspection = inspection;
         this.worker = worker;
         this.finalJudgement = finalJudgement;
         this.comment = comment;
         this.screenTiming = screenTiming;
+        this.batchId = batchId;
         this.confirmedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
     }
 }

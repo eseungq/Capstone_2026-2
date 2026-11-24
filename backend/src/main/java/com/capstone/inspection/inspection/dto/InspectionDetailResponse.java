@@ -11,6 +11,7 @@ import com.capstone.inspection.domain.inspection.ReviewReason;
 import com.capstone.inspection.inspection.DisplayState;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 // GET /inspections/{id} 응답 (계약 v4 6.5). AI 결과·정책 결과·작업자 판정·이미지를 블록으로 분리
 public record InspectionDetailResponse(String inspectionId,
@@ -30,7 +31,9 @@ public record InspectionDetailResponse(String inspectionId,
                                        JudgementBlock judgement,
                                        Images images,
                                        Error error,           // FAILED일 때만
-                                       RecheckBlock recheck) { // AUTO_PASS 표본 재확인 (계약 6.11), 표본이 아니면 null
+                                       RecheckBlock recheck,  // AUTO_PASS 표본 재확인 (계약 6.11), 표본이 아니면 null
+                                       List<JudgementRequestResponse> judgementRequests, // 판정 확인 요청 (6.12), 최신순
+                                       CorrectionBlock correction) { // 마지막 정정, 없으면 null (judgement 블록은 최초 판정)
 
     public record ManualOf(String inspectionId, String inspectionNo, String errorCode, String errorMessage) {
     }
