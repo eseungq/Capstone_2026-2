@@ -43,13 +43,15 @@ function dateMs(value:string):number{
  const t=Date.parse(value+'T00:00:00.000Z');
  return Number.isFinite(t)&&new Date(t).toISOString().slice(0,10)===value?t:NaN;
 }
+export class DailyQueryInputErrorV4 extends Error {}
+
 export function validateDailyRangeV4(partCode:string,from:string,to:string){
- if(!parts.includes(partCode))throw new Error('부품은 DOOR / FRAME / COWL_COVER 중 하나여야 합니다.');
+ if(!parts.includes(partCode))throw new DailyQueryInputErrorV4('부품은 DOOR / FRAME / COWL_COVER 중 하나여야 합니다.');
  const a=dateMs(from),b=dateMs(to);
  if(!Number.isFinite(a)||!Number.isFinite(b)||b<=a)
-   throw new Error('날짜는 YYYY-MM-DD 형식이며 시작일은 종료일보다 이전이어야 합니다.');
+   throw new DailyQueryInputErrorV4('날짜는 YYYY-MM-DD 형식이며 시작일은 종료일보다 이전이어야 합니다.');
  const days=(b-a)/86400000;
- if(days>DAILY_HISTORY_MAX_DAYS_V4)throw new Error('날짜 범위는 최대 92일입니다.');
+ if(days>DAILY_HISTORY_MAX_DAYS_V4)throw new DailyQueryInputErrorV4('날짜 범위는 최대 92일입니다.');
  return {partCode:partCode as AutomationDailyPartV4,from,to,days};
 }
 export function kstCalendarTodayV4(atMs:number=Date.now()):string{
@@ -183,9 +185,9 @@ export function oppositeEvidenceTextV4(row:DailyHistoryRowV4):string{
 export function validateDailyBandV4(value:string):number{
  const raw=value.trim();
  if(!/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/.test(raw))
-   throw new Error('band는 0.001~0.5 사이의 확률 차로 입력하세요.');
+   throw new DailyQueryInputErrorV4('구간 폭은 0.001~0.5 사이의 확률 차로 입력하세요.');
  const number=Number(raw);
  if(!Number.isFinite(number)||number<0.001||number>0.5)
-   throw new Error('band는 0.001~0.5 사이여야 합니다.');
+   throw new DailyQueryInputErrorV4('구간 폭은 0.001~0.5 사이여야 합니다.');
  return number;
 }

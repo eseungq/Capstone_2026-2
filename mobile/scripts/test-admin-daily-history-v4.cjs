@@ -119,7 +119,7 @@ test('row sorting and duplicate policy/date/model grouped rows enforced',()=>{
 test('band 0.001..0.5 allowed; out-of-range and wrong syntax rejected',()=>{
  for(const input of ['0.001','0.05','0.5'])assert.equal(core.validateDailyBandV4(input),Number(input));
  for(const input of ['0','0.0009','0.5001','-0.1','5','garbage','0,05'])
-   assert.throws(()=>core.validateDailyBandV4(input),/band/);
+   assert.throws(()=>core.validateDailyBandV4(input),/구간 폭/);
 });
 test('detail supports threshold bands and corrected verdict separately',()=>{
  const d=core.decodeDailyDetailV4(detail(),{
@@ -182,7 +182,7 @@ test('ADMIN detail URL matches policy, KST date, requested band',async()=>{
 test('no policy row must not trigger detail request; unknown band rejected first',async()=>{
  const h=mock();
  await assert.rejects(h.service.detail('COWL_COVER','2026-11-23','', '0.05'),/정책 없는/);
- await assert.rejects(h.service.detail('COWL_COVER','2026-11-23',pid,'0.7'),/band/);
+ await assert.rejects(h.service.detail('COWL_COVER','2026-11-23',pid,'0.7'),/구간 폭/);
  assert.equal(h.calls.length,0);
 });
 test('server may not return rows outside requested date range',async()=>{
@@ -257,5 +257,27 @@ test('a list reload invalidates its old detail; focus loss invalidates the pendi
  const retry=reads.loadRows('FRAME','2026-11-24','2026-11-25');
  lists[1].reject(new Error('current error'));
  await retry;
- assert.deepEqual(state.list,{value:null,loading:false,error:'current error'});
+ assert.deepEqual(state.list,{value:null,loading:false,error:'통계를 불러오지 못했습니다. 잠시 후 다시 조회해 주세요.'});
+});
+
+test('an input error tells the user how to fix the query; server errors do not produce an empty result', async () => {
+ const {reads,lists,state}=screenReads();
+ const invalid=reads.loadRows('FRAME','2026-11-24','2026-11-23');
+ let reason;
+ try { core.validateDailyRangeV4('FRAME','2026-11-24','2026-11-23'); }
+ catch (error) { reason=error; }
+ assert.ok(reason instanceof core.DailyQueryInputErrorV4);
+ lists[0].reject(reason);
+ await invalid;
+ assert.match(state.list.error,/종료일보다 이전/);
+ assert.equal(state.list.value,null);
+ const failed=reads.loadRows('FRAME','2026-11-23','2026-11-24');
+ const {ApiV4RequestError}=require(path.join(root,'httpCore.ts'));
+ lists[1].reject(new ApiV4RequestError(403,'ACCESS_DENIED','raw error','test-trace'));
+ await failed;
+ assert.deepEqual(state.list,{loading:false,value:null,error:'관리자 계정으로 로그인해 주세요.'});
+ const empty=reads.loadRows('FRAME','2026-11-23','2026-11-24');
+ lists[2].resolve([]);
+ await empty;
+ assert.deepEqual(state.list,{loading:false,value:[],error:null});
 });
