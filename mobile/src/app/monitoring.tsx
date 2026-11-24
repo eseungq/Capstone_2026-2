@@ -114,18 +114,12 @@ const showInspection = (inspectionNo: string) => {
         ? '검사 이력'
         : '설정';
 
-  // 실제 조회와 Mock 시연을 구분해 화면 상단 모드를 일치시킵니다.
-  const modeLabel = isLive ? 'SERVER' : 'Mock';
   const pageSubtitle =
     activeTab === 'monitoring'
-      ? isAdmin
-        ? `전체 라인·검사·오류 조회 · ${modeLabel}`
-        : `최근 이미지 · 확인 필요 알림 · ${modeLabel}`
+      ? isAdmin ? '전체 공정 · 검사 현황' : '최근 검사 · 확인 필요 알림'
       : activeTab === 'history'
-        ? `검사 기록 조회 · ${modeLabel}`
-        : isAdmin
-          ? `시스템 관리자 · ${modeLabel}`
-          : `현장 작업자 · ${modeLabel}`;
+        ? '검사 기록 조회'
+        : isAdmin ? '시스템 관리자' : '현장 작업자';
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -134,7 +128,7 @@ const showInspection = (inspectionNo: string) => {
       {/* 화면 제목 */}
       <View style={styles.header}>
         <Text style={styles.title}>{pageTitle}</Text>
-        <Text style={styles.subtitle}>{pageSubtitle}</Text>
+        <Text style={styles.subtitle}>{pageSubtitle}{!isLive && ' · 시연'}</Text>
       </View>
 
       <ScrollView

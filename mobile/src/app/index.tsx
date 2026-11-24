@@ -2,7 +2,8 @@ import Pressable from '../components/TouchPressable';
 
 import { authV4 } from '../api/backendV4/authRuntime';
 
-import { useState } from 'react';
+import { ApiV4RequestError } from '../api/backendV4/httpCore';
+import { useRef, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import {
   Alert,
@@ -23,44 +24,41 @@ export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-// 실제 백엔드 로그인: 인증 성공 후 모니터링 화면으로 이동
-const handleLogin = async () => {
-  if (!username.trim() || !password) {
-    Alert.alert('입력 확인', '아이디와 비밀번호를 입력하세요.');
-    return;
-  }
+  const loginPending = useRef(false);
+  const [signingIn, setSigningIn] = useState(false);
 
-  try {
-    // 실제 백엔드 인증 요청
-    const session = await authV4.login(username, password);
-
-    // 실제 서버가 전달한 권한만 사용
-    if (session.role !== 'WORKER' && session.role !== 'ADMIN') {
-      Alert.alert(
-        '서버 권한 확인 필요',
-        '로그인 요청은 성공했지만 사용자 권한을 확인할 수 없습니다. 백엔드 응답 형식을 확인해 주세요.',
-      );
+  const handleLogin = async () => {
+    if (loginPending.current) return;
+    if (!username.trim() || !password) {
+      Alert.alert('입력 확인', '아이디와 비밀번호를 입력하세요.');
       return;
     }
 
-    // 인증 성공 후 모니터링 화면으로 이동
-    router.replace({
-  pathname: '/monitoring',
-  params: {
-    role: session.role,
-    mode: 'live',
-  },
-});
-  } catch (error) {
-    Alert.alert(
-      '로그인 실패',
-      error instanceof Error
-        ? error.message
-        : '서버와 연결할 수 없습니다.',
-    );
-  }
-};
-
+    loginPending.current = true;
+    setSigningIn(true);
+    try {
+      const session = await authV4.login(username, password);
+      if (session.role !== 'WORKER' && session.role !== 'ADMIN') {
+        Alert.alert('계정 확인', '모바일 앱은 작업자 또는 관리자 계정으로 이용할 수 있습니다.');
+        return;
+      }
+      router.replace({
+        pathname: '/monitoring',
+        params: { role: session.role, mode: 'live' },
+      });
+    } catch (error) {
+      const reasons: Record<string, string> = {
+        AUTH_INVALID_CREDENTIALS: '아이디와 비밀번호를 다시 확인해 주세요.',
+        AUTH_ACCOUNT_LOCKED: '로그인 시도가 반복되어 계정이 잠겼습니다. 관리자에게 잠금 해제를 요청해 주세요.',
+        NETWORK_ERROR: '서버에 연결할 수 없습니다. 네트워크를 확인해 주세요.',
+      };
+      const reason = error instanceof ApiV4RequestError ? reasons[error.code] : undefined;
+      Alert.alert('로그인 실패', reason ?? '로그인할 수 없습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      loginPending.current = false;
+      setSigningIn(false);
+    }
+  };
 
   // 서버 로그인 없이 화면 권한 표시만 확인하기 위한 독립 Mock WORKER 진입.
   // 실제 인증 세션이나 백엔드의 권한을 변경하지 않습니다.
@@ -74,12 +72,9 @@ const handleLogin = async () => {
   // 관리자 화면 시연용 이동
   const handleAdminPreview = () => {
     router.replace({
-  pathname: '/monitoring',
-  params: {
-    role: 'ADMIN',
-    mode: 'mock',
-  },
-});
+      pathname: '/monitoring',
+      params: { role: 'ADMIN', mode: 'mock' },
+    });
   };
 
   return (
@@ -102,7 +97,7 @@ const handleLogin = async () => {
           </Text>
 
           <Text style={styles.subtitle}>
-            자동차 부품 검사 · 모바일 프로토타입
+            자동차 부품 품질검사
           </Text>
 
           {/* 서비스 소개 */}
@@ -154,10 +149,12 @@ const handleLogin = async () => {
           {/* 로그인 버튼 */}
           <Pressable
             style={styles.loginButton}
+            accessibilityRole="button"
+            disabled={signingIn}
             onPress={handleLogin}
           >
             <Text style={styles.buttonText}>
-              로그인
+              {signingIn ? '로그인 중…' : '로그인'}
             </Text>
           </Pressable>
 
@@ -191,8 +188,7 @@ const handleLogin = async () => {
           {/* 시연 상태 */}
           <View style={styles.notice}>
             <Text style={styles.noticeText}>
-              화면 설계 · 계정 인증 및 API 연결은
-              별도 검증 대상
+              시연은 예시 데이터를 사용합니다. 실제 검사 업무는 계정으로 로그인해 주세요.
             </Text>
           </View>
 
@@ -200,6 +196,7 @@ const handleLogin = async () => {
           <Pressable
             accessibilityRole="button"
             style={styles.previewButton}
+            disabled={signingIn}
             onPress={handleWorkerPreview}
           >
             <Text style={styles.previewText}>
@@ -209,6 +206,7 @@ const handleLogin = async () => {
           <Pressable
             accessibilityRole="button"
             style={styles.previewButton}
+            disabled={signingIn}
             onPress={handleAdminPreview}
           >
             <Text style={styles.previewText}>

@@ -25,8 +25,16 @@ const color = {
   muted: '#64748B',
   border: '#E4E7EC',
   blue: '#2054D8',
-  info: '#EBF1FF',
 };
+
+const adminDemoScreens = [
+  { label: '품질 통계 보기 · Mock', href: { pathname: '/statistics', params: { role: 'ADMIN' } } },
+  { label: '검사 조회 API v4 사전 점검', href: '/inspection-read-v4-preview' },
+  { label: '판정·재검사 API v4 사전 점검', href: '/inspection-write-v4-preview' },
+  { label: 'AI 결과·Grad-CAM 사전 점검', href: '/ai-display-v4-preview' },
+  { label: '공정 모니터링 5초 갱신 사전 점검', href: '/monitoring-poll-v4-preview' },
+  { label: '75단계 · 통합 연결 준비 점검', href: '/integration-readiness-v4-preview' },
+] as const;
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -112,14 +120,14 @@ export default function SettingsScreen() {
     setLoggingOut(true);
     try {
       // 서버 Refresh Token 폐기를 시도하고, 실패해도 기기의 SecureStore는 삭제합니다.
-      const { remoteRevoked } = await authV4.logout();
-      if (remoteRevoked) {
-        router.replace('/');
-      } else {
+      const completion = authV4.logout();
+      const logoutEpoch = authV4.sessionEpoch();
+      const { remoteRevoked } = await completion;
+      // Local logout already reset the stack; a later account must not receive this alert.
+      if (!remoteRevoked && authV4.sessionEpoch() === logoutEpoch) {
         Alert.alert(
           '이 기기에서 로그아웃됨',
-          '기기에 저장된 로그인 정보는 삭제했습니다. 다만 서버의 Refresh Token 폐기 여부는 확인되지 않았습니다.',
-          [{ text: '확인', onPress: () => router.replace('/') }],
+          '이 기기의 로그인 정보를 삭제했습니다. 서버에서도 로그아웃됐는지는 확인하지 못했습니다.',
         );
       }
     } catch {
@@ -148,20 +156,12 @@ export default function SettingsScreen() {
       return;
     }
     Alert.alert(
-      '실제 서버 로그아웃',
-      '서버 로그인 세션을 종료하고 기기에 저장된 인증 정보를 삭제할까요?',
+      '로그아웃',
+      '이 기기에서 로그아웃할까요?',
       [
         { text: '취소', style: 'cancel' },
         { text: '로그아웃', style: 'destructive', onPress: () => { void performLiveLogout(); } },
       ],
-    );
-  };
-
-  const openPolicy = () => {
-    Alert.alert(
-      '관리자 정책 화면 · 연결 전',
-      'Figma의 자동 통과 기준 관리 화면은 다음 단계에서 구현합니다. 검증된 자동 통과 정책이 없으며 passThreshold를 임의로 설정하지 않습니다.',
-      [{ text: '확인' }],
     );
   };
 
@@ -174,11 +174,11 @@ export default function SettingsScreen() {
           {checkingSession ? (
             <>
               <ActivityIndicator color={color.blue} />
-              <Text style={styles.cardText}>실제 서버 로그인 상태를 확인하는 중입니다.</Text>
+              <Text style={styles.cardText}>로그인 상태를 확인하고 있습니다.</Text>
             </>
           ) : (
             <>
-              <Text style={styles.cardText}>유효한 WORKER 또는 ADMIN 로그인 세션이 없습니다.</Text>
+              <Text style={styles.cardText}>작업자 또는 관리자 계정으로 다시 로그인해 주세요.</Text>
               <Pressable
                 accessibilityRole="button"
                 style={[styles.button, styles.primary]}
@@ -201,19 +201,19 @@ export default function SettingsScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>설정</Text>
         <Text style={styles.subtitle}>
-          {isAdmin ? (mode === 'live' ? '시스템 관리자 계정 · SERVER' : '시스템 관리자 계정 · Mock') : (mode === 'live' ? '현장 작업자 계정 · SERVER' : '현장 작업자 계정 · Mock')}
+          {isAdmin ? '시스템 관리자' : '현장 작업자'}{mode === 'mock' && ' · 시연'}
         </Text>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <Card title="계정 정보">
           <Field label="권한" value={isAdmin ? '시스템 관리자' : '현장 작업자'} />
-          <Field label="로그인 상태" value={mode === 'live' ? '실제 서버 모드' : 'Mock 시연'} />
+          <Field label="로그인 상태" value={mode === 'live' ? '로그인됨' : '시연 중'} />
         </Card>
 
         <Card title="사용 가능한 메뉴">
           <Text style={styles.cardText}>
-            {isAdmin ? '모니터링 · 전체 이력 · 설정' : '모니터링 · 담당 이력 · REVIEW 확인 · 설정'}
+            {isAdmin ? '모니터링 · 전체 이력 · 설정' : '모니터링 · 검사 이력 · 판정 대기 · 설정'}
           </Text>
         </Card>
 
@@ -221,7 +221,7 @@ export default function SettingsScreen() {
           <Text style={styles.cardText}>
             {isAdmin
               ? '자동 통과 기준치 · 준비·적용 상태 관리'
-              : '확인 필요 알림 → 검사 상세 → PASS/FAIL 제출'}
+              : '확인 필요 알림 → 검사 상세 → 통과·불량 판정 제출'}
           </Text>
         </Card>
 
@@ -232,7 +232,7 @@ export default function SettingsScreen() {
             accessibilityRole="button"
           >
             <Text style={styles.buttonText}>
-              AUTO_PASS 표본 재확인 · {isAdmin ? '관리자 결과 확인' : '작업자 확인'}
+              자동 통과 표본 재확인 · {isAdmin ? '관리자 결과 확인' : '작업자 확인'}
             </Text>
           </Pressable>
         )}
@@ -242,146 +242,42 @@ export default function SettingsScreen() {
             accessibilityRole="button"
             onPress={() => router.push('/judgement-requests-admin-live')}>
             <Text style={[styles.buttonText, { color: color.white }]}>
-              판정 확인 요청 관리 · SERVER
+              판정 확인 요청 관리
             </Text>
           </Pressable>
         )}
 
         {isAdmin && (
-          <Pressable style={[styles.button, styles.primary]} 
-onPress={() => {
-  if (mode === 'live') {
-    // 실제 서버 화면은 로그인 세션 role=ADMIN을 별도 검증합니다.
-    router.push('/policy-live');
-  } else {
-    router.push({ pathname: '/policy', params: { role: 'ADMIN' } });
-  }
-}}
- accessibilityRole="button">
-            <Text style={[styles.buttonText, { color: color.white }]}>{mode === 'live' ? 'COWL_COVER 실서버 정책 관리' : '자동 통과 기준 관리 · Mock'}</Text>
+          <Pressable style={[styles.button, styles.primary]} accessibilityRole="button"
+            onPress={() => mode === 'live'
+              ? router.push('/policy-live')
+              : router.push({ pathname: '/policy', params: { role: 'ADMIN' } })}>
+            <Text style={[styles.buttonText, { color: color.white }]}>
+              {mode === 'live' ? '카울커버 자동 판정 정책' : '자동 통과 기준 관리 · Mock'}
+            </Text>
           </Pressable>
         )}
 
-{isAdmin && mode === 'live' && (
-  <Pressable style={[styles.button, styles.primary]} accessibilityRole="button"
-    onPress={() => router.push('/admin-daily-live')}>
-    <Text style={[styles.buttonText, {color: color.white}]}>
-      날짜별 자동 판정 통계 · SERVER
-    </Text>
-  </Pressable>
-)}
+        {isAdmin && mode === 'live' && (
+          <Pressable style={[styles.button, styles.primary]} accessibilityRole="button"
+            onPress={() => router.push('/admin-daily-live')}>
+            <Text style={[styles.buttonText, { color: color.white }]}>날짜별 자동 판정 통계</Text>
+          </Pressable>
+        )}
 
-{isAdmin && (
-  <Pressable
-    style={[styles.button, styles.secondary]}
-    onPress={() =>
-      router.push({
-        pathname: '/statistics',
-        params: { role: 'ADMIN' },
-      })
-    }
-    accessibilityRole="button"
-  >
-    <Text style={styles.buttonText}>
-      품질 통계 보기 · Mock
-    </Text>
-  </Pressable>
-)}
-
-{isAdmin && (
-  <Pressable
-    style={[styles.button, styles.secondary]}
-    onPress={() =>
-      router.push({
-        pathname: '/inspection-read-v4-preview',
-      })
-    }
-    accessibilityRole="button"
-  >
-    <Text style={styles.buttonText}>
-      검사 조회 API v4 사전 점검
-    </Text>
-  </Pressable>
-)}
-
-{isAdmin && (
-  <Pressable
-    style={[styles.button, styles.secondary]}
-    onPress={() =>
-      router.push({
-        pathname: '/inspection-write-v4-preview',
-      })
-    }
-    accessibilityRole="button"
-  >
-    <Text style={styles.buttonText}>
-      판정·재검사 API v4 사전 점검
-    </Text>
-  </Pressable>
-)}
-
-{isAdmin && (
-  <Pressable
-    style={[styles.button, styles.secondary]}
-    onPress={() =>
-      router.push({
-        pathname: '/ai-display-v4-preview',
-      })
-    }
-    accessibilityRole="button"
-  >
-    <Text style={styles.buttonText}>
-      AI 결과·Grad-CAM 사전 점검
-    </Text>
-  </Pressable>
-)}
-
-{isAdmin && (
-  <Pressable
-    style={[styles.button, styles.secondary]}
-    onPress={() =>
-      router.push({
-        pathname: '/monitoring-poll-v4-preview',
-      })
-    }
-    accessibilityRole="button"
-  >
-    <Text style={styles.buttonText}>
-      공정 모니터링 5초 갱신 사전 점검
-    </Text>
-  </Pressable>
-)}
-
-{isAdmin && (
-  <Pressable
-    style={[styles.button, styles.secondary]}
-    onPress={() =>
-      router.push({
-        pathname: '/integration-readiness-v4-preview',
-      })
-    }
-    accessibilityRole="button"
-  >
-    <Text style={styles.buttonText}>
-      75단계 · 통합 연결 준비 점검
-    </Text>
-  </Pressable>
-)}
+        {isAdmin && mode === 'mock' && adminDemoScreens.map(({ label, href }) => (
+          <Pressable key={label} style={[styles.button, styles.secondary]} accessibilityRole="button"
+            onPress={() => router.push(href)}>
+            <Text style={styles.buttonText}>{label}</Text>
+          </Pressable>
+        ))}
 
         <Pressable style={[styles.button, styles.secondary, loggingOut && styles.disabled]}
           onPress={logout} disabled={loggingOut} accessibilityRole="button">
           <Text style={styles.buttonText}>{loggingOut ? '로그아웃 처리 중…' : '로그아웃'}</Text>
         </Pressable>
 
-        <View style={styles.notice}>
-          <Text style={styles.noticeText}>
-            {isAdmin && mode === 'mock' ? '정책 관리 화면은 Mock · ' : ''}
-            {isAdmin && mode === 'live' ? '실서버 정책 관리 화면에서 정책을 실제 변경할 수 있습니다. · ' : ''}
-            {mode === 'live'
-              ? '로그아웃 시 서버 세션 종료를 시도하고 기기의 로그인 정보를 삭제합니다.'
-              : 'Mock 시연 종료는 실제 서버 로그인 정보를 변경하지 않습니다.'}
-          </Text>
-        </View>
+        {mode === 'mock' && <Text style={styles.demoNote}>시연에서는 예시 검사와 정책을 사용합니다.</Text>}
       </ScrollView>
 
       <NavBar role={displayRole} mode={mode} />
@@ -408,8 +304,7 @@ const styles = StyleSheet.create({
   primary: { backgroundColor: color.blue },
   secondary: { backgroundColor: color.white, borderWidth: 1, borderColor: color.border },
   buttonText: { fontSize: 13, lineHeight: 20, fontWeight: '700', color: color.ink },
-  notice: { backgroundColor: color.info, borderRadius: 10, padding: 9 },
-  noticeText: { fontSize: 10, lineHeight: 15, fontWeight: '500', color: color.blue },
+  demoNote: { color: color.muted, fontSize: 11, lineHeight: 16 },
   nav: { height: 58, borderWidth: 1, borderColor: color.border, borderRadius: 15, backgroundColor: color.white, marginHorizontal: 20, marginBottom: 6, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' },
   navItem: { flex: 1, height: 46, alignItems: 'center', justifyContent: 'center', gap: 1 },
   navIcon: { color: color.muted, fontSize: 16, lineHeight: 24, fontWeight: '700' },
