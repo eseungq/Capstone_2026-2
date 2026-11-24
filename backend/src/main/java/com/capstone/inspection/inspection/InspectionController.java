@@ -4,6 +4,8 @@ import com.capstone.inspection.auth.security.AuthUser;
 import com.capstone.inspection.common.api.ApiResponse;
 import com.capstone.inspection.common.api.PageResponse;
 import com.capstone.inspection.common.time.Times;
+import com.capstone.inspection.inspection.dto.ConfirmBatchRequest;
+import com.capstone.inspection.inspection.dto.ConfirmBatchResponse;
 import com.capstone.inspection.inspection.dto.ConfirmRequest;
 import com.capstone.inspection.inspection.dto.ConfirmResponse;
 import com.capstone.inspection.inspection.dto.InspectionDetailResponse;
@@ -40,6 +42,7 @@ public class InspectionController {
     private final InspectionIntakeService intakeService;
     private final InspectionQueryService queryService;
     private final InspectionConfirmService confirmService;
+    private final InspectionConfirmBatchService confirmBatchService;
     private final InspectionRetryService retryService;
     private final InspectionManualService manualService;
 
@@ -88,6 +91,15 @@ public class InspectionController {
                                                 @PathVariable String inspectionId,
                                                 @Valid @RequestBody ConfirmRequest request) {
         return ApiResponse.of(confirmService.confirm(user, inspectionId, request));
+    }
+
+    @Operation(summary = "일괄 FAIL", description = "WORKER만. 직접 고른 REVIEW 건(1~50건)을 한 번에 FAIL로 확정. "
+            + "건마다 작업자 확인과 같은 규칙으로 따로 처리하고 한 건이 실패해도 나머지는 저장. 200과 요청 순서대로 건별 결과 반환. "
+            + "FAIL이 아니거나 건수·중복 ID·체류 시간 값이 틀리면 요청 전체 400 INVALID_PARAMETER")
+    @PostMapping("/confirm-batch")
+    public ApiResponse<ConfirmBatchResponse> confirmBatch(@AuthenticationPrincipal AuthUser user,
+                                                          @Valid @RequestBody ConfirmBatchRequest request) {
+        return ApiResponse.of(confirmBatchService.confirmBatch(user, request));
     }
 
     @Operation(summary = "재검사", description = "WORKER·ADMIN. FAILED 건을 저장된 원본으로 다시 분석. 새 inspectionId로 202 반환(retryOf=원래 ID), "
