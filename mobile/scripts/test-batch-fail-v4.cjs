@@ -16,7 +16,7 @@ Module._extensions['.ts'] = (module,filename) => {
 };
 const root=path.join(__dirname,'../src/api/backendV4');
 const {MAX_BATCH_FAIL_V4,selectableReviewForBatchV4,prepareBatchFailBodyV4,
-  decodeBatchFailReplyV4,batchFailResultLabelV4} = require(path.join(root,'batchFailCoreV4.ts'));
+  decodeBatchFailReplyV4,batchFailResultLabelV4,canReviewBatchImagesV4} = require(path.join(root,'batchFailCoreV4.ts'));
 const {createBatchFailServiceV4}=require(path.join(root,'batchFailServiceV4.ts'));
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const item=n=>({inspectionId:id(n),inspectionNo:`INS-${String(n).padStart(6,'0')}`,partCode:'COWL_COVER'});
@@ -135,4 +135,15 @@ test('network failure releases lock for later deliberate retry',async()=>{
   await assert.rejects(svc.submit('WORKER',[item(1)],''),/offline/);
   assert.equal((await svc.submit('WORKER',[item(1)],'')).value.results[0].result,'CONFIRMED');
   assert.equal(count,2);
+});
+
+test('batch review requires successful image loading rather than URL presence',()=>{
+ const url='https://example.test/original.png',cam='https://example.test/cam.png';
+ for(const state of ['loading','failed']){
+   assert.equal(canReviewBatchImagesV4(url,state,cam,'loaded'),false);
+   assert.equal(canReviewBatchImagesV4(url,'loaded',cam,state),false);
+ }
+ assert.equal(canReviewBatchImagesV4(null,'loaded',null,'loaded'),false);
+ assert.equal(canReviewBatchImagesV4(url,'loaded',cam,'loaded'),true);
+ assert.equal(canReviewBatchImagesV4(url,'loaded',null,'loading'),true);
 });
