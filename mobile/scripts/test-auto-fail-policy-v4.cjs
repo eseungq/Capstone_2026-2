@@ -8,7 +8,7 @@ Module._extensions['.ts']=(module,filename)=>{
 const root=path.join(__dirname,'../src/api/backendV4');
 const {decodeAdminPolicyV4,createAdminPolicyServiceV4}=require(path.join(root,'adminPolicyServiceV4.ts'));
 const {parseAutoFailPercentV4,makeAutoFailThresholdEditV4,
-  ensureAutoFailToggleV4}=require(path.join(root,'autoFailPolicyCoreV4.ts'));
+  ensureAutoFailToggleV4,autoFailRangeLabelV4}=require(path.join(root,'autoFailPolicyCoreV4.ts'));
 const {createAutoFailPolicyServiceV4}=require(path.join(root,'autoFailPolicyServiceV4.ts'));
 const base={
   policyId:'9a77d895-74cd-4b42-a7c9-1baaa91b3025', policyVersion:'example-cowl-e08',
@@ -144,4 +144,10 @@ test('fixed 99.66% threshold and inactive version can enable AUTO_FAIL without m
  const saved=await createAutoFailPolicyServiceV4(value).saveToggle(source,true);
  assert.equal(saved.active,false);assert.equal(saved.autoFailEnabled,true);
  assert.equal(calls.length,1);assert.deepEqual(calls[0],{route:`/admin/policies/${fixed.policyId}/auto-fail`,opts:{method:'POST',body:{enabled:true}}});
+});
+
+test('equal AUTO_FAIL bounds are fixed trial values, not a validated range',()=>{
+ assert.equal(autoFailRangeLabelV4(0.9966,0.9966),'검증 범위 없음(고정값)');
+ assert.equal(autoFailRangeLabelV4(null,null),'미제공');
+ assert.equal(autoFailRangeLabelV4(0.98,1),'98.0000% ~ 100.0000%');
 });
