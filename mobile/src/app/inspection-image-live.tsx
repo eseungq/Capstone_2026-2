@@ -26,7 +26,7 @@ function missingImageText(detail: InspectionViewV4, kind: ImageKind): string {
 function getErrorText(error: unknown): string {
   if (error instanceof ApiV4RequestError) {
     return error.code === 'IMAGE_NOT_AVAILABLE'
-      ? '이미지 파일을 제공받지 못했습니다. (IMAGE_NOT_AVAILABLE)'
+      ? '이 검사에서 사진을 제공받지 못했습니다.'
       : '서버에서 사진 정보를 조회하지 못했습니다. 연결 상태를 확인해 주세요.';
   }
   return error instanceof Error ? error.message : '검사 상세를 불러오지 못했습니다.';
@@ -132,6 +132,7 @@ export default function InspectionImageLiveScreen() {
   };
 
   const selectKind = (next: ImageKind) => {
+    if (next === imageKind) return;
     setImageKind(next);
     setLoadedUrl(null);
     setZoom(1);
