@@ -1,6 +1,6 @@
 import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
-import React,{useEffect,useRef,useState} from 'react';
-import {router,Stack} from 'expo-router';
+import React,{useCallback,useEffect,useRef,useState} from 'react';
+import {router,Stack,useFocusEffect} from 'expo-router';
 import {ActivityIndicator,Alert,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {authV4} from '../api/backendV4/authRuntime';
@@ -29,6 +29,10 @@ export default function JudgementRequestsAdminLiveScreen(){
   const [processing,setProcessing]=useState(false);
   const [message,setMessage]=useState<string|null>(null);
   const generation=useRef(0),locked=useRef(false),mounted=useRef(true);
+  const confirmation=useRef(0);
+  const sessionEpoch=useRef(authV4.sessionEpoch()).current;
+
+  useFocusEffect(useCallback(()=>()=>{ confirmation.current++; },[]));
 
   useEffect(()=>{
     mounted.current=true;let cancelled=false;
@@ -62,27 +66,34 @@ export default function JudgementRequestsAdminLiveScreen(){
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[admin,authLoading,status,partCode]);
 
-  const resolve=async()=>{
-    if(!selected||selected.status!=='OPEN'||locked.current)return;
+  const resolve=async(ticket:number)=>{
+    const current=()=>mounted.current&&confirmation.current===ticket&&authV4.sessionEpoch()===sessionEpoch;
+    if(!current()||!selected||selected.status!=='OPEN'||locked.current)return;
     locked.current=true;setProcessing(true);setError(null);setMessage(null);
     try{
       const session=await authV4.restore();
+      if(!current())return;
       if(!session.signedIn||session.role!=='ADMIN')throw new Error('관리자 계정으로 다시 로그인해 주세요.');
       const reply=await writer.resolve(session.role,selected,decision,note);
-      if(!mounted.current)return;
+      if(!current())return;
       setMessage(`${reply.request.inspectionNo} 요청을 ${judgementRequestStatusLabelV4(reply.request.status)} 처리했습니다.`);
       setSelected(null);setNote('');setPage(null);
       await load(0,false);
-    }catch(e){if(mounted.current)setError(err(e));}
-    finally{locked.current=false;if(mounted.current)setProcessing(false);}
+    }catch(e){if(current())setError(err(e));}
+    finally{
+      if(confirmation.current===ticket)confirmation.current++;
+      locked.current=false;
+      if(mounted.current)setProcessing(false);
+    }
   };
   const confirm=()=>{
     if(!selected||processing)return;
     if(!note.trim()){setError('관리자 처리 근거를 입력해 주세요.');return;}
+    const ticket=++confirmation.current;
     Alert.alert('관리자 판정 요청 처리',
       `${selected.inspectionNo} · 최초 ${selected.originalJudgement} · 현재 ${selected.currentJudgement} · 작업자 주장 ${selected.claimedJudgement}\n${decision==='KEEP'?'현재 판정을 유지합니다.':'요청한 판정으로 정정 기록을 남깁니다.'} 최초 시스템 판정은 변경되지 않습니다.`,
       [{text:'취소',style:'cancel'},{text:decision==='KEEP'?'유지 처리':'정정 처리',
-        style:decision==='CORRECT'?'destructive':'default',onPress:()=>{void resolve();}}]);
+        style:decision==='CORRECT'?'destructive':'default',onPress:()=>{void resolve(ticket);}}]);
   };
   return <SafeAreaView style={s.root}>
     <Stack.Screen options={{headerShown:false}}/>
@@ -101,7 +112,7 @@ export default function JudgementRequestsAdminLiveScreen(){
             {(['OPEN','RESOLVED','ALL'] as const).map(x=><Pressable key={x}
               style={[s.filter,status===x&&s.filterOn]} accessibilityRole="button"
               accessibilityState={{selected:status===x}}
-              onPress={()=>{setStatus(x);setPage(null);setSelected(null);}}>
+              disabled={processing} onPress={()=>{if(x===status)return;confirmation.current++;setStatus(x);setPage(null);setSelected(null);}}>
               <Text style={[s.filterText,status===x&&s.filterTextOn]}>
                 {x==='OPEN'?'대기':x==='RESOLVED'?'처리 완료':'전체'}
               </Text>
@@ -110,11 +121,11 @@ export default function JudgementRequestsAdminLiveScreen(){
           <Text style={s.strong}>부품</Text>
           <View style={s.rowWrap}>
             {parts.map(x=><Pressable key={x||'ALL'} style={[s.part,partCode===x&&s.partOn]}
-              onPress={()=>{setPartCode(x);setPage(null);setSelected(null);}}>
+              disabled={processing} onPress={()=>{if(x===partCode)return;confirmation.current++;setPartCode(x);setPage(null);setSelected(null);}}>
               <Text style={[s.filterText,partCode===x&&s.filterTextOn]}>{x||'전체'}</Text>
             </Pressable>)}
           </View>
-          <Pressable style={s.outline} disabled={loading} onPress={()=>{void load(0,false);}}>
+          <Pressable style={s.outline} disabled={loading||processing} onPress={()=>{confirmation.current++;void load(0,false);}}>
             <Text style={s.link}>요청 목록 새로고침</Text>
           </Pressable>
           {loading&&<ActivityIndicator/>}
@@ -123,13 +134,13 @@ export default function JudgementRequestsAdminLiveScreen(){
           {page&&<>
             <Text style={s.muted}>전체 {page.totalElements}건 · {page.page+1}/{Math.max(1,page.totalPages)}페이지</Text>
             {page.items.length===0&&<Text style={s.muted}>선택 조건의 요청이 없습니다.</Text>}
-            {page.items.map(item=><Pressable key={item.requestId} style={s.entry}
-              onPress={()=>{setSelected(item);setNote('');setDecision('KEEP');}}>
+            {page.items.map(item=><Pressable key={item.requestId} style={s.entry} disabled={processing}
+              onPress={()=>{confirmation.current++;setSelected(item);setNote('');setDecision('KEEP');}}>
               <Text style={s.strong}>{item.inspectionNo} · {item.partCode} · {judgementRequestStatusLabelV4(item.status)}</Text>
               <Text style={s.muted}>{item.originalJudgement} · 시스템 자동 판정 → 요청 {item.claimedJudgement}</Text>
               <Text style={s.link}>내용 검토 ›</Text>
             </Pressable>)}
-            {page.page+1<page.totalPages&&<Pressable style={s.outline} disabled={loading}
+            {page.page+1<page.totalPages&&<Pressable style={s.outline} disabled={loading||processing}
               onPress={()=>{void load(page.page+1,true);}}>
               <Text style={s.link}>다음 페이지 20건 불러오기</Text>
             </Pressable>}
@@ -152,7 +163,7 @@ export default function JudgementRequestsAdminLiveScreen(){
             <Text style={s.strong}>처리 선택</Text>
             <View style={s.row}>
               {(['KEEP','CORRECT'] as const).map(x=><Pressable key={x}
-                style={[s.filter,decision===x&&s.filterOn]} onPress={()=>setDecision(x)}
+                style={[s.filter,decision===x&&s.filterOn]} disabled={processing} onPress={()=>{confirmation.current++;setDecision(x);}}
                 accessibilityRole="button" accessibilityState={{selected:decision===x}}>
                 <Text style={[s.filterText,decision===x&&s.filterTextOn]}>
                   {x==='KEEP'?'현재 판정 유지':'요청 판정으로 정정'}
@@ -160,7 +171,7 @@ export default function JudgementRequestsAdminLiveScreen(){
               </Pressable>)}
             </View>
             <Text style={s.strong}>관리자 처리 근거 (필수, 1~500자)</Text>
-            <TextInput style={s.input} value={note} onChangeText={setNote} multiline
+            <TextInput style={s.input} value={note} editable={!processing} onChangeText={text=>{confirmation.current++;setNote(text);}} multiline
               maxLength={500} placeholder="검토 근거를 입력해 주세요." placeholderTextColor="#64748B" />
             <Pressable style={[s.submit,processing&&s.disabled]} disabled={processing}
               onPress={confirm}><Text style={s.submitText}>
