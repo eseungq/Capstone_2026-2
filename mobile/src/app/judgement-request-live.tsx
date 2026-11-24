@@ -15,6 +15,10 @@ const err=(e:unknown)=>e instanceof Error?e.message:'서버 요청 오류';
 export default function JudgementRequestLiveScreen(){
   const {inspectionId}=useLocalSearchParams<{inspectionId?:string}>();
   const id=typeof inspectionId==='string'?inspectionId:'';
+  return <JudgementRequestForm key={id} id={id}/>;
+}
+
+function JudgementRequestForm({id}:{id:string}){
   const [role,setRole]=useState<BackendRole|null>(null);
   const [loading,setLoading]=useState(true);
   const [detail,setDetail]=useState<InspectionViewV4|null>(null);
@@ -23,9 +27,9 @@ export default function JudgementRequestLiveScreen(){
   const [reason,setReason]=useState('');
   const [claim,setClaim]=useState<FinalJudgementV4>('FAIL');
   const [submitting,setSubmitting]=useState(false);
-  const [success,setSuccess]=useState<string|null>(null);
+  const [submittedRequestId,setSubmittedRequestId]=useState<string|null>(null);
   const submittingRef=useRef(false),serial=useRef(0),mounted=useRef(true);
-  const refresh=useCallback(async()=>{
+  const refresh=useCallback(async(expectedRequestId?:string|null)=>{
     const count=++serial.current;
     setLoading(true);setError(null);
     try{
@@ -34,35 +38,45 @@ export default function JudgementRequestLiveScreen(){
       const result=await reader.detail(id);
       if(count!==serial.current||!mounted.current)return;
       if(result.source!=='SERVER')throw new Error('실제 서버 검사 응답이 아닙니다.');
+      if(expectedRequestId && !result.value.judgementRequests.some(request=>request.requestId===expectedRequestId)){
+        throw new Error('접수한 요청이 최신 이력에 아직 표시되지 않았습니다.');
+      }
       setRole(session.role);setDetail(result.value);
       const current=currentJudgementV4(result.value.finalJudgement,result.value.correction);
       if(current)setClaim(current==='PASS'?'FAIL':'PASS');
-    }catch(e){if(count===serial.current&&mounted.current){setError(err(e));setDetail(null);}}
+    }catch(e){
+      if(count===serial.current&&mounted.current){
+        setError(expectedRequestId ? `최신 이력을 다시 조회해 주세요. ${err(e)}` : err(e));
+        setDetail(null);
+      }
+    }
     finally{if(count===serial.current&&mounted.current)setLoading(false);}
   },[id]);
   useEffect(()=>{mounted.current=true;void refresh();return()=>{mounted.current=false;serial.current++};},[refresh]);
-  const available=role==='WORKER'&&detail?.judgedBy==='SYSTEM'&&detail.finalJudgement!==null&&
-    !detail.judgementRequests.some(x=>x.status==='OPEN');
-  const send=async()=>{
-    if(submittingRef.current||!detail||!available)return;
-    submittingRef.current=true;setSubmitting(true);setError(null);setSuccess(null);
+  const pendingRequest=detail?.judgementRequests.find(request=>request.status==='OPEN');
+  const available=!loading&&role==='WORKER'&&detail?.judgedBy==='SYSTEM'&&detail.finalJudgement!==null&&!pendingRequest;
+  const send=async(confirmedRevision:number)=>{
+    if(!mounted.current||confirmedRevision!==serial.current||submittingRef.current||!detail||!available)return;
+    submittingRef.current=true;setSubmitting(true);setError(null);setSubmittedRequestId(null);
     try{
       const session=await authV4.restore();
       if(!session.signedIn||session.role!=='WORKER')throw new Error('WORKER 로그인 정보를 확인하세요.');
       // 전송 전 서버 최신 판정·정정·OPEN 요청을 다시 조회하여 화면의 낡은 값으로 POST하지 않습니다.
       const latest=(await reader.detail(id)).value;
+      if(!mounted.current||confirmedRevision!==serial.current)return;
       if(latest.judgedBy!=='SYSTEM'||latest.finalJudgement!==detail.finalJudgement||
         currentJudgementV4(latest.finalJudgement,latest.correction)!==
         currentJudgementV4(detail.finalJudgement,detail.correction)||
         latest.judgementRequests.some(x=>x.status==='OPEN')){
-        if(mounted.current)setDetail(latest);
+        setDetail(latest);
         throw new Error('검사 판정/요청 상태가 변경됐습니다. 최신 상세를 다시 검토해 주세요.');
       }
       const result=await writer.request(session.role,latest,claim,area,reason);
       if(mounted.current){
-        setSuccess(`판정 확인 요청이 ${result.status==='OPEN'?'접수되었습니다.':'처리되었습니다.'} 관리자 검토를 기다려 주세요.`);
-        setDetail((await reader.detail(id)).value);
+        setSubmittedRequestId(result.requestId);
+        setDetail(null);
         setArea('');setReason('');
+        await refresh(result.requestId);
       }
     }catch(e){if(mounted.current)setError(err(e));}
     finally{submittingRef.current=false;if(mounted.current)setSubmitting(false);}
@@ -70,8 +84,9 @@ export default function JudgementRequestLiveScreen(){
   const confirm=()=>{
     if(!available||submitting)return;
     if(!reason.trim()){setError('확인 근거를 입력해 주세요.');return;}
+    const revision=serial.current;
     Alert.alert('판정 확인 요청 제출',`${detail?.inspectionNo} · 현재 ${currentJudgementV4(detail?.finalJudgement??null,detail?.correction??null)} → 주장 ${claim}\n원본 시스템 판정은 변경되지 않으며 관리자 검토를 요청합니다.`,[
-      {text:'취소',style:'cancel'}, {text:'확인 요청',onPress:()=>{void send();}},
+      {text:'취소',style:'cancel'}, {text:'확인 요청',onPress:()=>{void send(revision);}},
     ]);
   };
   return <SafeAreaView style={s.root}>
@@ -86,7 +101,10 @@ export default function JudgementRequestLiveScreen(){
       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
       {loading&&<ActivityIndicator/>}
       {error&&<Text style={s.error}>{error}</Text>}
-      {!loading&&<Pressable style={s.outline} onPress={()=>{void refresh();}}><Text style={s.link}>최신 검사 다시 조회</Text></Pressable>}
+      {!loading&&!submitting&&<Pressable style={s.outline} onPress={()=>{void refresh(submittedRequestId);}}><Text style={s.link}>최신 검사 다시 조회</Text></Pressable>}
+      {submittedRequestId&&<View style={s.card}><Text style={s.success}>
+        {pendingRequest?.requestId===submittedRequestId?'판정 확인 요청이 접수되었습니다. 관리자 검토를 기다려 주세요.':'판정 확인 요청이 접수되었습니다.'}
+      </Text></View>}
       {detail&&<View style={s.card}>
         <Text style={s.strong}>{detail.inspectionNo} · {detail.partCode}</Text>
         <Text style={s.muted}>최초 판정: {detail.finalJudgement??'미확정'} · {detail.judgedBy??'미제공'}</Text>
@@ -99,8 +117,7 @@ export default function JudgementRequestLiveScreen(){
         </View>)}
         {role!=='WORKER'&&<Text style={s.error}>WORKER 계정에서만 요청할 수 있습니다.</Text>}
         {role==='WORKER'&&detail.judgedBy!=='SYSTEM'&&<Text style={s.error}>시스템 판정 건이 아니므로 요청 대상이 아닙니다.</Text>}
-        {detail.judgementRequests.some(x=>x.status==='OPEN')&&
-          <Text style={s.error}>이미 처리 대기 중인 요청이 있습니다. 중복 요청은 할 수 없습니다.</Text>}
+        {pendingRequest&&pendingRequest.requestId!==submittedRequestId&&<Text style={s.muted}>관리자 검토 대기 중입니다.</Text>}
       </View>}
       {available&&<View style={s.card}>
         <Text style={s.strong}>요청할 판정 (현재 판정과 달라야 함)</Text>
@@ -122,7 +139,6 @@ export default function JudgementRequestLiveScreen(){
           <Text style={s.submitText}>{submitting?'요청 제출 중…':'관리자 판정 확인 요청'}</Text>
         </Pressable>
       </View>}
-      {success&&<View style={s.card}><Text style={s.success}>{success}</Text></View>}
     </ScrollView>
   </SafeAreaView>;
 }

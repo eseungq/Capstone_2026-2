@@ -8,6 +8,7 @@ Module._extensions['.ts']=(module,filename)=>{
 const root=path.join(__dirname,'../src/api/backendV4');
 const core=require(path.join(root,'adminDailyHistoryCoreV4.ts'));
 const {createDailyHistoryServiceV4}=require(path.join(root,'adminDailyHistoryServiceV4.ts'));
+const {createDailyHistoryReadsV4}=require('../src/components/adminDailyHistoryReadsV4.ts');
 const pid='91f17717-d9c0-4e77-8f1b-7d9a66cc11a0';
 const uuid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const row=(changes={})=>({
@@ -86,6 +87,11 @@ test('resolvedRequests=0 explicitly shows no evidence, not zero percent accuracy
  const r=row({confirmedOpposite:{autoPassThenFail:0,autoFailThenPass:0,resolvedRequests:0}});
  assert.equal(core.oppositeEvidenceTextV4(r),'확인 자료 없음');
  assert.equal(core.oppositeEvidenceTextV4(row()),'확인 2건 중 정정 1건');
+});
+test('a kept decision counts as resolved even when there is no physical reference',()=>{
+ const kept=row({confirmedOpposite:{autoPassThenFail:0,autoFailThenPass:0,resolvedRequests:1}});
+ assert.equal(core.oppositeEvidenceTextV4(kept),'확인 1건 중 정정 0건');
+ assert.equal(detail().reference,null);
 });
 test('bad total, manual exceeding REVIEW, or done exceeding total fails closed',()=>{
  assert.throws(()=>core.decodeDailyHistoryRowsV4([row({total:9})]),/total/);
@@ -182,4 +188,74 @@ test('no policy row must not trigger detail request; unknown band rejected first
 test('server may not return rows outside requested date range',async()=>{
  const h=mock({dailyRows:[row({date:'2026-11-22'})]});
  await assert.rejects(h.service.daily('COWL_COVER','2026-11-23','2026-11-24'),/범위 밖/);
+});
+
+function pendingCall(queue) {
+ return (...args)=>new Promise((resolve,reject)=>queue.push({args,resolve,reject}));
+}
+function screenReads() {
+ const lists=[],details=[],state={};
+ const reads=createDailyHistoryReadsV4(
+   {daily:pendingCall(lists),detail:pendingCall(details)},
+   update=>{state.list=update;},update=>{state.detail=update;},
+ );
+ return {lists,details,state,reads};
+}
+const idle={value:null,loading:false,error:null};
+test('editing a filter discards late rows before another query is submitted',async()=>{
+ const {reads,lists,state}=screenReads();
+ const old=reads.loadRows('COWL_COVER','2026-11-23','2026-11-25');
+ reads.reset();
+ lists[0].resolve([row()]);
+ await old;
+ assert.deepEqual(state.list,idle);
+ assert.deepEqual(state.detail,idle);
+});
+test('a superseded list failure cannot clear the new loading state or publish its error',async()=>{
+ const {reads,lists,state}=screenReads();
+ const old=reads.loadRows('COWL_COVER','2026-11-23','2026-11-25');
+ reads.reset();
+ const latest=reads.loadRows('DOOR','2026-11-24','2026-11-25');
+ lists[0].reject(new Error('old connection'));
+ await old;
+ assert.deepEqual(state.list,{value:null,loading:true,error:null});
+ assert.deepEqual(lists[1].args,['DOOR','2026-11-24','2026-11-25']);
+ lists[1].resolve([]);
+ await latest;
+ assert.deepEqual(state.list,{value:[],loading:false,error:null});
+});
+test('a band edit keeps the list and discards details from the previous band',async()=>{
+ const {reads,lists,details,state}=screenReads();
+ const query=reads.loadRows('FRAME','2026-11-23','2026-11-25');
+ const rows=[row()];
+ lists[0].resolve(rows);
+ await query;
+ const old=reads.loadDetail('FRAME',rows[0].date,pid,'0.05');
+ reads.resetDetail();
+ assert.deepEqual(state.detail,idle);
+ const current=reads.loadDetail('FRAME',rows[0].date,pid,'0.10');
+ const newDetail=detail({partCode:'FRAME',band:0.10});
+ details[1].resolve(newDetail);
+ await current;
+ details[0].resolve(detail({partCode:'FRAME'}));
+ await old;
+ assert.deepEqual(state.detail,{value:newDetail,loading:false,error:null});
+ assert.deepEqual(state.list,{value:rows,loading:false,error:null});
+});
+test('a list reload invalidates its old detail; focus loss invalidates the pending list',async()=>{
+ const {reads,lists,details,state}=screenReads();
+ const oldDetail=reads.loadDetail('DOOR','2026-11-23',pid,'0.05');
+ const newList=reads.loadRows('DOOR','2026-11-23','2026-11-25');
+ details[0].reject(new Error('old detail'));
+ await oldDetail;
+ assert.deepEqual(state.detail,idle);
+ reads.reset();
+ lists[0].reject(new Error('old list'));
+ await newList;
+ assert.deepEqual(state.list,idle);
+ assert.deepEqual(state.detail,idle);
+ const retry=reads.loadRows('FRAME','2026-11-24','2026-11-25');
+ lists[1].reject(new Error('current error'));
+ await retry;
+ assert.deepEqual(state.list,{value:null,loading:false,error:'current error'});
 });
