@@ -100,6 +100,7 @@ export interface AuthV4Config {
   baseUrl: string; // 서버 연결 시 외부 설정. 소스 코드에 IP/비밀정보 입력 금지
   vault: AuthVault; // iOS/Android 운영 테스트에서는 makeSecureAuthVault() 사용
   fetchImpl?: ApiFetch;
+  timeoutMs?: number;
   /** 실제 /auth/refresh 요청 본문 확인 후에만 지정. 예: (token) => ({ refreshToken: token }) — 미확정 예시 */
   refreshBody?: (refreshToken: string) => unknown;
   /** 실제 /auth/logout 요청 본문 확인 후에만 지정. 없으면 서버 로그아웃을 시도하지 않음. */
@@ -143,7 +144,7 @@ export function createAuthV4(config: AuthV4Config) {
   }
 
   const api = <T>(path: string, method: 'GET' | 'POST', body: unknown, token: string | null, mode: BodyMode = 'data', signal?: AbortSignal) =>
-    requestApiV4<T>(config.baseUrl, { path, method, body, token, mode, signal, fetchImpl: config.fetchImpl });
+    requestApiV4<T>(config.baseUrl, { path, method, body, token, mode, signal, fetchImpl: config.fetchImpl, timeoutMs: config.timeoutMs });
 
   // Revoke exactly this token pair, regardless of which account is now on the device.
   async function revokeServerSession(session: AuthSessionV4): Promise<boolean> {
@@ -215,6 +216,9 @@ export function createAuthV4(config: AuthV4Config) {
           void revokeServerSession(next);
           throw new UnsupportedMobileRoleError();
         }
+        if (next.loginId !== before.loginId || next.role !== before.role) {
+          throw new ApiV4RequestError(401, 'SESSION_IDENTITY_CHANGED', '로그인 계정 또는 권한이 변경됐습니다. 다시 로그인해 주세요.', null);
+        }
         await withVault(async () => {
           requireCurrent(generation);
           await config.vault.write(next);
@@ -258,6 +262,9 @@ export function createAuthV4(config: AuthV4Config) {
       if (!stored || stored.loginId !== current.loginId || stored.role !== current.role) throw err;
       const after = stored.accessToken !== current.accessToken ? stored : await refreshAccessToken();
       requireCurrent(generation);
+      if (after.loginId !== current.loginId || after.role !== current.role) {
+        throw new ApiV4RequestError(401, 'SESSION_IDENTITY_CHANGED', '로그인 계정 또는 권한이 변경됐습니다. 다시 로그인해 주세요.', null);
+      }
       response = await send(after.accessToken);
     }
     requireCurrent(generation);
