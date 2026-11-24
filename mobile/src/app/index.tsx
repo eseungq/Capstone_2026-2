@@ -1,6 +1,7 @@
 import Pressable from '../components/TouchPressable';
 
 import { authV4 } from '../api/backendV4/authRuntime';
+import { UnsupportedMobileRoleError } from '../api/backendV4/authCore';
 
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
 import { useRef, useState } from 'react';
@@ -38,15 +39,15 @@ export default function LoginScreen() {
     setSigningIn(true);
     try {
       const session = await authV4.login(username, password);
-      if (session.role !== 'WORKER' && session.role !== 'ADMIN') {
-        Alert.alert('계정 확인', '모바일 앱은 작업자 또는 관리자 계정으로 이용할 수 있습니다.');
-        return;
-      }
       router.replace({
         pathname: '/monitoring',
         params: { role: session.role, mode: 'live' },
       });
     } catch (error) {
+      if (error instanceof UnsupportedMobileRoleError) {
+        Alert.alert('계정 확인', error.message);
+        return;
+      }
       const reasons: Record<string, string> = {
         AUTH_INVALID_CREDENTIALS: '아이디와 비밀번호를 다시 확인해 주세요.',
         AUTH_ACCOUNT_LOCKED: '로그인 시도가 반복되어 계정이 잠겼습니다. 관리자에게 잠금 해제를 요청해 주세요.',

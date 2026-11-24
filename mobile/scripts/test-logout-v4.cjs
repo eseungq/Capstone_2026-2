@@ -200,3 +200,88 @@ test('계정 잠금은 세션을 종료하고 일시적인 갱신 실패는 세�
     assert.equal(changes.length, signedIn ? 0 : 1);
   }
 });
+
+test('로그인 응답에서 지원하지 않는 모바일 권한은 저장하지 않고 그 요청의 토큰만 폐기한다', async () => {
+  for (const role of ['DEVICE', 'UNKNOWN', null]) {
+    const vault = makeMemoryAuthVault();
+    const revocations = [];
+    const writes = [];
+    const auth = makeAuth({ ...vault, write: async (s) => { writes.push(s); await vault.write(s); } }, async (url, options) => {
+      if (url.endsWith('/auth/login')) {
+        return Response.json({ data: {
+          accessToken: 'issued-access', refreshToken: 'issued-refresh', user: { loginId: 'machine', role },
+        } });
+      }
+      assert.ok(url.endsWith('/auth/logout'));
+      revocations.push([options.headers.Authorization, JSON.parse(options.body).refreshToken]);
+      return new Response(null, { status: 204 });
+    });
+    await assert.rejects(auth.login('machine', 'test'), { name: 'UnsupportedMobileRoleError' });
+    assert.deepEqual(writes, []);
+    assert.deepEqual(revocations, [['Bearer issued-access', 'issued-refresh']]);
+    assert.equal((await auth.restore()).signedIn, false);
+  }
+});
+
+test('기존 앱에 남은 DEVICE 세션은 복원·네트워크 조회에 쓰지 않고 기기에서 제거한다', async () => {
+  const vault = makeMemoryAuthVault();
+  const auth = makeAuth(vault, async () => assert.fail('legacy credentials must never reach the network'));
+  await vault.write({ ...token, role: 'DEVICE' });
+  await assert.rejects(auth.authorizedRequest('/inspections'), err => err.code === 'NOT_LOGGED_IN');
+  assert.equal(await vault.read(), null);
+  await vault.write({ ...token, role: null });
+  assert.equal((await auth.restore()).signedIn, false);
+  assert.equal(await vault.read(), null);
+});
+
+test('늦은 DEVICE 로그인 응답이 이후에 로그인한 관리자 세션을 제거하지 않는다', async () => {
+  const deviceReply = deferred();
+  const vault = makeMemoryAuthVault();
+  const revoked = [];
+  const auth = makeAuth(vault, async (url, options) => {
+    if (url.endsWith('/auth/login')) {
+      if (JSON.parse(options.body).loginId === 'device') return deviceReply.promise;
+      return Response.json({ data: { ...token, user: { role: 'ADMIN', loginId: 'admin' } } });
+    }
+    revoked.push(JSON.parse(options.body).refreshToken);
+    return new Response(null, { status: 204 });
+  });
+  const old = auth.login('device', 'test');
+  await auth.login('admin', 'test');
+  deviceReply.resolve(Response.json({ data: { accessToken: 'device-access', refreshToken: 'device-refresh', role: 'DEVICE' } }));
+  await assert.rejects(old);
+  assert.deepEqual(await auth.restore(), { signedIn: true, role: 'ADMIN', loginId: 'admin' });
+  assert.deepEqual(revoked, ['device-refresh']);
+});
+
+test('갱신 응답이 DEVICE이거나 명시한 권한을 알 수 없으면 이전 작업자 권한을 재사용하지 않는다', async () => {
+  for (const role of ['DEVICE', 'UNRECOGNIZED', null]) {
+    const vault = makeMemoryAuthVault();
+    await vault.write(token);
+    const revocations = [];
+    const auth = makeAuth(vault, async (url, options) => {
+      if (url.endsWith('/auth/refresh')) {
+        return Response.json({ data: { accessToken: 'other-access', refreshToken: 'other-refresh', user: { role } } });
+      }
+      revocations.push(options.headers.Authorization);
+      return new Response(null, { status: 204 });
+    });
+    await assert.rejects(auth.refreshAccessToken(), { name: 'UnsupportedMobileRoleError' });
+    assert.equal((await auth.restore()).signedIn, false);
+    assert.deepEqual(revocations, ['Bearer other-access']);
+  }
+});
+
+test('작업자·관리자 로그인 및 권한 필드가 생략된 갱신은 기존 호환 동작을 유지한다', async () => {
+  for (const role of ['WORKER', 'ADMIN']) {
+    const vault = makeMemoryAuthVault();
+    const auth = makeAuth(vault, async (url) => {
+      if (url.endsWith('/auth/login')) return Response.json({ data: { ...token, user: { role, loginId: 'person' } } });
+      return Response.json({ data: { accessToken: 'updated' } });
+    });
+    assert.deepEqual(await auth.login('person', 'test'), { signedIn: true, role, loginId: 'person' });
+    await auth.refreshAccessToken();
+    assert.deepEqual(await auth.restore(), { signedIn: true, role, loginId: 'person' });
+    assert.equal((await vault.read()).accessToken, 'updated');
+  }
+});
