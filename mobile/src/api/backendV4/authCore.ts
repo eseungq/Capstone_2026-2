@@ -225,7 +225,8 @@ export function createAuthV4(config: AuthV4Config) {
         // Forget the device session before waiting for the network.
         let session: AuthSessionV4 | null = null;
         try { session = await config.vault.read(); }
-        finally { await config.vault.clear(); }
+        catch { /* A missing or unreadable token still permits local sign-out. */ }
+        await config.vault.clear();
         return session;
       });
     } finally {

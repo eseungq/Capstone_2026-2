@@ -175,3 +175,15 @@ test('같은 세션의 동시 조회는 토큰을 한 번만 갱신한다', asyn
   assert.deepEqual(await pending, ['ok', 'ok']);
   assert.equal(refreshCount, 1);
 });
+
+test('저장 정보 읽기에 실패해도 기기 세션 삭제 결과를 정확히 반환한다', async () => {
+  let cleared = false;
+  const vault = {
+    async read() { throw new Error('cannot read'); },
+    async write() {},
+    async clear() { cleared = true; },
+  };
+  const auth = makeAuth(vault, async () => { throw new Error('server should not be called'); });
+  assert.deepEqual(await auth.logout(), {remoteRevoked: false});
+  assert.equal(cleared, true);
+});
