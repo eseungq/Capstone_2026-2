@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MonitoringDashboardV4 from '../components/MonitoringDashboardV4';
 import MonitoringLiveDashboardV4 from '../components/MonitoringLiveDashboardV4';
-import type { MonitorAlertV4 } from '../api/backendV4/monitoringPollCore';
+import { mergeMonitorAlertsV4, dismissMonitorAlertV4, type MonitorAlertV4 } from '../api/backendV4/monitoringPollCore';
 type Tab = 'monitoring' | 'history' | 'settings';
 
 // Figma에서 내려받은 이미지
@@ -71,24 +71,20 @@ const isAdmin = role === 'ADMIN';
 const isLive = mode === 'live';
 
   const [activeTab, setActiveTab] = useState<Tab>('monitoring');
-  const [liveBannerAlerts, setLiveBannerAlerts] = useState<MonitorAlertV4[] | null>(null);
+  const [liveBannerAlerts, setLiveBannerAlerts] = useState<MonitorAlertV4[]>([]);
 
   // 실제 5초 폴링에서 새로 발견된 REVIEW/FAILED만 표시합니다.
   // 최초 서버 조회의 기존 대기 건은 controller에서 제외합니다.
   const handleNewLiveAlerts = useCallback((alerts: MonitorAlertV4[]) => {
-    if (alerts.length) setLiveBannerAlerts([...alerts]);
+    if (alerts.length) setLiveBannerAlerts(old => mergeMonitorAlertsV4(old, alerts));
   }, []);
 
-  const latestLiveAlert = liveBannerAlerts
-    ? [...liveBannerAlerts].sort(
-      (a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt),
-    )[0] ?? null
-    : null;
+  const latestLiveAlert = liveBannerAlerts[0] ?? null;
   const failedLiveAlert = latestLiveAlert?.kind === 'ANALYSIS_FAILED';
   const openLiveAlert = () => {
     if (!latestLiveAlert) return;
     const inspectionId = latestLiveAlert.inspectionId;
-    setLiveBannerAlerts(null);
+    setLiveBannerAlerts(old => dismissMonitorAlertV4(old, latestLiveAlert));
     router.push({
       pathname: '/inspection-live',
       params: { inspectionId },
@@ -375,12 +371,12 @@ onPress={() =>
           <View style={styles.liveBannerHeader}>
             <Text style={[styles.liveBannerTitle, failedLiveAlert && styles.liveBannerFailedText]}>
               {failedLiveAlert ? '새 AI 분석 실패' : '새 작업자 확인 필요'}
-              {liveBannerAlerts && liveBannerAlerts.length > 1 ? ` · 외 ${liveBannerAlerts.length - 1}건` : ''}
+              {liveBannerAlerts.length > 1 ? ` · 외 ${liveBannerAlerts.length - 1}건` : ''}
             </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="새 검사 알림 닫기"
-              onPress={() => setLiveBannerAlerts(null)}
+              onPress={() => setLiveBannerAlerts(old => dismissMonitorAlertV4(old, latestLiveAlert))}
               style={styles.liveBannerDismiss}
             >
               <Text style={styles.liveBannerDismissText}>닫기</Text>
@@ -388,9 +384,9 @@ onPress={() =>
           </View>
           <Text style={styles.liveBannerDescription}>
             {latestLiveAlert.partCode} · {latestLiveAlert.inspectionNo ?? '검사번호 확인 필요'}
-            {' · '}{failedLiveAlert ? 'FAILED' : 'REVIEW_PENDING'}
+            {' · '}{failedLiveAlert ? 'AI 분석 실패' : '작업자 확인 필요'}
           </Text>
-          <Text style={styles.liveBannerNote}>모니터링 중 발견 · 앱 내부 알림 (푸시 아님)</Text>
+          <Text style={styles.liveBannerNote}>앱 실행 중 확인된 새 검사입니다.</Text>
           <Pressable accessibilityRole="button" onPress={openLiveAlert} style={styles.liveBannerOpen}>
             <Text style={styles.liveBannerOpenText}>새 검사 상세 보기 ›</Text>
           </Pressable>

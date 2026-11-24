@@ -65,6 +65,23 @@ export function monitorAlertFromQueueV4(item: QueueItemV4): MonitorAlertV4 {
     partCode: item.partCode, receivedAt: item.receivedAt,
   };
 }
+/** Keep undisplayed events even when another successful poll produces more. */
+export function mergeMonitorAlertsV4(
+  pending: readonly MonitorAlertV4[], incoming: readonly MonitorAlertV4[],
+): MonitorAlertV4[] {
+  const unique = new Map<string, MonitorAlertV4>();
+  for (const alert of [...pending, ...incoming]) {
+    unique.set(`${alert.inspectionId}:${alert.kind}`, alert);
+  }
+  return [...unique.values()].sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt));
+}
+
+export function dismissMonitorAlertV4(
+  pending: readonly MonitorAlertV4[], handled: MonitorAlertV4,
+): MonitorAlertV4[] {
+  return pending.filter(alert => alert.inspectionId !== handled.inspectionId || alert.kind !== handled.kind);
+}
+
 export function monitorRetryDelayV4(failureStreak: number, intervalMs = MONITOR_POLL_INTERVAL_V4): number {
   if (!Number.isSafeInteger(failureStreak) || failureStreak < 0) throw new Error('failureStreak는 0 이상 정수여야 합니다.');
   if (!Number.isSafeInteger(intervalMs) || intervalMs < 1000) throw new Error('폴링 간격은 1초 이상이어야 합니다.');
@@ -148,7 +165,12 @@ export function createMonitoringPollControllerV4(options: MonitorOptionsV4) {
       const alerts: MonitorAlertV4[] = [];
       for (const item of queue) {
         const key = monitorAlertKeyV4(item);
-        if (baselineTaken && !seenAlertKeys.has(key)) alerts.push(monitorAlertFromQueueV4(item));
+        // Manual conversions remain visible in the work queue, but §6.10
+        // excludes their notification: the worker created the task directly.
+        if (baselineTaken && !seenAlertKeys.has(key) &&
+            !(item.displayState === 'REVIEW_PENDING' && item.reviewReason === 'AI_UNAVAILABLE')) {
+          alerts.push(monitorAlertFromQueueV4(item));
+        }
         seenAlertKeys.add(key);
       }
       baselineTaken = true; // 첫 성공 응답에 이미 존재한 과거 대기 항목은 새 알림을 띄우지 않음
