@@ -1,9 +1,10 @@
 import Pressable from '../components/TouchPressable';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
-import React from 'react';
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { authV4 } from '../api/backendV4/authRuntime';
+import React, { useCallback, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
-  
   ScrollView,
   StyleSheet,
   Text,
@@ -13,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Figma: FyGAGiL2xkZgaDfegUk10A
 // 99:772 (07 · 작업자 설정), 99:809 (07-M · 관리자 설정)
-// 실제 인증 서비스에 연결되지 않은 Mock 역할 선택 화면입니다.
+// Mock 모드와 실제 서버 세션을 분리하여 표시합니다.
 type Role = 'WORKER' | 'ADMIN';
 type Mode = 'live' | 'mock';
 
@@ -74,19 +75,84 @@ function NavBar({ role, mode }: { role: Role; mode: Mode }) {
 
 export default function SettingsScreen() {
   const { role: rawRole, mode: rawMode } = useLocalSearchParams<{ role?: string; mode?: string }>();
-  // 현재는 화면 이동 파라미터에 따른 Mock 역할 표시입니다. 서버 권한 검증과 무관합니다.
-  const role: Role = rawRole === 'ADMIN' ? 'ADMIN' : 'WORKER';
-  // 서버 조회 여부는 모니터링/이력 라우트에서 결정합니다. 이 화면은 여전히 Mock 설정 UI입니다.
   const mode: Mode = rawMode === 'live' ? 'live' : 'mock';
+  const mockRole: Role = rawRole === 'ADMIN' ? 'ADMIN' : 'WORKER';
+  const [liveRole, setLiveRole] = useState<Role | null>(null);
+  const [checkingSession, setCheckingSession] = useState(mode === 'live');
+  const [loggingOut, setLoggingOut] = useState(false);
+  const logoutLock = useRef(false);
+
+  // 실서버 권한은 URL role 파라미터가 아니라 SecureStore의 로그인 세션으로 확인합니다.
+  useFocusEffect(useCallback(() => {
+    if (mode !== 'live') {
+      setCheckingSession(false);
+      return;
+    }
+    let active = true;
+    setCheckingSession(true);
+    void authV4.restore().then((session) => {
+      if (!active) return;
+      const verified = session.signedIn &&
+        (session.role === 'WORKER' || session.role === 'ADMIN') ? session.role : null;
+      setLiveRole(verified);
+    }).catch(() => {
+      if (active) setLiveRole(null);
+    }).finally(() => {
+      if (active) setCheckingSession(false);
+    });
+    return () => { active = false; };
+  }, [mode]));
+
+  const role: Role | null = mode === 'live' ? liveRole : mockRole;
   const isAdmin = role === 'ADMIN';
 
+  const performLiveLogout = async () => {
+    if (logoutLock.current) return;
+    logoutLock.current = true;
+    setLoggingOut(true);
+    try {
+      // 서버 Refresh Token 폐기를 시도하고, 실패해도 기기의 SecureStore는 삭제합니다.
+      const { remoteRevoked } = await authV4.logout();
+      if (remoteRevoked) {
+        router.replace('/');
+      } else {
+        Alert.alert(
+          '이 기기에서 로그아웃됨',
+          '기기에 저장된 로그인 정보는 삭제했습니다. 다만 서버의 Refresh Token 폐기 여부는 확인되지 않았습니다.',
+          [{ text: '확인', onPress: () => router.replace('/') }],
+        );
+      }
+    } catch {
+      // SecureStore 삭제가 실패할 경우 로그아웃됐다고 표시하거나 화면을 이동하지 않습니다.
+      Alert.alert(
+        '로그아웃을 완료하지 못했습니다',
+        '기기에 저장된 로그인 정보 삭제를 확인할 수 없습니다. 다시 시도해 주세요.',
+      );
+    } finally {
+      setLoggingOut(false);
+      logoutLock.current = false;
+    }
+  };
+
   const logout = () => {
+    if (loggingOut || logoutLock.current) return;
+    if (mode === 'mock') {
+      Alert.alert(
+        '로그아웃 · Mock',
+        '시연 화면을 종료하고 로그인 화면으로 돌아갈까요? 저장된 실제 서버 로그인 정보는 변경하지 않습니다.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '로그아웃', onPress: () => router.replace('/') },
+        ],
+      );
+      return;
+    }
     Alert.alert(
-      '로그아웃 · Mock',
-      '로그인 화면으로 돌아갈까요? 이 동작은 시연용이며 기기에 저장된 Mock 판정 기록은 지우지 않습니다.',
+      '실제 서버 로그아웃',
+      '서버 로그인 세션을 종료하고 기기에 저장된 인증 정보를 삭제할까요?',
       [
         { text: '취소', style: 'cancel' },
-        { text: '로그아웃', onPress: () => router.replace('/') },
+        { text: '로그아웃', style: 'destructive', onPress: () => { void performLiveLogout(); } },
       ],
     );
   };
@@ -98,6 +164,36 @@ export default function SettingsScreen() {
       [{ text: '확인' }],
     );
   };
+
+  if (mode === 'live' && (checkingSession || role === null)) {
+    return (
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.sessionGuard}>
+          <Text style={styles.title}>설정</Text>
+          {checkingSession ? (
+            <>
+              <ActivityIndicator color={color.blue} />
+              <Text style={styles.cardText}>실제 서버 로그인 상태를 확인하는 중입니다.</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.cardText}>유효한 WORKER 또는 ADMIN 로그인 세션이 없습니다.</Text>
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.button, styles.primary]}
+                onPress={() => router.replace('/')}>
+                <Text style={[styles.buttonText, { color: color.white }]}>로그인 화면으로 이동</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+  // live 모드의 역할이 없으면 위 화면에서 차단되므로 실제 권한 없이
+  // 관리자 메뉴를 노출하거나 URL role을 신뢰하는 일이 없습니다.
+  const displayRole: Role = role ?? mockRole;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -241,24 +337,31 @@ onPress={() => {
   </Pressable>
 )}
 
-        <Pressable style={[styles.button, styles.secondary]} onPress={logout} accessibilityRole="button">
-          <Text style={styles.buttonText}>로그아웃</Text>
+        <Pressable style={[styles.button, styles.secondary, loggingOut && styles.disabled]}
+          onPress={logout} disabled={loggingOut} accessibilityRole="button">
+          <Text style={styles.buttonText}>{loggingOut ? '로그아웃 처리 중…' : '로그아웃'}</Text>
         </Pressable>
 
         <View style={styles.notice}>
           <Text style={styles.noticeText}>
-            {isAdmin && mode === 'mock' ? '정책 관리 화면은 Mock · ' : ''}{isAdmin && mode === 'live' ? '실서버 정책 관리 화면에서 정책을 실제 변경할 수 있습니다. · ' : ''}로그아웃 메뉴는 별도 시연 동작입니다.
+            {isAdmin && mode === 'mock' ? '정책 관리 화면은 Mock · ' : ''}
+            {isAdmin && mode === 'live' ? '실서버 정책 관리 화면에서 정책을 실제 변경할 수 있습니다. · ' : ''}
+            {mode === 'live'
+              ? '로그아웃 시 서버 세션 종료를 시도하고 기기의 로그인 정보를 삭제합니다.'
+              : 'Mock 시연 종료는 실제 서버 로그인 정보를 변경하지 않습니다.'}
           </Text>
         </View>
       </ScrollView>
 
-      <NavBar role={role} mode={mode} />
+      <NavBar role={displayRole} mode={mode} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: color.background },
+  sessionGuard: { flex: 1, paddingHorizontal: 20, paddingTop: 36, gap: 20 },
+  disabled: { opacity: 0.45 },
   header: { paddingHorizontal: 20, paddingTop: 9, paddingBottom: 26 },
   title: { color: color.ink, fontSize: 23, fontWeight: '700', lineHeight: 34 },
   subtitle: { color: color.muted, fontSize: 11, lineHeight: 18, marginTop: 1 },
