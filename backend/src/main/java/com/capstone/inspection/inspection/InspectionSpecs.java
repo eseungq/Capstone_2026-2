@@ -1,9 +1,13 @@
 package com.capstone.inspection.inspection;
 
 import com.capstone.inspection.domain.inspection.Inspection;
+import com.capstone.inspection.domain.inspection.InspectionSource;
 import com.capstone.inspection.domain.inspection.InspectionStatus;
+import com.capstone.inspection.domain.inspection.Judgement;
+import com.capstone.inspection.domain.inspection.PredictedQuality;
 import com.capstone.inspection.domain.inspection.RecommendedAction;
 import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -27,6 +31,17 @@ public final class InspectionSpecs {
         };
     }
 
+    // CSV 내보내기: 모델·정책까지 함께 조회 (정책은 없을 수 있어 LEFT)
+    public static Specification<Inspection> fetchModelAndPolicy() {
+        return (root, query, cb) -> {
+            if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
+                root.fetch("model");
+                root.fetch("policy", JoinType.LEFT);
+            }
+            return null;
+        };
+    }
+
     public static Specification<Inspection> partId(String partId) {
         return (root, query, cb) -> cb.equal(root.get("part").get("id"), partId);
     }
@@ -44,6 +59,24 @@ public final class InspectionSpecs {
     // displayState → status·recommendedAction·finalJudgement 조합 (DisplayState.of와 같은 규칙)
     public static Specification<Inspection> displayState(DisplayState state) {
         return (root, query, cb) -> displayStatePredicate(root, cb, state);
+    }
+
+    // AI 예측과 작업자 판정이 엇갈린 REVIEW_DONE 건. 수동 판정(AI 예측 없음)은 제외
+    public static Specification<Inspection> reviewMismatch(ReviewMismatch type) {
+        return (root, query, cb) -> {
+            var quality = root.<PredictedQuality>get("predictedQuality");
+            var judgement = root.<Judgement>get("finalJudgement");
+            Predicate defectPassed = cb.and(cb.equal(quality, PredictedQuality.DEFECT), cb.equal(judgement, Judgement.PASS));
+            Predicate goodFailed = cb.and(cb.equal(quality, PredictedQuality.GOOD), cb.equal(judgement, Judgement.FAIL));
+            Predicate mismatch = switch (type) {
+                case ANY -> cb.or(defectPassed, goodFailed);
+                case DEFECT_PASSED -> defectPassed;
+                case GOOD_FAILED -> goodFailed;
+            };
+            // 수동 판정은 predictedQuality가 null이라 이미 빠지지만, 의도를 드러내려고 명시적으로 제외
+            return cb.and(displayStatePredicate(root, cb, DisplayState.REVIEW_DONE),
+                    cb.notEqual(root.get("source"), InspectionSource.MANUAL), mismatch);
+        };
     }
 
     // 확인 필요 목록 대상: REVIEW_PENDING

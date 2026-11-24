@@ -15,4 +15,7 @@ public interface WorkerConfirmationRepository extends JpaRepository<WorkerConfir
     // 목록 조회용: 여러 검사의 확인 기록을 한 번에 (N+1 방지)
     @Query("select c from WorkerConfirmation c where c.inspection.id in :inspectionIds")
     List<WorkerConfirmation> findByInspectionIds(Collection<String> inspectionIds);
+
+    @Query("select c from WorkerConfirmation c join fetch c.worker where c.inspection.id in :inspectionIds")
+    List<WorkerConfirmation> findByInspectionIdsWithWorker(Collection<String> inspectionIds);
 }

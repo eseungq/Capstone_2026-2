@@ -6,11 +6,19 @@ import com.capstone.inspection.admin.dto.PolicyResponse;
 import com.capstone.inspection.admin.dto.ThresholdRequest;
 import com.capstone.inspection.admin.dto.UserLockResponse;
 import com.capstone.inspection.common.api.ApiResponse;
+import com.capstone.inspection.common.time.Times;
+import com.capstone.inspection.inspection.DisplayState;
+import com.capstone.inspection.inspection.InspectionExportService;
+import com.capstone.inspection.inspection.ReviewMismatch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,17 +28,23 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 // ADMIN만 호출 가능 (SecurityConfig)
-@Tag(name = "관리자", description = "모델 조회, 자동 통과 정책 등록·조정·적용·중지, 계정 잠금 해제")
+@Tag(name = "관리자", description = "모델 조회, 자동 통과 정책 등록·조정·적용·중지, 검사 기록 CSV, 계정 잠금 해제")
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
 public class AdminController {
 
+    private static final DateTimeFormatter FILE_TIME = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm");
+
     private final AdminPolicyService policyService;
     private final AdminUserService userService;
+    private final InspectionExportService exportService;
 
     @Operation(summary = "모델 목록", description = "모델 버전·부품·보정기·활성 여부와 AI 서버 로드 가능 여부(확인 불가·확인 끔이면 null). 조회만 제공")
     @GetMapping("/models")
@@ -69,6 +83,24 @@ public class AdminController {
     @PostMapping("/policies/{id}/deactivate")
     public ApiResponse<PolicyResponse> deactivate(@PathVariable String id) {
         return ApiResponse.of(policyService.deactivate(id));
+    }
+
+    @Operation(summary = "검사 기록 CSV 내보내기", description = "검사 이력과 같은 조건(partCode·displayState·mismatch·from·to), "
+            + "접수 시각 오름차순, 최대 " + InspectionExportService.MAX_ROWS + "건. 엑셀용 UTF-8 BOM. 이미지·AI 응답 원문은 제외")
+    @GetMapping("/inspections/export")
+    public ResponseEntity<byte[]> exportInspections(@RequestParam(required = false) String partCode,
+                                                    @RequestParam(required = false) DisplayState displayState,
+                                                    @RequestParam(required = false) ReviewMismatch mismatch,
+                                                    @RequestParam(required = false) String from,
+                                                    @RequestParam(required = false) String to) {
+        byte[] csv = exportService.exportCsv(partCode, displayState, mismatch, Times.parseParam("from", from),
+                Times.parseParam("to", to));
+        String filename = "inspections_" + LocalDateTime.now(Times.ZONE).format(FILE_TIME) + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(filename).build().toString())
+                .body(csv);
     }
 
     @Operation(summary = "계정 잠금 해제", description = "로그인 실패 누적으로 잠긴 계정을 풀고 실패 횟수 초기화. 잠기지 않은 계정도 200")

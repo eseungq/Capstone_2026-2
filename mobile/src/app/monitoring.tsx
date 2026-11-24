@@ -1,9 +1,10 @@
+import Pressable from '../components/TouchPressable';
 
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   Image,
-  Pressable,
+  
   ScrollView,
   StyleSheet,
   Text,

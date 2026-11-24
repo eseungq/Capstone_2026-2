@@ -1,7 +1,8 @@
--- 저장 흐름 예시 (구 03_write_paths v4판, 11/11 V6 수동 판정 W8-2 추가): 백엔드가 실행할 저장 쿼리 순서 예시 (V1~V6 명칭 기준, 김남균 DB, 2026-10-28)
+-- 저장 흐름 예시 (구 03_write_paths v4판, 11/11 V6 수동 판정 W8-2, 11/20 V7~V9 표본 재확인 W3-2~W3-4 추가): 백엔드가 실행할 저장 쿼리 순서 예시 (V1~V9 명칭 기준, 김남균 DB, 2026-10-28)
 -- 계약 v4 5장 처리 흐름을 SQL로 옮긴 것. 백엔드(JPA) 구현의 기준 순서로 참고하고, 그대로 쓸 필요는 없다.
 --
--- 전제: V1~V6 + 개발 시드(V2 부품 DOOR/SCRATCH, V3_1 계정, V4_1 mock 모델·example 정책) 적용된 개발 DB
+-- 전제: V1~V9 + 개발 시드(V2 부품 DOOR, V3_1 계정, V4_1 mock 모델·example 정책 등) 적용된 개발 DB
+--       (로컬 설치 스크립트 00_local_setup.sql 상태: 도어 활성 모델 Mock, 적용 정책 example-door-p1)
 -- 값: 모두 예시 값. 검사 ID는 example-wp- 접두어, 이미지 키는 example/ 경로. 실제 검증 값 아님
 -- 실행: 전체를 한 번에 실행하면 마지막 ROLLBACK으로 모두 되돌린다 (흐름 확인용).
 --       결과를 남기고 싶으면 마지막 줄을 COMMIT으로 바꾼다.
@@ -14,7 +15,7 @@ START TRANSACTION;
 
 -- 공통으로 쓰는 ID (코드로 찾음)
 SELECT id INTO @part_id   FROM part WHERE part_code = 'DOOR';
-SELECT id INTO @item_id   FROM inspection_item WHERE part_id = @part_id AND item_code = 'SCRATCH';   -- [TBD-04]
+SELECT id INTO @item_id   FROM inspection_item WHERE part_id = @part_id AND item_code = 'UNIFIED';   -- V7 (TBD-04 확정)
 SELECT id INTO @device_id FROM users WHERE login_id = 'device-door';
 SELECT id INTO @worker_id FROM users WHERE login_id = 'worker01';
 SELECT id INTO @admin_id  FROM users WHERE login_id = 'admin01';
@@ -50,21 +51,69 @@ WHERE id = 'example-wp-0001' AND status = 'RECEIVED';
 
 -- =====================================================================
 -- W3. 분석 완료 – AUTO_PASS (GOOD, 준비된 정책, 보정 확률 ≤ 기준치)
+--     보정 확률은 적용 기준치의 60%로 둔다 (어느 정책이 적용돼 있어도 AUTO_PASS가 되도록)
+--     표본 재확인 기능이 켜져 있으면 판정과 같은 트랜잭션에서 그때 규칙을 recheck_rule_id로 연결 (V9)
 --     정책은 판정 시점에 조회하고, 기준치는 스냅숏으로 함께 저장
 -- =====================================================================
 SELECT id, pass_threshold INTO @policy_id, @threshold
 FROM automation_policy
 WHERE model_id = @model_id AND active = TRUE AND ready = TRUE AND calibrator_version = @model_cal;
 
+-- 규칙은 값(경계·비율)과 시험 이름이 같으면 같은 행을 쓴다. 예시는 실제 시험과 섞이지 않게 시험 이름을 따로 둠
+INSERT INTO recheck_rule (id, rule_version, trial_name, near_ratio, mid_ratio, near_rate, mid_rate, low_rate, created_at)
+VALUES ('example-wp-rule-1', 'v1-b40-80-p100-30-10', 'example 흐름 확인', 0.800000, 0.400000, 1.000000, 0.300000, 0.100000,
+        '2026-10-28 09:00:00');
+
 UPDATE inspection SET
     status = 'COMPLETED', predicted_quality = 'GOOD',
-    raw_defect_probability = 0.040000, calibrated_defect_probability = 0.030000, calibrator_version = @model_cal,
+    raw_defect_probability = 0.040000, calibrated_defect_probability = ROUND(@threshold * 0.6, 6), calibrator_version = @model_cal,
     automation_policy_ready = TRUE, policy_id = @policy_id, pass_threshold_applied = @threshold,
     recommended_action = 'AUTO_PASS', review_reason = NULL,
-    final_judgement = 'PASS', judged_by = 'SYSTEM',
+    final_judgement = 'PASS', judged_by = 'SYSTEM', recheck_rule_id = 'example-wp-rule-1',
     gradcam_status = 'NOT_REQUIRED', inference_time_ms = 850,
     ai_response_json = JSON_OBJECT('note', 'example'), completed_at = '2026-10-28 09:00:02'
 WHERE id = 'example-wp-0001' AND status = 'ANALYZING';
+
+-- =====================================================================
+-- W3-2. 표본 추출 결정 (V8·V9, 계약 6.11): AUTO_PASS 저장 뒤 별도 단계. 뽑히지 않아도 1행 기록
+--       r = 보정 확률 ÷ 판정 당시 기준치 → r ≥ 0.8 NEAR, ≥ 0.4 MID, 나머지 LOW → 구간 비율
+--       draw_value는 백엔드가 검사 ID의 SHA-256으로 정하는 0~1 값. 여기서는 예시 값 0.120000
+--       시스템 판정(PASS·SYSTEM)은 바꾸지 않는다
+-- =====================================================================
+--       r 계산은 무결성 점검 I20과 같은 식 (기준치 0 이하이면 나누지 않고 1)
+INSERT INTO auto_pass_recheck (id, inspection_id, sampled, stratum, sampling_rate, sampled_at, rule_id, ratio, draw_value)
+SELECT 'example-wp-recheck-0001', s.id, (s.rate > 0 AND 0.120000 < s.rate), s.stratum, s.rate, '2026-10-28 09:00:03',
+       s.rule_id, s.r, 0.120000
+FROM (
+    SELECT c.id, c.rule_id, c.r,
+           CASE WHEN c.r + 0.000000001 >= c.near_ratio THEN 'NEAR'
+                WHEN c.r + 0.000000001 >= c.mid_ratio THEN 'MID' ELSE 'LOW' END AS stratum,
+           CASE WHEN c.r + 0.000000001 >= c.near_ratio THEN c.near_rate
+                WHEN c.r + 0.000000001 >= c.mid_ratio THEN c.mid_rate ELSE c.low_rate END AS rate
+    FROM (
+        SELECT i.id, k.id AS rule_id, k.near_ratio, k.mid_ratio, k.near_rate, k.mid_rate, k.low_rate,
+               CASE WHEN i.pass_threshold_applied > 0 THEN i.calibrated_defect_probability / i.pass_threshold_applied
+                    ELSE 1 END AS r
+        FROM inspection i JOIN recheck_rule k ON k.id = i.recheck_rule_id
+        WHERE i.id = 'example-wp-0001' AND i.recommended_action = 'AUTO_PASS'
+    ) c
+) s;
+
+-- W3-3. 재확인 결과 (POST /inspections/{id}/recheck, WORKER): 뽑힌 건만, 결과가 비어 있을 때만 (동시 제출 1건)
+UPDATE auto_pass_recheck SET result = 'FAIL', comment = '예시 메모: 고정부 들뜸 의심',
+       rechecked_by = @worker_id, rechecked_at = '2026-10-28 09:20:00',
+       screen_dwell_ms = 18250, first_opened_at = '2026-10-28 09:19:40', open_count = 1
+WHERE inspection_id = 'example-wp-0001' AND sampled = TRUE AND result IS NULL;
+
+-- W3-4. 관리자 확인함 (POST /admin/rechecks/{id}/acknowledge, ADMIN): 재확인 FAIL만, 처음 기록 유지
+UPDATE auto_pass_recheck SET acknowledged_by = @admin_id, acknowledged_at = '2026-10-28 09:30:00',
+       acknowledge_note = '예시 메모: 라인 담당자에게 전달'
+WHERE inspection_id = 'example-wp-0001' AND result = 'FAIL' AND acknowledged_by IS NULL;
+
+-- 원래 판정은 그대로 (AUTO_PASS·PASS·SYSTEM), 재확인 결과는 따로
+SELECT i.inspection_no, i.recommended_action, i.final_judgement, i.judged_by,
+       r.stratum, r.sampling_rate, r.sampled, r.result, r.acknowledged_at
+FROM inspection i JOIN auto_pass_recheck r ON r.inspection_id = i.id WHERE i.id = 'example-wp-0001';
 
 -- =====================================================================
 -- W4. 두 번째 검사: REVIEW (ABOVE_THRESHOLD) → W5 작업자 확인
@@ -93,8 +142,11 @@ WHERE id = 'example-wp-0002' AND status = 'ANALYZING';
 -- W5. 작업자 확인 (PATCH /inspections/{id}/confirmation)
 --     확인 기록 INSERT + 검사 판정 UPDATE를 한 트랜잭션. 동시 제출은 worker_confirmation.inspection_id UNIQUE가 막음
 --     UPDATE 영향 행이 0이면(이미 확정·대상 아님) 트랜잭션 전체를 되돌린다
-INSERT INTO worker_confirmation (id, inspection_id, worker_id, final_judgement, comment, confirmed_at)
-VALUES ('example-wp-conf-0002', 'example-wp-0002', @worker_id, 'PASS', '예시 메모: 반사광', '2026-10-28 09:05:00');
+--     화면 체류 시간 3개는 선택, 셋 다 넣거나 셋 다 비움 (V9)
+INSERT INTO worker_confirmation (id, inspection_id, worker_id, final_judgement, comment, confirmed_at,
+                                 screen_dwell_ms, first_opened_at, open_count)
+VALUES ('example-wp-conf-0002', 'example-wp-0002', @worker_id, 'PASS', '예시 메모: 반사광', '2026-10-28 09:05:00',
+        9000, '2026-10-28 09:04:50', 1);
 
 UPDATE inspection SET final_judgement = 'PASS', judged_by = 'WORKER'
 WHERE id = 'example-wp-0002' AND status = 'COMPLETED' AND recommended_action = 'REVIEW' AND final_judgement IS NULL;

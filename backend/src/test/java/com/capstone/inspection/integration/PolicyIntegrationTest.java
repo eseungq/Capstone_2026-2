@@ -1,5 +1,6 @@
 package com.capstone.inspection.integration;
 
+import com.capstone.inspection.ai.AiPredictResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -244,6 +245,40 @@ class PolicyIntegrationTest extends IntegrationTestBase {
         String applied = "select pass_threshold_applied from inspection where id = ?";
         assertThat(jdbc.queryForObject(applied, Double.class, first.path("inspectionId").asText())).isEqualTo(0.0092);
         assertThat(jdbc.queryForObject(applied, Double.class, review.path("inspectionId").asText())).isEqualTo(0.0084);
+    }
+
+    @Test
+    @DisplayName("도어 e02 시연 11/17 (V7_1): 보정기 미응답이면 REVIEW, 보정 0.00876에서 0.84% REVIEW → 0.92% AUTO_PASS")
+    void doorE02Demo() throws Exception {
+        String e02 = "door-swin-tiny-e02-28a2dd1cb40b-dev";
+        String calibrator = "door-e02-temperature-30962f5cac45-demo";
+        aiModels = () -> Map.of(e02, true);
+        jdbc.update("update automation_policy set active = false");
+        jdbc.update("update ai_model set active = false");
+        jdbc.update("update ai_model set active = true where model_version = ?", e02);
+        String low = jdbc.queryForObject(
+                "select id from automation_policy where policy_version = 'door-e02-demo-0084'", String.class);
+        String base = jdbc.queryForObject(
+                "select id from automation_policy where policy_version = 'door-e02-demo-0092'", String.class);
+
+        // 8771이 아직 보정기 없이 응답하면 정책이 있어도 REVIEW
+        assertThat(activate(base).getResponse().getStatus()).isEqualTo(200);
+        ai = r -> new AiPredictResponse(r.inspectionId(), r.requestedModelVersion(), "GOOD", 0.04, null, null,
+                64, 64, null, 10);
+        assertThat(submitAndWait().path("displayState").asText()).isEqualTo("REVIEW_PENDING");
+
+        ai = r -> new AiPredictResponse(r.inspectionId(), r.requestedModelVersion(), "GOOD", 0.04, 0.00876,
+                calibrator, 64, 64, null, 10);
+        assertThat(activate(low).getResponse().getStatus()).isEqualTo(200);
+        JsonNode review = submitAndWait();
+        assertThat(review.at("/policy/reviewReason").asText()).isEqualTo("ABOVE_THRESHOLD");
+        assertThat(review.at("/policy/passThreshold").asDouble()).isEqualTo(0.0084);
+
+        assertThat(activate(base).getResponse().getStatus()).isEqualTo(200);
+        JsonNode pass = submitAndWait();
+        assertThat(pass.path("displayState").asText()).isEqualTo("AUTO_PASS");
+        assertThat(pass.at("/policy/passThreshold").asDouble()).isEqualTo(0.0092);
+        assertThat(pass.at("/judgement/judgedBy").asText()).isEqualTo("SYSTEM");
     }
 
     @Test
