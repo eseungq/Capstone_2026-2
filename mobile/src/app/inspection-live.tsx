@@ -1,3 +1,4 @@
+import { createImageErrorRefreshBudgetV4, imageExpiryRefreshDelayV4 } from '../api/backendV4/imageRefreshBudgetV4';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
@@ -116,6 +117,9 @@ export default function InspectionLiveScreen() {
   );
   const requestSerial = useRef(0);
   const failedImageUrls = useRef(new Set<string>());
+  const imageErrorBudget = useRef(createImageErrorRefreshBudgetV4());
+  const lastExpiryAttempt = useRef<number | null>(null);
+  const [imageRetryRevision, setImageRetryRevision] = useState(0);
   const lastAutoRefreshedExpiry = useRef<string | null>(null);
   const pendingImageRefreshOnResume = useRef(false);
   const [role, setRole] = useState<BackendRole | null>(null);
@@ -150,6 +154,8 @@ export default function InspectionLiveScreen() {
       setLoading(true);
       setDetail(null);
       failedImageUrls.current.clear();
+      imageErrorBudget.current.reset();
+      lastExpiryAttempt.current = null;
       lastAutoRefreshedExpiry.current = null;
       pendingImageRefreshOnResume.current = false;
       setImageNotice(null);
@@ -243,11 +249,14 @@ export default function InspectionLiveScreen() {
     if (!isFocused || !isForeground || loading || refreshing) return;
     const expiry = detail?.imageUrlExpiresAt;
     if (!expiry || lastAutoRefreshedExpiry.current === expiry) return;
+    if (imageErrorBudget.current.exhausted() &&
+        [detail?.originalImageUrl, detail?.gradcamImageUrl].some(url => !!url && failedImageUrls.current.has(url))) return;
     const expiryMs = Date.parse(expiry);
     if (!Number.isFinite(expiryMs)) return;
-    const delay = Math.max(0, expiryMs - Date.now() - 30_000);
+    const delay = imageExpiryRefreshDelayV4(expiryMs, lastExpiryAttempt.current, Date.now());
     const timer = setTimeout(() => {
       lastAutoRefreshedExpiry.current = expiry;
+      lastExpiryAttempt.current = Date.now();
       void load(false);
     }, delay);
     return () => clearTimeout(timer);
@@ -257,20 +266,21 @@ export default function InspectionLiveScreen() {
   useEffect(() => {
     if (!isFocused || !isForeground || loading || refreshing || !pendingImageRefreshOnResume.current) return;
     pendingImageRefreshOnResume.current = false;
-    void load(false);
-  }, [isFocused, isForeground, loading, refreshing, load]);
+    if (imageErrorBudget.current.take()) void load(false);
+    else setImageNotice('사진을 표시할 수 없습니다. 검사 상세 다시 조회를 눌러 주세요.');
+  }, [isFocused, isForeground, loading, refreshing, load, imageNotice]);
 
   const handleImageError = (url: string) => {
     // 과거 검사 또는 만료된 이전 이미지의 늦은 콜백은 무시합니다.
     if (url !== detail?.originalImageUrl && url !== detail?.gradcamImageUrl) return;
     if (failedImageUrls.current.has(url)) return;
     failedImageUrls.current.add(url);
-    setImageNotice('사진을 표시할 수 없어 다시 불러오는 중입니다.');
-    if (!isFocused || !isForeground) {
-      pendingImageRefreshOnResume.current = true;
+    if (imageErrorBudget.current.exhausted()) {
+      setImageNotice('사진을 표시할 수 없습니다. 검사 상세 다시 조회를 눌러 주세요.');
       return;
     }
-    void load(false);
+    pendingImageRefreshOnResume.current = true;
+    setImageNotice('사진을 표시할 수 없어 다시 불러오는 중입니다.');
   };
 
   // 새 검사로 이동하는 첫 렌더에서도 이전 검사의 데이터를 숨깁니다.
@@ -657,7 +667,7 @@ export default function InspectionLiveScreen() {
             )}
 
             {(isManualInspection || visibleDetail.displayState === 'FAILED') ? (
-              <ImagePanel title="원본 사진" url={visibleDetail.originalImageUrl}
+              <ImagePanel key={`original-${imageRetryRevision}`} title="원본 사진" url={visibleDetail.originalImageUrl}
                 missingText="원본 이미지가 제공되지 않았습니다."
                 onLoadError={handleImageError}
                 onOpen={() => router.push({
@@ -667,7 +677,7 @@ export default function InspectionLiveScreen() {
               />
             ) : (
               <View style={styles.imageRow}>
-                <ImagePanel title="원본 사진" url={visibleDetail.originalImageUrl}
+                <ImagePanel key={`original-${imageRetryRevision}`} title="원본 사진" url={visibleDetail.originalImageUrl}
                   missingText="원본 이미지가 제공되지 않았습니다." compact
                   onLoadError={handleImageError}
                   onOpen={() => router.push({
@@ -675,7 +685,7 @@ export default function InspectionLiveScreen() {
                     params: { inspectionId: id, kind: 'original' },
                   })}
                 />
-                <ImagePanel title="AI 판단 근거" url={visibleDetail.gradcamImageUrl}
+                <ImagePanel key={`gradcam-${imageRetryRevision}`} title="AI 판단 근거" url={visibleDetail.gradcamImageUrl}
                   missingText={gradcamMissing} compact
                   onLoadError={handleImageError}
                   onOpen={() => router.push({
@@ -951,6 +961,11 @@ export default function InspectionLiveScreen() {
                 disabled={refreshing}
                 onPress={() => {
                   lastAutoRefreshedExpiry.current = visibleDetail.imageUrlExpiresAt;
+                  lastExpiryAttempt.current = null;
+                  imageErrorBudget.current.reset();
+                  pendingImageRefreshOnResume.current = false;
+                  failedImageUrls.current.clear();
+                  setImageRetryRevision(value => value + 1);
                   void load(false);
                 }}>
                 <Text style={styles.secondaryButtonText}>{refreshing ? '조회 중…' : '검사 상세 다시 조회'}</Text>
