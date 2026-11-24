@@ -1,3 +1,4 @@
+import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
 import React,{useEffect,useRef,useState} from 'react';
 import {router,Stack} from 'expo-router';
 import {ActivityIndicator,Alert,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
@@ -66,7 +67,7 @@ export default function JudgementRequestsAdminLiveScreen(){
     locked.current=true;setProcessing(true);setError(null);setMessage(null);
     try{
       const session=await authV4.restore();
-      if(!session.signedIn||session.role!=='ADMIN')throw new Error('ADMIN 로그인 상태를 다시 확인해 주세요.');
+      if(!session.signedIn||session.role!=='ADMIN')throw new Error('관리자 계정으로 다시 로그인해 주세요.');
       const reply=await writer.resolve(session.role,selected,decision,note);
       if(!mounted.current)return;
       setMessage(`${reply.request.inspectionNo} 요청을 ${judgementRequestStatusLabelV4(reply.request.status)} 처리했습니다.`);
@@ -93,7 +94,7 @@ export default function JudgementRequestsAdminLiveScreen(){
     <ScrollView style={{flex:1}} contentContainerStyle={s.body}
       automaticallyAdjustKeyboardInsets={true}
       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-      {authLoading?<ActivityIndicator/>:!admin?<Text style={s.error}>ADMIN 실제 서버 계정만 접근할 수 있습니다.</Text>:<>
+      {authLoading?<ActivityIndicator/>:!admin?<Text style={s.error}>관리자 계정으로 로그인해 주세요.</Text>:<>
         <View style={s.card}>
           <Text style={s.strong}>조회 상태</Text>
           <View style={s.row}>
@@ -125,7 +126,7 @@ export default function JudgementRequestsAdminLiveScreen(){
             {page.items.map(item=><Pressable key={item.requestId} style={s.entry}
               onPress={()=>{setSelected(item);setNote('');setDecision('KEEP');}}>
               <Text style={s.strong}>{item.inspectionNo} · {item.partCode} · {judgementRequestStatusLabelV4(item.status)}</Text>
-              <Text style={s.muted}>{item.originalJudgement} · SYSTEM → 요청 {item.claimedJudgement}</Text>
+              <Text style={s.muted}>{item.originalJudgement} · 시스템 자동 판정 → 요청 {item.claimedJudgement}</Text>
               <Text style={s.link}>내용 검토 ›</Text>
             </Pressable>)}
             {page.page+1<page.totalPages&&<Pressable style={s.outline} disabled={loading}
@@ -136,7 +137,7 @@ export default function JudgementRequestsAdminLiveScreen(){
         </View>
         {selected&&<View style={s.card}>
           <Text style={s.strong}>{selected.inspectionNo} · 요청 상세</Text>
-          <Text style={s.muted}>최초 판정: {selected.originalJudgement} · {selected.originalJudgedBy}</Text>
+          <Text style={s.muted}>최초 판정: {selected.originalJudgement} · {actorLabelV4(selected.originalJudgedBy)}</Text>
           <Text style={s.muted}>요청 당시 현재 판정: {selected.currentJudgement}</Text>
           <Text style={s.muted}>작업자 주장: {selected.claimedJudgement}</Text>
           <Text style={s.muted}>요청자: {selected.requestedBy} · {selected.requestedAt}</Text>

@@ -13,7 +13,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { authV4 } from '../api/backendV4/authRuntime';
-import { ApiV4RequestError } from '../api/backendV4/httpCore';
 import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
 import type { HistoryPageV4, HistoryRowV4 } from '../api/backendV4/inspectionReadCore';
 import { historyJudgementLabelV4 } from '../api/backendV4/judgementRequestCoreV4';
@@ -67,9 +66,6 @@ function dateText(value: string | null): string {
 }
 
 function errorText(error: unknown): string {
-  if (error instanceof ApiV4RequestError) {
-    return `${error.message} (${error.code})${error.traceId ? `\ntraceId: ${error.traceId}` : ''}`;
-  }
   return error instanceof Error ? error.message : '검사 이력 조회에 실패했습니다.';
 }
 

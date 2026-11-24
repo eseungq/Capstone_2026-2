@@ -79,9 +79,9 @@ function AutoFailInAppBannerV4({ isMonitoring }: { isMonitoring: boolean }) {
         </Pressable>
       </View>
       <Text style={s.description}>
-        {alert.partCode} · {alert.inspectionNo ?? '검사번호 확인 필요'} · AUTO_FAIL
+        {alert.partCode} · {alert.inspectionNo ?? '검사번호 확인 필요'} · 자동 불량
       </Text>
-      <Text style={s.note}>앱 실행 중 발견 · 5초 폴링 (원격 푸시 아님) · 별도 재판정 불필요</Text>
+      <Text style={s.note}>앱 실행 중 확인된 자동 불량입니다.</Text>
       <Pressable accessibilityRole="button" style={s.open} onPress={open}>
         <Text style={s.openText}>검사 상세 보기 ›</Text>
       </Pressable>
