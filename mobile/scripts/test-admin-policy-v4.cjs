@@ -96,6 +96,49 @@ test('equivalent policy check requires same model, calibrator, part and ready st
   assert.equal(findEquivalentPolicyVersionV4([t1], ORIGINAL, Number.NaN), null);
 });
 
+test('a pass-only change cannot reuse a version with different automatic FAIL settings, bounds or evidence', () => {
+  const active = decodeAdminPolicyV4({
+    ...ORIGINAL, autoFailEnabled: true, failThreshold: 0.9966, failValidatedMin: 0.99, failValidatedMax: 1,
+    metrics: { autoFail: { count: 50, tested: true }, strata: [1, 2] },
+  });
+  const candidate = { ...active, policyId: 'new-id', active: false, passThreshold: 0.01 };
+  for (const change of [
+    { autoFailEnabled: false }, { autoFailEnabled: null }, { failThreshold: 0.997 },
+    { failValidatedMin: 0.98 }, { failValidatedMax: 0.999 }, { validatedMin: 0.009 },
+    { validatedMax: 0.02 }, { metrics: null }, { metrics: { ...active.metrics, strata: [2, 1] } },
+  ]) {
+    assert.equal(findEquivalentPolicyVersionV4([{ ...candidate, ...change }], active, 0.01), null);
+  }
+  const same = { ...candidate, metrics: { strata: [1, 2], autoFail: { tested: true, count: 50 } } };
+  assert.equal(findEquivalentPolicyVersionV4([same], active, 0.01), same);
+  const alsoSame = { ...same, passThreshold: active.passThreshold };
+  assert.equal(findEquivalentPolicyVersionV4([alsoSame, active], active, active.passThreshold), active);
+  const legacy = decodeAdminPolicyV4(ORIGINAL);
+  const disabled = { ...legacy, autoFailEnabled: false, passThreshold: 0.01 };
+  assert.equal(findEquivalentPolicyVersionV4([disabled], legacy, 0.01), null);
+});
+
+test('pass threshold save requires the server to preserve automatic FAIL settings', async () => {
+  const base = decodeAdminPolicyV4({
+    ...ORIGINAL, autoFailEnabled: true, failThreshold: 0.9966, failValidatedMin: 0.9966, failValidatedMax: 0.9966,
+  });
+  const reply = { ...base, passThreshold: 0.012, basedOnPolicyId: base.policyId, active: false, policyId: 'saved' };
+  const { transport, calls } = fakeTransport({ thresholdReply: { ...reply, autoFailEnabled: false } });
+  await assert.rejects(createAdminPolicyServiceV4(transport).saveNewVersion(base, '1.20'), /승계한 설정/);
+  assert.equal(calls.length, 1);
+  const valid = fakeTransport({ thresholdReply: reply });
+  assert.equal((await createAdminPolicyServiceV4(valid.transport).saveNewVersion(base, '1.20')).autoFailEnabled, true);
+});
+
+test('a pass threshold at or above the automatic FAIL threshold is rejected before saving', async () => {
+  const base = { ...ORIGINAL, failThreshold: 0.015, autoFailEnabled: false };
+  const { transport, calls } = fakeTransport();
+  for (const percent of ['1.50', '1.60']) {
+    await assert.rejects(createAdminPolicyServiceV4(transport).saveNewVersion(base, percent), /자동 불량 기준보다 낮아야/);
+  }
+  assert.equal(calls.length, 0);
+});
+
 test('refresh before POST detects a policy version created since the initial screen load', () => {
   const firstList = [ORIGINAL];
   const refreshedList = [ORIGINAL, EXISTING_T1];

@@ -125,24 +125,44 @@ export function decodeCowlPolicyListV4(raw: unknown): AdminPolicyV4[] {
   return policies;
 }
 
-/**
- * 동일 모델·보정기에서 기준치가 이미 존재하는지 확인합니다.
- * 정책 목록 조회 당시와 POST 직전 최신 목록 모두에 같은 규칙을 적용합니다.
- */
+// 정책의 평가 근거는 JSON입니다. 객체 키의 순서는 근거의 의미를 바꾸지 않습니다.
+function policyEvidenceKey(metrics: AdminPolicyV4['metrics']): string {
+  return JSON.stringify(metrics ?? null, (_key, value) => {
+    if (!record(value)) return value;
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]]));
+  });
+}
+
+/** 서버가 통과 기준을 변경할 때 원본에서 승계하는 설정을 모두 비교합니다. */
+function matchesThresholdEdit(candidate: AdminPolicyV4, base: AdminPolicyV4, threshold: number): boolean {
+  return candidate.partCode === base.partCode &&
+    candidate.modelVersion === base.modelVersion &&
+    candidate.calibratorVersion === base.calibratorVersion &&
+    candidate.ready === base.ready &&
+    candidate.validatedMin === base.validatedMin &&
+    candidate.validatedMax === base.validatedMax &&
+    (candidate.autoFailEnabled ?? null) === (base.autoFailEnabled ?? null) &&
+    (candidate.failThreshold ?? null) === (base.failThreshold ?? null) &&
+    (candidate.failValidatedMin ?? null) === (base.failValidatedMin ?? null) &&
+    (candidate.failValidatedMax ?? null) === (base.failValidatedMax ?? null) &&
+    candidate.passThreshold != null &&
+    Math.abs(candidate.passThreshold - threshold) < 0.0000005 &&
+    policyEvidenceKey(candidate.metrics) === policyEvidenceKey(base.metrics);
+}
+
 export function findEquivalentPolicyVersionV4(
   policies: readonly AdminPolicyV4[],
   activePolicy: AdminPolicyV4,
   threshold: number,
 ): AdminPolicyV4 | null {
-  if (!Number.isFinite(threshold)) return null;
-  return policies.find((policy) =>
-    policy.partCode === COWL_PART_CODE_V4 &&
-    policy.modelVersion === activePolicy.modelVersion &&
-    policy.calibratorVersion === activePolicy.calibratorVersion &&
-    policy.ready &&
-    policy.passThreshold != null &&
-    Math.abs(policy.passThreshold - threshold) < 0.0000005
-  ) ?? null;
+  if (!Number.isFinite(threshold) || !activePolicy.ready || activePolicy.partCode !== COWL_PART_CODE_V4) return null;
+  let firstMatch: AdminPolicyV4 | null = null;
+  for (const policy of policies) {
+    if (!matchesThresholdEdit(policy, activePolicy, threshold)) continue;
+    if (policy.active) return policy;
+    firstMatch ??= policy;
+  }
+  return firstMatch;
 }
 
 export function percentageTextV4(fraction: number | null, digits = 2): string {
@@ -172,6 +192,9 @@ export function parsePolicyPercentInputV4(input: string, policy: AdminPolicyV4):
       OUT_OF_RANGE: `허용 범위(${percentageTextV4(policy.validatedMin)}~${percentageTextV4(policy.validatedMax)}) 밖입니다.`,
     };
     throw new Error(messages[result.reason]);
+  }
+  if (policy.failThreshold != null && result.value >= policy.failThreshold) {
+    throw new Error('자동 통과 기준은 자동 불량 기준보다 낮아야 합니다.');
   }
   return result.value;
 }
@@ -222,9 +245,8 @@ export function createAdminPolicyServiceV4(transport: PolicyAdminTransportV4) {
       );
       const result = decodeAdminPolicyV4(raw);
       if (result.policyId === base.policyId || result.basedOnPolicyId !== base.policyId ||
-          result.partCode !== base.partCode || result.modelVersion !== base.modelVersion ||
-          result.active || Math.abs((result.passThreshold ?? -1) - passThreshold) > 0.000001) {
-        throw new PolicyAdminContractErrorV4('새 버전이 비활성 상태로 생성되지 않았거나 원본 연결이 다릅니다.');
+          result.active || !matchesThresholdEdit(result, base, passThreshold)) {
+        throw new PolicyAdminContractErrorV4('새 버전이 비활성 상태로 생성되지 않았거나 원본에서 승계한 설정이 다릅니다.');
       }
       return result;
     });

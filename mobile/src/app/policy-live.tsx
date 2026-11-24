@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { authV4 } from '../api/backendV4/authRuntime';
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
 import {
-  createAdminPolicyServiceV4, findEquivalentPolicyVersionV4,
+  createAdminPolicyServiceV4, PolicyAdminContractErrorV4, findEquivalentPolicyVersionV4,
   parsePolicyPercentInputV4, percentageTextV4, rootPolicyForV4,
 } from '../api/backendV4/adminPolicyServiceV4';
 import type { AdminPolicyV4 } from '../api/backendV4/adminPolicyServiceV4';
@@ -46,16 +46,29 @@ function Button({ title, onPress, disabled, secondary }: {
 function errorText(error: unknown): string {
   if (error instanceof ApiV4RequestError) {
     const hint: Record<string, string> = {
-      ACCESS_DENIED: 'ADMIN 계정 권한을 확인해 주세요.',
+      ACCESS_DENIED: '관리자 계정으로 로그인해 주세요.',
       POLICY_THRESHOLD_OUT_OF_RANGE: '서버 검증 범위를 벗어났습니다. 정책 목록을 다시 확인해 주세요.',
-      POLICY_NOT_READY: '활성 모델 또는 보정기 호환성·ready 상태를 확인해 주세요.',
+      POLICY_NOT_READY: '이 정책은 아직 적용할 수 없습니다. 모델과 보정기 준비 상태를 확인해 주세요.',
       POLICY_NOT_FOUND: '정책이 변경되거나 삭제됐습니다. 목록을 다시 조회해 주세요.',
       POLICY_VERSION_DUPLICATE: '동시에 다른 버전이 생성됐을 수 있습니다. 목록을 확인해 주세요.',
       NETWORK_ERROR: '연결 불확실: 새 요청 전에 정책 목록에서 생성·적용 여부를 확인해 주세요.',
     };
-    return `${hint[error.code] ?? '서버 정책 요청 실패'}\n${error.message} (HTTP ${error.httpStatus}, ${error.code})${error.traceId ? `\ntraceId: ${error.traceId}` : ''}`;
+    if (error.httpStatus === 401) return '로그인이 만료됐습니다. 다시 로그인해 주세요.';
+    if (error.httpStatus === 403) return '정책을 관리할 권한이 없습니다.';
+    return hint[error.code] ?? '정책 요청을 처리하지 못했습니다. 현재 정책을 다시 확인해 주세요.';
   }
+  if (error instanceof PolicyAdminContractErrorV4) return '정책 정보를 확인할 수 없습니다. 목록을 새로고침해 주세요.';
   return error instanceof Error ? error.message : '정책 요청에 실패했습니다.';
+}
+
+function activationDetails(policy: AdminPolicyV4): string {
+  const autoFail = policy.autoFailEnabled == null ? '정보 없음' : policy.autoFailEnabled ? '켜짐' : '꺼짐';
+  return [
+    policy.policyVersion,
+    `통과 기준 ${percentageTextV4(policy.passThreshold, 4)} · 허용 범위 ${percentageTextV4(policy.validatedMin, 4)} ~ ${percentageTextV4(policy.validatedMax, 4)}`,
+    `자동 불량 ${autoFail} · 불량 기준 ${percentageTextV4(policy.failThreshold, 4)}`,
+    `불량 기준 범위 ${autoFailRangeLabelV4(policy.failValidatedMin, policy.failValidatedMax)}`,
+  ].join('\n');
 }
 
 export default function PolicyLiveScreen() {
@@ -66,7 +79,7 @@ export default function PolicyLiveScreen() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
-  const [percentInput, setPercentInput] = useState('1.00');
+  const [percentInput, setPercentInput] = useState('');
   const [savedPolicy, setSavedPolicy] = useState<AdminPolicyV4 | null>(null);
   const [failPercent, setFailPercent] = useState('');
   const [failMinPercent, setFailMinPercent] = useState('');
@@ -88,7 +101,7 @@ export default function PolicyLiveScreen() {
       if (!session.signedIn || session.role !== 'ADMIN') {
         setAccess('denied');
         setPolicies([]);
-        throw new Error('실제 서버 ADMIN 계정으로 로그인해야 정책을 조회·변경할 수 있습니다.');
+        throw new Error('정책을 조회하거나 변경하려면 관리자 계정으로 로그인해 주세요.');
       }
       setAccess('admin');
       const result = await service.list();
@@ -100,15 +113,8 @@ export default function PolicyLiveScreen() {
         setFailMinPercent(serverActive.failValidatedMin == null ? '' : (serverActive.failValidatedMin * 100).toFixed(4));
         setFailMaxPercent(serverActive.failValidatedMax == null ? '' : (serverActive.failValidatedMax * 100).toFixed(4));
       }
-      if (!editedInput.current) {
-        const active = result.find((item) => item.active);
-        // 최초 입력값만 서버 기준에 따라 채우며, 사용자가 편집 중이면 덮어쓰지 않습니다.
-        if (active?.passThreshold != null) {
-          const suggested = active.validatedMin != null &&
-            active.validatedMin <= 0.01 && (active.validatedMax ?? 0) >= 0.01
-              ? '1.00' : (active.passThreshold * 100).toFixed(2);
-          setPercentInput(suggested);
-        }
+      if (!editedInput.current && serverActive?.passThreshold != null) {
+        setPercentInput(String(Number((serverActive.passThreshold * 100).toFixed(4))));
       }
     } catch (cause) {
       if (refreshSerial.current === serial) setError(errorText(cause));
@@ -139,7 +145,7 @@ export default function PolicyLiveScreen() {
       if (existing) {
         validationText = existing.active
           ? '현재 적용 중인 기준치입니다. 다른 값을 입력해 주세요.'
-          : `이미 ${existing.policyVersion} 정책이 같은 기준치로 저장돼 있습니다. 아래 정책 목록에서 기존 버전을 적용해 주세요.`;
+          : `같은 설정의 ${existing.policyVersion} 정책이 이미 저장돼 있습니다. 아래 정책 목록에서 기존 버전을 적용해 주세요.`;
       } else {
         validInput = true;
         validationText = '검증 범위 안의 값입니다. 저장 시 새 비활성 정책 버전이 생성됩니다.';
@@ -152,7 +158,7 @@ export default function PolicyLiveScreen() {
   const canWrite = access === 'admin' && !loading && !refreshing && writing === null && error === null;
 
   let failEditValid = false;
-  let failEditHint = '실제 서버의 활성 정책과 팀에서 합의한 불량 기준·min·max 값을 확인해 주세요.';
+  let failEditHint = '현재 정책의 불량 기준과 허용 범위를 확인해 주세요.';
   if (active && active.autoFailEnabled !== null) {
     try {
       const value=makeAutoFailThresholdEditV4(active,failPercent,failMinPercent,failMaxPercent);
@@ -164,7 +170,7 @@ export default function PolicyLiveScreen() {
         failEditValid=true;
         failEditHint=value.failValidatedMin===value.failValidatedMax
           ? '검증 범위 없음(고정값) · 시험값 고정용입니다. 저장 시 비활성 버전이 생성됩니다.'
-          : '불량 기준이 입력한 min·max 범위 안에 있습니다. 저장 시 비활성 버전이 생성됩니다.';
+          : '불량 기준이 입력한 허용 범위 안에 있습니다. 저장 시 비활성 버전이 생성됩니다.';
       }
     } catch(cause) {failEditHint=errorText(cause);}
   }
@@ -193,7 +199,7 @@ export default function PolicyLiveScreen() {
     try {
       await operation();
     } catch (cause) {
-      setActionError(errorText(cause) + '\n서버 상태가 불확실하면 POST를 반복하지 말고 목록을 먼저 새로고침하세요.');
+      setActionError(errorText(cause) + '\n다시 시도하기 전에 목록을 새로고침해 변경 사항을 확인해 주세요.');
     } finally {
       writeLock.current = false;
       setWriting(null);
@@ -205,11 +211,11 @@ export default function PolicyLiveScreen() {
     const base = active;
     const input = percentInput;
     const value = parsePolicyPercentInputV4(input, base);
-    Alert.alert('실서버 새 정책 버전 저장',
+    Alert.alert('새 정책 버전 저장',
       `${base.policyVersion}의 기준치를 ${percentageTextV4(value)}로 조정해 새 비활성 버전을 생성할까요?\n\n원래 적용 중인 정책은 그대로 유지됩니다.`,
       [
         { text: '취소', style: 'cancel' },
-        { text: '실제 서버에 저장', onPress: () => {
+        { text: '저장', onPress: () => {
           void runWrite('save', async () => {
             const latest = await assertLatest(base);
             const current = latest.find((p) => p.policyId === base.policyId);
@@ -217,7 +223,7 @@ export default function PolicyLiveScreen() {
             const matching = findEquivalentPolicyVersionV4(latest, current, value);
             if (matching) {
               setPolicies(latest);
-              throw new Error(`동일 기준치의 ${matching.policyVersion} 정책이 이미 존재합니다. 기존 버전을 사용해 주세요.`);
+              throw new Error(`같은 설정의 ${matching.policyVersion} 정책이 이미 있습니다. 기존 버전을 사용해 주세요.`);
             }
             const result = await service.saveNewVersion(current, input);
             setSavedPolicy(result);
@@ -233,11 +239,11 @@ export default function PolicyLiveScreen() {
     if (!canWrite || target.active || !target.ready) return;
     const expectedActive = active;
     Alert.alert(
-      target.policyId === root?.policyId ? '실서버 원래 정책 복귀' : '실서버 정책 적용',
-      `${target.policyVersion} (통과 ${percentageTextV4(target.passThreshold)}, 자동 불량 ${target.autoFailEnabled===null?'미지원':target.autoFailEnabled?'켜짐':'꺼짐'}, 불량 기준 ${percentageTextV4(target.failThreshold,4)})을(를) 적용할까요?\n\n실제로 서버의 활성 정책이 변경되고 같은 모델의 다른 정책은 중지됩니다. 과거 검사 판정은 바뀌지 않습니다.${target.autoFailEnabled&&!target.metrics?.autoFail?'\n\n검증 자료 없음: 승인된 시험 범위에서만 적용하세요.':''}`,
+      target.policyId === root?.policyId ? '원래 정책으로 복귀' : '정책 적용',
+      `현재 적용 중\n${expectedActive ? activationDetails(expectedActive) : '활성 정책 없음'}\n\n적용할 정책\n${activationDetails(target)}\n\n적용 이후 접수하는 검사부터 새 정책을 사용합니다.${target.autoFailEnabled && !target.metrics?.autoFail ? '\n자동 불량 검증 자료가 없습니다. 승인된 시험 범위를 확인해 주세요.' : ''}`,
       [
         { text: '취소', style: 'cancel' },
-        { text: '실제 서버에 적용', onPress: () => {
+        { text: '적용', onPress: () => {
           void runWrite('activate', async () => {
             const latest = await assertLatest(expectedActive);
             const current = latest.find((p) => p.policyId === target.policyId);
@@ -267,7 +273,7 @@ export default function PolicyLiveScreen() {
         void runWrite('fail-threshold',async()=>{
           const current=(await assertLatest(base)).find(p=>p.policyId===base.policyId);
           if(!current?.active || current.autoFailEnabled===null)
-            throw new Error('활성 정책/서버 AUTO_FAIL 지원 상태가 변경됐습니다.');
+            throw new Error('적용 중인 정책 또는 자동 불량 기능의 사용 가능 여부가 변경됐습니다.');
           const latestEdit=makeAutoFailThresholdEditV4(current,...args);
           if(latestEdit.failThreshold!==expected.failThreshold ||
             latestEdit.failValidatedMin!==expected.failValidatedMin ||
@@ -313,19 +319,19 @@ export default function PolicyLiveScreen() {
         <Pressable accessibilityRole="button" onPress={() => router.back()}>
           <Text style={s.back}>‹ 설정으로 돌아가기</Text>
         </Pressable>
-        <Text style={s.title}>자동 통과 기준 · 실서버</Text>
-        <Text style={s.subtitle}>ADMIN 전용 · COWL_COVER · API v4 6.9</Text>
+        <Text style={s.title}>카울커버 자동 판정 정책</Text>
+        <Text style={s.subtitle}>관리자 · COWL_COVER</Text>
       </View>
       <ScrollView style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
         <View style={s.notice}>
           <Text style={s.noticeText}>
-            이 화면은 실제 백엔드 정책을 변경합니다. 시연 목표는 1.63% → 1.00%로 새 버전을 저장·적용한 후 원래 1.63% 정책으로 복귀하는 것입니다. 수치는 서버에서 조회한 값을 우선합니다.
+            통과·불량 기준을 저장하면 새 정책 버전이 생깁니다. 적용할 버전을 선택해야 새 검사에 반영됩니다.
           </Text>
         </View>
         {(loading || refreshing) && (
           <View style={s.status}>
             <ActivityIndicator />
-            <Text style={s.muted}>{loading ? '실서버 정책과 로그인 권한 확인 중…' : '최신 정책 다시 조회 중…'}</Text>
+            <Text style={s.muted}>{loading ? '정책과 접근 권한 확인 중…' : '최신 정책 다시 조회 중…'}</Text>
           </View>
         )}
         {error && (
@@ -336,14 +342,14 @@ export default function PolicyLiveScreen() {
         )}
         {access === 'denied' && (
           <Card title="접근 권한 없음">
-            <Text style={s.muted}>화면의 role 파라미터와 관계없이 실제 로그인 세션의 ADMIN 권한이 필요합니다.</Text>
+            <Text style={s.muted}>정책을 관리하려면 관리자 계정으로 로그인해 주세요.</Text>
           </Card>
         )}
         {access === 'admin' && !loading && (
           <>
             <Card title="1. 현재 적용 중인 정책">
               {!active ? (
-                <Text style={s.errorText}>현재 활성 COWL_COVER 정책이 없습니다. 서버에서 적용 상태를 확인해 주세요.</Text>
+                <Text style={s.errorText}>현재 적용 중인 카울커버 정책이 없습니다. 서버에서 적용 상태를 확인해 주세요.</Text>
               ) : (
                 <>
                   <Row label="정책 버전" value={active.policyVersion} />
@@ -351,11 +357,11 @@ export default function PolicyLiveScreen() {
                   <Row label="보정기" value={active.calibratorVersion ?? '미제공'} />
                   <Row label="활성 기준치" value={percentageTextV4(active.passThreshold)} />
                   <Row label="검증 범위" value={`${percentageTextV4(active.validatedMin)} ~ ${percentageTextV4(active.validatedMax)}`} />
-                  <Row label="ready / active" value={`${active.ready ? '준비됨' : '미준비'} / 적용 중`} />
+                  <Row label="정책 상태" value={`${active.ready ? '준비됨' : '미준비'} / 적용 중`} />
                   <Row label="자동 불량" value={active.autoFailEnabled===null?'미지원':active.autoFailEnabled?'켜짐':'꺼짐'} />
                 </>
               )}
-              <Button title="실서버 정책 새로고침" secondary onPress={() => { void load(false); }}
+              <Button title="정책 새로고침" secondary onPress={() => { void load(false); }}
                 disabled={!canWrite} />
             </Card>
 
@@ -365,27 +371,27 @@ export default function PolicyLiveScreen() {
                 활성화는 아래 정책 목록에서 별도로 선택해야 하며, 시험 승인 전에는 적용하지 마세요.
               </Text>
               {!active ? <Text style={s.errorText}>활성 정책을 확인한 뒤 사용할 수 있습니다.</Text> : <>
-                <Row label="현재 자동 불량" value={active.autoFailEnabled===null?'서버 미지원 / 배포 전':active.autoFailEnabled?'켜짐':'꺼짐'} />
+                <Row label="현재 자동 불량" value={active.autoFailEnabled===null?'정보 없음':active.autoFailEnabled?'켜짐':'꺼짐'} />
                 <Row label="불량 기준" value={percentageTextV4(active.failThreshold,4)} />
                 <Row label="불량 검증 범위" value={autoFailRangeLabelV4(active.failValidatedMin,active.failValidatedMax)} />
                 <Row label="AI 검증 근거" value={evidencePresent?'정책 자료 등록됨 (독립 검증 여부 별도)':'검증 자료 없음'} />
                 {active.autoFailEnabled===null && (
-                  <Text style={s.errorText}>서버가 AUTO_FAIL 정책 필드를 아직 제공하지 않습니다. 신규 설정 요청을 보내지 않습니다.</Text>
+                  <Text style={s.errorText}>현재 정책에서는 자동 불량 설정을 사용할 수 없습니다.</Text>
                 )}
                 {active.autoFailEnabled!==null && <>
                   <Text style={s.label}>불량 기준 입력 (%)</Text>
-                  <TextInput style={s.input} value={failPercent} placeholder="팀 합의 불량 기준 (%)"
+                  <TextInput style={s.input} value={failPercent} placeholder="불량 기준 (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
                     accessibilityLabel="자동 불량 기준 백분율" />
-                  <Text style={s.muted}>min·max는 API 설정값입니다. 두 값이 같으면 검증 범위가 아니라 시험 고정값을 뜻합니다.</Text>
-                  <Text style={s.label}>불량 기준 최솟값 (min, %)</Text>
-                  <TextInput style={s.input} value={failMinPercent} placeholder="min (%)"
+                  <Text style={s.muted}>최솟값과 최댓값이 같으면 시험용 고정 기준입니다.</Text>
+                  <Text style={s.label}>불량 기준 최솟값 (%)</Text>
+                  <TextInput style={s.input} value={failMinPercent} placeholder="최솟값 (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailMinPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
                     accessibilityLabel="불량 기준 최솟값" />
-                  <Text style={s.label}>불량 기준 최댓값 (max, %)</Text>
-                  <TextInput style={s.input} value={failMaxPercent} placeholder="max (%)"
+                  <Text style={s.label}>불량 기준 최댓값 (%)</Text>
+                  <TextInput style={s.input} value={failMaxPercent} placeholder="최댓값 (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailMaxPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
                     accessibilityLabel="불량 기준 최댓값" />
@@ -408,7 +414,7 @@ export default function PolicyLiveScreen() {
 
             <Card title="2. 기준치 조정 · 새 버전 저장">
               <Text style={s.muted}>
-                백분율(%)을 입력하세요. 예: 1.00 = API 요청 passThreshold 0.0100. 검증 범위 밖이면 저장할 수 없습니다.
+                현재 정책의 허용 범위 안에서 백분율(%)을 입력하세요.
               </Text>
               <Text style={s.label}>새 기준치 입력 (%)</Text>
               <TextInput style={s.input} value={percentInput}
@@ -417,7 +423,7 @@ export default function PolicyLiveScreen() {
                 editable={canWrite && activeHasBounds} selectTextOnFocus
                 accessibilityLabel="새 자동 통과 기준 백분율" />
               <Text style={[s.hint, !validInput && s.errorText]}>{validationText}</Text>
-              <Button title={writing === 'save' ? '새 버전 저장 중…' : '새 정책 버전 저장 · 실서버'}
+              <Button title={writing === 'save' ? '새 버전 저장 중…' : '새 정책 버전 저장'}
                 onPress={confirmSave} disabled={!canWrite || !validInput} />
               <Text style={s.muted}>저장 직후 새 정책은 비활성이며, 이전 활성 정책은 그대로 유지됩니다.</Text>
             </Card>
@@ -430,7 +436,7 @@ export default function PolicyLiveScreen() {
                 <Row label="불량 검증 범위" value={autoFailRangeLabelV4(currentSaved.failValidatedMin,currentSaved.failValidatedMax)} />
                 <Row label="현재 상태" value={currentSaved.active ? '적용 중' : '비활성 (별도 적용 필요)'} />
                 {!currentSaved.active && (
-                  <Button title="새 버전 적용 · 실서버"
+                  <Button title="새 버전 적용"
                     onPress={() => confirmActivate(currentSaved)}
                     disabled={!canWrite || !currentSaved.ready} />
                 )}
@@ -453,7 +459,7 @@ export default function PolicyLiveScreen() {
                       {policy.policyVersion}{policy.active ? ' · 적용 중' : ''}
                     </Text>
                     <Row label="기준치" value={percentageTextV4(policy.passThreshold)} />
-                    <Row label="상태" value={`${policy.ready ? 'ready' : '미준비'} · ${policy.active ? 'active' : '비활성'}`} />
+                    <Row label="상태" value={`${policy.ready ? '준비됨' : '미준비'} · ${policy.active ? '적용 중' : '비활성'}`} />
                     <Row label="자동 불량" value={policy.autoFailEnabled===null?'미지원':policy.autoFailEnabled?'켜짐':'꺼짐'} />
                     <Row label="불량 기준" value={percentageTextV4(policy.failThreshold,4)} />
                     <Row label="불량 검증 범위" value={autoFailRangeLabelV4(policy.failValidatedMin,policy.failValidatedMax)} />
@@ -465,7 +471,7 @@ export default function PolicyLiveScreen() {
                     {isOriginal && <Text style={s.muted}>원본 정책 버전</Text>}
                     {canActivate && (
                       <Button secondary
-                        title={isOriginal ? '원래 정책 복귀 · 실서버' : '이 정책 적용 · 실서버'}
+                        title={isOriginal ? '원래 정책으로 복귀' : '이 정책 적용'}
                         onPress={() => confirmActivate(policy)} disabled={!canWrite} />
                     )}
                   </View>
@@ -481,7 +487,7 @@ export default function PolicyLiveScreen() {
             {actionNotice && <View style={s.successCard}><Text style={s.successText}>{actionNotice}</Text></View>}
             {actionError && <View style={s.errorCard}><Text style={s.errorText}>{actionError}</Text></View>}
             <Text style={s.footer}>
-              동일한 사진을 다시 접수해야 정책 변경 전후의 AUTO_PASS / REVIEW 차이를 관찰할 수 있습니다. 기존 검사 기록은 소급 변경되지 않습니다.
+              각 검사의 이력에는 접수 당시 적용한 정책이 표시됩니다.
             </Text>
           </>
         )}
