@@ -1,7 +1,7 @@
 import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {router,Stack,useFocusEffect} from 'expo-router';
-import {ActivityIndicator,Alert,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Alert,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {authV4} from '../api/backendV4/authRuntime';
 import {createJudgementRequestServiceV4} from '../api/backendV4/judgementRequestServiceV4';
@@ -30,6 +30,16 @@ export default function JudgementRequestsAdminLiveScreen(){
   const [message,setMessage]=useState<string|null>(null);
   const generation=useRef(0),locked=useRef(false),mounted=useRef(true);
   const confirmation=useRef(0);
+  const scrollRef=useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const noteRef=useRef<React.ComponentRef<typeof TextInput>>(null);
+  const revealNote=()=>{
+    const input=noteRef.current;
+    const content=scrollRef.current?.getInnerViewRef();
+    if(!input?.isFocused()||!content)return;
+    input.measureLayout(content,(_x,y)=>{
+      if(input.isFocused())scrollRef.current?.scrollTo({y:Math.max(0,y-12),animated:false});
+    });
+  };
   const sessionEpoch=useRef(authV4.sessionEpoch()).current;
 
   useFocusEffect(useCallback(()=>()=>{ confirmation.current++; },[]));
@@ -97,14 +107,14 @@ export default function JudgementRequestsAdminLiveScreen(){
   };
   return <SafeAreaView style={s.root}>
     <Stack.Screen options={{headerShown:false}}/>
-    <View style={s.top}>
-      <Pressable onPress={()=>router.back()}><Text style={s.link}>‹ 관리자 화면으로</Text></Pressable>
-      <Text style={s.title}>판정 확인 요청 관리</Text>
-      <Text style={s.muted}>요청별 유지·정정 근거를 남깁니다. 최초 판정은 보존됩니다.</Text>
-    </View>
-    <ScrollView style={{flex:1}} contentContainerStyle={s.body}
-      automaticallyAdjustKeyboardInsets={true}
-      keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+    <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <ScrollView ref={scrollRef} style={{flex:1}} contentContainerStyle={s.body}
+      onLayout={revealNote} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
+      <View style={s.top}>
+        <Pressable onPress={()=>router.back()}><Text style={s.link}>‹ 관리자 화면으로</Text></Pressable>
+        <Text style={s.title}>판정 확인 요청 관리</Text>
+        <Text style={s.muted}>요청별 유지·정정 근거를 남깁니다. 최초 판정은 보존됩니다.</Text>
+      </View>
       {authLoading?<ActivityIndicator/>:!admin?<Text style={s.error}>관리자 계정으로 로그인해 주세요.</Text>:<>
         <View style={s.card}>
           <Text style={s.strong}>조회 상태</Text>
@@ -171,12 +181,8 @@ export default function JudgementRequestsAdminLiveScreen(){
               </Pressable>)}
             </View>
             <Text style={s.strong}>관리자 처리 근거 (필수, 1~500자)</Text>
-            <TextInput style={s.input} value={note} editable={!processing} onChangeText={text=>{confirmation.current++;setNote(text);}} multiline
+            <TextInput ref={noteRef} onFocus={revealNote} style={s.input} value={note} editable={!processing} onChangeText={text=>{confirmation.current++;setNote(text);}} multiline
               maxLength={500} placeholder="검토 근거를 입력해 주세요." placeholderTextColor="#64748B" />
-            <Pressable style={[s.submit,processing&&s.disabled]} disabled={processing}
-              onPress={confirm}><Text style={s.submitText}>
-                {processing?'처리 중…':decision==='KEEP'?'판정 유지 전 최종 확인':'정정 기록 전 최종 확인'}
-              </Text></Pressable>
           </>:<>
             <Text style={s.success}>{judgementRequestStatusLabelV4(selected.status)}</Text>
             <Text style={s.muted}>관리자: {selected.resolvedBy??'미제공'}</Text>
@@ -185,11 +191,23 @@ export default function JudgementRequestsAdminLiveScreen(){
         </View>}
       </>}
     </ScrollView>
+    {admin && !authLoading && selected?.status==='OPEN' && (
+      <View style={s.footer}>
+        <Pressable accessibilityRole="button" accessibilityState={{disabled:processing}}
+          style={[s.submit,processing&&s.disabled]} disabled={processing} onPress={confirm}>
+          <Text style={s.submitText}>
+            {processing?'처리 중…':decision==='KEEP'?'판정 유지 전 최종 확인':'정정 기록 전 최종 확인'}
+          </Text>
+        </Pressable>
+      </View>
+    )}
+    </KeyboardAvoidingView>
   </SafeAreaView>;
 }
 const s=StyleSheet.create({
- root:{flex:1,backgroundColor:'#F5F7FB'},top:{padding:18,gap:8},title:{fontSize:22,fontWeight:'700',color:'#111827'},
- body:{paddingHorizontal:18,paddingBottom:28,gap:12},
+ root:{flex:1,backgroundColor:'#F5F7FB'},top:{paddingVertical:18,gap:8},title:{fontSize:22,fontWeight:'700',color:'#111827'},
+ body:{paddingHorizontal:18,paddingBottom:16,gap:12},
+ footer:{paddingHorizontal:18,paddingVertical:8,borderTopWidth:StyleSheet.hairlineWidth,borderColor:'#E4E7EC',backgroundColor:'#FFFFFF'},
  card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:14,gap:12},
  link:{fontSize:12,color:'#2054D8',fontWeight:'700'},strong:{fontSize:13,color:'#111827',fontWeight:'700'},
  muted:{fontSize:12,color:'#64748B',lineHeight:18},error:{fontSize:12,color:'#B42318',lineHeight:18},

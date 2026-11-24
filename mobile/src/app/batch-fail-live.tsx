@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
-  ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet,
+  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
   Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -238,7 +238,8 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
           검사를 하나씩 상세 검토한 뒤 직접 선택합니다. 서버에 제출하면 건별로 FAIL 판정이 기록됩니다.
         </Text>
       </View>
-      <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={{flex:1}} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {authLoading ? <ActivityIndicator /> : role !== 'WORKER' ? (
           <View style={s.card}><Text style={s.error}>작업자 계정으로 로그인하면 일괄 판정을 사용할 수 있습니다.</Text></View>
         ) : (
@@ -338,6 +339,7 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
           </>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
       {/* 목록과 독립된 상세 검토 화면: 뒤로 가면 기존 목록 스크롤 위치 유지. */}
       <Modal
         visible={previewLoading || preview !== null || previewError !== null}

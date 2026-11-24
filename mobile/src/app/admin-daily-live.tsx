@@ -1,6 +1,6 @@
 import React,{useCallback,useRef,useState} from 'react';
 import {router,Stack,useFocusEffect} from 'expo-router';
-import {ActivityIndicator,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {authV4} from '../api/backendV4/authRuntime';
 import {createDailyHistoryServiceV4} from '../api/backendV4/adminDailyHistoryServiceV4';
@@ -94,7 +94,8 @@ export default function AdminDailyLiveScreen(){
      <Text style={s.title}>날짜별 자동 판정 이력</Text>
      <Text style={s.muted}>관리자 · 한국 시간 기준</Text>
    </View>
-   <ScrollView style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
+   <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+   <ScrollView style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
      {access==='checking'&&<ActivityIndicator/>}
      {access==='denied'&&<View style={s.card}>
        <Text style={s.error}>날짜별 자동 판정 이력은 관리자 계정에서 조회할 수 있습니다.</Text>
@@ -170,6 +171,7 @@ export default function AdminDailyLiveScreen(){
        <Text style={s.muted}>통계의 '판정 완료'는 조회 시점 기준입니다. 정책 변경이 과거 검사를 소급 변경하지 않습니다. 집계의 ‘확인 자료 없음’은 관리자가 유지 또는 정정 처리한 검사가 0건이라는 뜻입니다. 기준 상세의 ‘자료 없음’은 실물 판정 참고 자료가 없다는 뜻입니다. 실물 기준으로 확인한 자료가 있어야 품질 정확도나 미검출률을 평가할 수 있습니다.</Text>
      </>}
    </ScrollView>
+   </KeyboardAvoidingView>
  </SafeAreaView>;
 }
 const s=StyleSheet.create({

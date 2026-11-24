@@ -3,6 +3,8 @@ import React, { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   
   ScrollView,
   StyleSheet,
@@ -161,7 +163,8 @@ export default function HistoryLiveScreenV4() {
         <Text style={styles.subtitle}>상태 · 기간 · 부품별 검사 기록 조회</Text>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <View style={styles.card}>
           <Text style={styles.filterTitle}>검사 상태</Text>
           <View style={styles.chipRow}>
@@ -316,6 +319,7 @@ export default function HistoryLiveScreenV4() {
           <Text style={styles.caption}>서버가 다음 페이지 여부를 제공하지 않아 임의로 다음 페이지를 추정하지 않습니다.</Text>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <View style={styles.bottomNav}>
         <Pressable style={styles.navItem} onPress={toMonitor} accessibilityRole="button">

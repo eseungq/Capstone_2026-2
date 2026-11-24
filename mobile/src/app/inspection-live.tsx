@@ -6,6 +6,8 @@ import {
   Alert,
   AppState,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -574,7 +576,8 @@ export default function InspectionLiveScreen() {
         <Text style={styles.muted}>{visibleDetail ? visibleDetail.partCode + ' · ' + visibleDetail.inspectionNo : '검사 결과 조회'}</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.body}>
+      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={{flex:1}} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {refreshing && !loading && (
           <Text style={styles.muted}>서버에서 최신 상세 정보를 확인하는 중…</Text>
         )}
@@ -978,6 +981,7 @@ export default function InspectionLiveScreen() {
           </>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

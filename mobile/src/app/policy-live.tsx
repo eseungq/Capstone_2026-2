@@ -2,7 +2,7 @@ import Pressable from '../components/TouchPressable';
 import React, { useCallback, useRef, useState } from 'react';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import {
-  ActivityIndicator, Alert,  ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -348,7 +348,8 @@ export default function PolicyLiveScreen() {
         <Text style={s.title}>카울커버 자동 판정 정책</Text>
         <Text style={s.subtitle}>관리자 · COWL_COVER</Text>
       </View>
-      <ScrollView style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <View style={s.notice}>
           <Text style={s.noticeText}>
             통과·불량 기준을 저장하면 새 정책 버전이 생깁니다. 적용할 버전을 선택해야 새 검사에 반영됩니다.
@@ -518,6 +519,7 @@ export default function PolicyLiveScreen() {
           </>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
