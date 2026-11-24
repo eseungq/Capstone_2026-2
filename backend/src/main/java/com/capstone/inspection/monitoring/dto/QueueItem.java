@@ -13,6 +13,8 @@ public record QueueItem(String inspectionId,
                         DisplayState displayState,        // REVIEW_PENDING 또는 FAILED
                         PredictedQuality predictedQuality,
                         ReviewReason reviewReason,
+                        Double calibratedDefectProbability, // 보정 불량 확률, 없으면 null [제안 11/23]
+                        Double passThresholdApplied,      // 판정 당시 기준치, 없으면 null [제안 11/23]
                         String errorCode,                 // FAILED일 때만
                         OffsetDateTime receivedAt,
                         String thumbnailUrl) {

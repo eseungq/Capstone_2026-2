@@ -10,6 +10,7 @@ import com.capstone.inspection.domain.inspection.Inspection;
 import com.capstone.inspection.domain.inspection.InspectionRepository;
 import com.capstone.inspection.domain.inspection.InspectionRepository.PartCount;
 import com.capstone.inspection.domain.inspection.InspectionRepository.PartLastReceived;
+import com.capstone.inspection.domain.inspection.PredictedQuality;
 import com.capstone.inspection.domain.model.AiModelRepository;
 import com.capstone.inspection.domain.model.AutomationPolicyRepository;
 import com.capstone.inspection.domain.part.InspectionItem;
@@ -29,6 +30,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,9 @@ public class MonitoringService {
     public static final int MAX_QUEUE_SIZE = 100;
     // 확인 필요 목록: 오래된 순 (먼저 들어온 사진부터 확인)
     private static final Sort QUEUE_SORT = Sort.by(Sort.Order.asc("receivedAt"), Sort.Order.asc("id"));
+    // sort=PRIORITY 그룹 번호 (커서에 남김)
+    private static final int PRIORITY_GROUP = 0;
+    private static final int REST_GROUP = 1;
     private static final Comparator<Inspection> NEWEST_FIRST = Comparator.comparing(Inspection::getReceivedAt)
             .thenComparing(Inspection::getId).reversed();
 
@@ -94,11 +99,37 @@ public class MonitoringService {
         }).toList();
     }
 
-    // 확인 필요 목록: REVIEW_PENDING + 재검사하지 않은 FAILED, 오래된 순, 커서 페이지
-    public QueueResponse queue(QueueType type, String partCode, String cursor, int size) {
+    // 확인 필요 목록: REVIEW_PENDING + 재검사하지 않은 FAILED, 커서 페이지
+    //   기본은 오래된 순. PRIORITY는 GOOD·기준 초과 REVIEW 그룹을 먼저 읽고 모자라면 나머지 그룹을 이어 읽음 (계약 6.4)
+    public QueueResponse queue(QueueType type, String partCode, PredictedQuality predictedQuality, QueueSort sort,
+                               String cursor, int size) {
         if (size < 1 || size > MAX_QUEUE_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_PARAMETER, "size는 1~" + MAX_QUEUE_SIZE + "이어야 합니다.");
         }
+        QueueSort order = sort == null ? QueueSort.RECEIVED : sort;
+        QueueCursor after = cursor == null || cursor.isBlank() ? null : QueueCursor.decode(cursor.trim(), order);
+        Specification<Inspection> base = queueTarget(type, partCode, predictedQuality);
+
+        // size+1건을 읽어 다음 페이지 유무 판단
+        List<QueueRow> rows = order == QueueSort.PRIORITY
+                ? priorityRows(base, after, size + 1)
+                : fetchRows(base, null, after, size + 1);
+        boolean hasNext = rows.size() > size;
+        List<QueueRow> page = hasNext ? rows.subList(0, size) : rows;
+        List<Inspection> inspections = page.stream().map(QueueRow::inspection).toList();
+        Map<String, String> urls = thumbnails.urlsFor(inspections);
+        List<QueueItem> items = inspections.stream().map(i -> new QueueItem(i.getId(), i.getInspectionNo(),
+                i.getPart().getPartCode(), DisplayState.of(i), i.getPredictedQuality(), i.getReviewReason(),
+                i.getCalibratedDefectProbability(), i.getPassThresholdApplied(),
+                InspectionQueryService.errorCodeOf(i), Times.toOffset(i.getReceivedAt()), urls.get(i.getId()))).toList();
+        QueueRow last = page.isEmpty() ? null : page.get(page.size() - 1);
+        String nextCursor = hasNext
+                ? new QueueCursor(last.group(), last.inspection().getReceivedAt(), last.inspection().getId()).encode()
+                : null;
+        return new QueueResponse(items, nextCursor);
+    }
+
+    private Specification<Inspection> queueTarget(QueueType type, String partCode, PredictedQuality predictedQuality) {
         Specification<Inspection> target = switch (type == null ? QueueType.ALL : type) {
             case REVIEW -> InspectionSpecs.reviewPending();
             case FAILED -> InspectionSpecs.failedNotRetried();
@@ -110,22 +141,31 @@ public class MonitoringService {
                     .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_PART_CODE));
             spec = spec.and(InspectionSpecs.partId(part.getId()));
         }
-        if (cursor != null && !cursor.isBlank()) {
-            QueueCursor c = QueueCursor.decode(cursor.trim());
-            spec = spec.and(InspectionSpecs.after(c.receivedAt(), c.id()));
-        }
+        // 예측이 없는 FAILED·수동 판정은 예측 필터를 주면 나오지 않음
+        return predictedQuality == null ? spec : spec.and(InspectionSpecs.predictedQuality(predictedQuality));
+    }
 
-        // size+1건을 읽어 다음 페이지 유무 판단
-        List<Inspection> rows = inspectionRepository.findBy(spec, q -> q.sortBy(QUEUE_SORT).limit(size + 1).all());
-        boolean hasNext = rows.size() > size;
-        List<Inspection> page = hasNext ? rows.subList(0, size) : rows;
-        Map<String, String> urls = thumbnails.urlsFor(page);
-        List<QueueItem> items = page.stream().map(i -> new QueueItem(i.getId(), i.getInspectionNo(),
-                i.getPart().getPartCode(), DisplayState.of(i), i.getPredictedQuality(), i.getReviewReason(),
-                InspectionQueryService.errorCodeOf(i), Times.toOffset(i.getReceivedAt()), urls.get(i.getId()))).toList();
-        Inspection last = page.isEmpty() ? null : page.get(page.size() - 1);
-        String nextCursor = hasNext ? new QueueCursor(last.getReceivedAt(), last.getId()).encode() : null;
-        return new QueueResponse(items, nextCursor);
+    // 우선 그룹(0) → 나머지(1) 순서. 커서가 나머지 그룹이면 우선 그룹은 이미 다 읽은 것
+    private List<QueueRow> priorityRows(Specification<Inspection> base, QueueCursor after, int limit) {
+        List<QueueRow> rows = new ArrayList<>();
+        int startGroup = after == null ? PRIORITY_GROUP : after.group();
+        for (int group = startGroup; group <= REST_GROUP && rows.size() < limit; group++) {
+            Specification<Inspection> spec = base.and(group == PRIORITY_GROUP
+                    ? InspectionSpecs.priorityReview() : InspectionSpecs.notPriorityReview());
+            QueueCursor groupAfter = after != null && after.group() == group ? after : null;
+            rows.addAll(fetchRows(spec, group, groupAfter, limit - rows.size()));
+        }
+        return rows;
+    }
+
+    private List<QueueRow> fetchRows(Specification<Inspection> spec, Integer group, QueueCursor after, int limit) {
+        Specification<Inspection> paged = after == null ? spec
+                : spec.and(InspectionSpecs.after(after.receivedAt(), after.id()));
+        return inspectionRepository.findBy(paged, q -> q.sortBy(QUEUE_SORT).limit(limit).all()).stream()
+                .map(i -> new QueueRow(i, group)).toList();
+    }
+
+    private record QueueRow(Inspection inspection, Integer group) {
     }
 
     private static Map<String, Long> toMap(List<PartCount> counts) {
