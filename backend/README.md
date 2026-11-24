@@ -2,17 +2,21 @@
 
 담당: 이승규 · 기준 문서: [백엔드 API 계약 v4](../docs/백엔드_API계약_v4.md)
 
-현재 구현 범위 (11/18)
+현재 구현 범위 (11/25)
 - 인증: 로그인·토큰 재발급·로그아웃, 역할(WORKER·ADMIN·DEVICE)별 접근 제어, 로그인 5회 실패 잠금
 - 사진 접수(비동기): `POST /api/v1/inspections` → 202, 스레드 풀(1개, 11/04 실측으로 2→1)에서 AI 호출·응답 검증·정책 적용
 - 검사 상세: `GET /api/v1/inspections/{id}` (AI·정책·판정·이미지 블록, 만료되는 이미지 주소)
 - 검사 이력: `GET /api/v1/inspections` (부품·displayState·AI-작업자 불일치(`mismatch`, #32)·기간 필터, 페이지)
 - 모니터링: `GET /api/v1/monitoring/parts` (부품별 요약), `GET /api/v1/monitoring/queue` (확인 필요 목록, 커서)
+- 확인 필요 목록 정렬·필터: `sort=PRIORITY`(AI 불량 의심 우선, 커서 유지)와 예측 필터 `predictedQuality` (계약 6.4, #49)
 - 작업자 확인: `POST /api/v1/inspections/{id}/confirm` (WORKER만)
+- 일괄 FAIL: `POST /api/v1/inspections/confirm-batch` (WORKER, FAIL만 1~50건, 건별 결과·순서 반환, 같은 요청은 처음 `batch_id` 유지, V11, 계약 6.7.1, #50)
+- 판정 확인 요청·정정: `POST /api/v1/inspections/{id}/judgement-requests` (WORKER, 시스템 판정 건에 대기 1건), `GET /api/v1/admin/judgement-requests`, `POST /api/v1/admin/judgement-requests/{id}/resolve` (ADMIN, 유지·정정, 최초 판정은 보존, V12, 계약 6.12, #51). 상세 `judgementRequests`는 역할과 상관없이 요청자 이름·사유를 모두 보여 줌 (11/24 설계 확정)
+- 자동 불량 AUTO_FAIL: 정책 `autoFailEnabled`(기본 꺼짐)·`failThreshold`. 불량 기준 등록·조정 `POST /api/v1/admin/policies/{id}/fail-threshold`(새 버전 `-f번호`), 켜기·끄기 `POST /api/v1/admin/policies/{id}/auto-fail`(새 버전 `-a번호`, 기준 없이 켜면 409 `AUTO_FAIL_NOT_CONFIGURED`). 판정 당시 기준은 검사에 `failThresholdApplied`로 보존 (V13 정책·V14 검사, 계약 4.1·6.9, #52). 원격 푸시는 `app.push.auto-failed` 기본 꺼짐, 앱은 폴링 내부 알림
 - 재검사: `POST /api/v1/inspections/{id}/retry` (FAILED만, 새 검사 생성)
 - 수동 판정 전환: `POST /api/v1/inspections/{id}/manual` (WORKER, 모든 FAILED, AI 상태 확인 안 함) → 새 검사(`source=MANUAL`, `AI_UNAVAILABLE`)를 기존 confirm으로 판정. FAILED 1건당 재검사·수동 전환 중 1건 (V6, 계약 6.10)
 - 후보 기준치 비교: `GET /api/v1/admin/policies/{id}/simulation` (같은 모델·보정기 기록에 현재·후보 기준치 대입, 바뀌는 건의 작업자 PASS·FAIL·미확인, 조회만, 계약 6.9.1)
-- 날짜별 이력·기준 상세: `GET /api/v1/admin/automation/daily?partCode&from&to` (KST 날짜 × 판정 당시 정책·모델·보정기 행, 최대 92일, 수동 전환·분석 실패 따로, 판정 확인 요청 집계), `GET /api/v1/admin/automation/daily/detail?partCode&date&policyId&band` (기준 주변 REVIEW 두 구간, 계약 6.13 [제안])
+- 날짜별 이력·기준 상세: `GET /api/v1/admin/automation/daily?partCode&from&to` (KST 날짜 × 판정 당시 정책·모델·보정기 행, 최대 92일, 수동 전환·분석 실패 따로, 판정 확인 요청 집계), `GET /api/v1/admin/automation/daily/detail?partCode&date&policyId&band` (기준 주변 REVIEW 두 구간, 계약 6.13, #53). 날짜는 서울(KST) 기준이며 저장·조회 시각도 JVM 시간대와 상관없이 서울로 통일 (`Times`)
 - AUTO_PASS 표본 재확인: AUTO_PASS 뒤 보정 확률 구간별 비율로 표본 추출(V8 `auto_pass_recheck`), `GET /api/v1/rechecks`, `POST /api/v1/inspections/{id}/recheck` (WORKER, 시스템 판정은 그대로), 상세 `recheck` 블록 (계약 6.11 [제안]). **기본 꺼 둠**: `APP_RECHECK_ENABLED=true`로 켬
 - 공동시험 기록 (V9, 계약 6.11 [합의 11/18 김도현·홍승인]): 추출 규칙(`recheck_rule`, 버전 `v1-b40-80-p100-30-10` 자동 생성, 시험 이름 `APP_RECHECK_TRIAL_NAME` 선택)을 AUTO_PASS 판정 때 검사에 남기고 재처리도 그 규칙을 씀 · 관리자 확인함 `POST /api/v1/admin/rechecks/{id}/acknowledge` (재확인 FAIL만, 해결 완료 아님) · 요약 `GET /api/v1/admin/rechecks/summary` (규칙·구간별 건수, 결정 누락, 가중 추정, 가상 비교 비율, REVIEW·재확인 대기 시간, 화면 체류 시간) · REVIEW 확인·재확인 제출의 화면 체류 시간(`screenDwellMs`·`firstOpenedAt`·`openCount`, 선택) · 후보 기준치 비교에 예상 재확인 건수·재확인 라벨
 - 부품 목록: `GET /api/v1/parts` (모델 사용 가능·정책 적용 여부)
@@ -35,7 +39,7 @@
 ```bash
 docker compose up -d                 # MySQL 8.4 (DB/계정/비밀번호: inspection)
 ./gradlew build                      # 컴파일 + 단위·통합 테스트 (통합은 Docker 필요, 없으면 건너뜀)
-./gradlew bootRun                    # Flyway가 V1~V9와 개발용 시드(db/seed-dev) 적용
+./gradlew bootRun                    # Flyway가 V1~V14와 개발용 시드(db/seed-dev) 적용
 
 # 다른 터미널에서 Mock AI
 cd mock-ai
@@ -269,19 +273,20 @@ AI가 11/12 도어 e02 내부 평가를 다시 해 정한 시연 기준(기본 0
 ```
 auth/                로그인·재발급·로그아웃, JWT 필터, 401·403 공통 오류 응답
 ai/                  AI 클라이언트, 요청·응답 형식, 응답 계약 검증, 모델 로드 확인
-admin/               관리자 모델 조회, 정책 등록·조정·적용·중지, 후보 기준치 비교(PolicySimulation)
+admin/               관리자 모델 조회, 정책 등록·조정·적용·중지·불량 기준·자동 불량 켜기, 후보 기준치 비교(PolicySimulation), 날짜별 이력(DailyHistory)
 notification/        기기 토큰, Expo 푸시 발송
 part/ monitoring/    부품 목록, 공정 모니터링
 inspection/          접수(InspectionIntakeService), 비동기 분석(AnalysisDispatcher → InspectionAnalysisService),
                      정책 판정(PolicyEvaluator), 결과 저장(AnalysisResultWriter), 상세·이력 조회(InspectionQueryService·InspectionSpecs),
-                     CSV 내보내기(InspectionExportService), 재검사·수동 판정, 재시작 정리,
+                     CSV 내보내기(InspectionExportService), 재검사·수동 판정, 일괄 FAIL, 판정 확인 요청·정정, 재시작 정리,
                      표본 재확인(RecheckSampler·RecheckSweeper·RecheckService·RecheckSummary)
 storage/             로컬 이미지 저장, 서명된 만료 주소, 이미지 제공 API
 config/              AppProperties(app.*), Security, 분석 스레드 풀, Swagger
 common/              공통 응답·오류, traceId, 시각 변환
 domain/              엔티티·리포지토리
 resources/db/migration   V1 스키마, V2 부품, V3 인증, V4 모니터링·비동기·Grad-CAM, V5 무결성 제약(김남균),
-                         V6 수동 판정, V7 도어 검사항목 UNIFIED, V8 표본 재확인, V9 재확인 공동시험 기록
+                         V6 수동 판정, V7 도어 검사항목 UNIFIED, V8 표본 재확인, V9 재확인 공동시험 기록,
+                         V10 재확인 CHECK 보강, V11 일괄 FAIL(batch_id), V12 판정 확인 요청, V13 자동 불량 정책, V14 자동 불량 검사
 resources/db/seed-dev    개발용 계정·Mock 모델·예시 정책, 실제 DOOR 모델(비활성), 프레임·카울커버 모델과 시연 정책,
                          도어 시연 정책(비활성), 도어 e02 시연 보정기·정책(V7_1, 비활성)
 mock-ai/             Mock AI 추론 서버 (FastAPI)

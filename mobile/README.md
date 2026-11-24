@@ -2,6 +2,11 @@
 
 담당: 홍승인
 
+현재 상태 (11/25, 커밋·PR 기준. 홍승인 확인 필요)
+- 병합됨: 실서버 연동 로그인·모니터링(공정 선택·운영용 카드·사진)·검사 상세(사진 확대)·판정·재검사·이력·수동 판정 화면, 알림 배너, 관리자 정책 화면, 모니터링 썸네일 서명 URL 갱신 시 깜빡임 방지(11/18), 버튼 터치 피드백 통일
+- 11/24 공동시험(iPhone 실서버): 우선 검토 정렬·일괄 FAIL·판정 확인 요청·AUTO_FAIL 관리자 기준·날짜별 이력 화면을 통합 시험 빌드로 확인. 개별 PR #54~#59는 Draft이며 백엔드 #49~#53 병합(11/25)에 맞춰 Ready 전환 예정. #43(AUTO_PASS 표본 재확인 화면)은 보류, #62(설정에서 실서버 로그아웃 복구)는 Draft
+- 알려진 제한: 푸시 토큰 등록·수신 미구현(AUTO_FAIL 알림은 5초 폴링 앱 내부 알림), 통계 화면은 Mock, 확인 필요 일괄 화면의 정렬·필터는 후속 개선
+
 이 폴더에 들어갈 것
 - React Native (Expo Router) 앱 코드
 - 실행 방법 (Expo Go, 연결할 백엔드 주소 설정 방법)
@@ -33,6 +38,9 @@
 ```powershell
 cd mobile
 npm run test:door-demo
+npm run test:admin-policy
+npm run test:monitor-alerts
+npm run test:monitor-thumbnails
 npx tsc --noEmit
 ```
 

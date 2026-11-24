@@ -8,7 +8,7 @@
 - 모델: `door-swin-tiny-e02-28a2dd1cb40b-dev`, DOOR, Swin-Tiny 224, epoch 2.
 - SHA256: `28a2dd1cb40b4bbecf3fc4e34dfc5354179dcb31c0c37297f1d3ee3bfe3d985e`.
 - 11월 4일 실제 백엔드 연동에서 GOOD/DEFECT, JPEG CAM 저장, 4xx/503/timeout/연결 실패와 복구 후 재검사를 확인했습니다. B6 자연 발생 NO_ACTIVATION은 보류입니다.
-- 보정기와 보정 확률은 null. 검증된 AUTO_PASS 정책은 없습니다. 성공한 분석도 백엔드에서 REVIEW가 됩니다.
+- 서버 자체는 보정기 없이 실행하면 보정 확률이 null이라 성공한 분석도 백엔드에서 REVIEW가 됩니다. 11/17부터 시연 보정기를 켠 e02 서버(8785)로 AUTO_PASS를 실서버에서 확인했고(백엔드 점검표 F13), 이 값은 시연 기준이며 독립 검증된 운영 정책은 아닙니다.
 - CAM은 현재 운영의 7×7 norm1 Grad-CAM, 기존 색상, JPEG 품질 90입니다. 새 28×28 HiResCAM/JET 연구 결과는 운영에 넣지 않았습니다.
 - 이 브랜치는 실제 실행 코드의 공유본입니다. 운영 DGX 파일을 변경하지 않았습니다. 개인 경로/팀 주소는 환경변수로 분리했으며 추론·CAM 계산 메서드는 AST로 동일함을 확인합니다.
 
@@ -48,7 +48,7 @@ predict 요청은 JSON Content-Length가 필요합니다. 현재 chunked 요청�
 ## 판정과 시간 계약
 
 - AI는 raw softmax 불량 점수 0.5를 기준으로 GOOD/DEFECT를 반환합니다. 이 값은 passThreshold와 별개입니다.
-- AUTO_PASS/REVIEW는 백엔드가 결정합니다. DEFECT는 항상 REVIEW, GOOD도 호환 정책 ready·active 및 유효한 보정 확률/기준치 조건을 모두 만족해야 AUTO_PASS입니다. 자동 FAIL은 없습니다.
+- AUTO_PASS/REVIEW는 백엔드가 결정합니다. DEFECT는 항상 REVIEW, GOOD도 호환 정책 ready·active 및 유효한 보정 확률/기준치 조건을 모두 만족해야 AUTO_PASS입니다. 자동 FAIL(AUTO_FAIL)은 11/23부터 백엔드 정책에서 켠 경우에만 동작합니다(기본 꺼짐, 불량 기준 이상인 DEFECT 예측). AI 서버는 판정하지 않고 확률만 반환하며, 11/24 공동시험의 카울커버 AUTO_FAIL 기준은 기능 점검용 값입니다.
 - `inferenceTimeMs`: handler 진입부터 응답 JSON 직렬화 직전까지. 이미지 다운로드·모델 잠금 대기·추론·CAM·JPEG 인코딩을 포함합니다. 직렬화·응답 전송·백엔드 후처리는 제외합니다.
 - e02의 `requests.jsonl`에는 `requestId`로 연결되는 서비스 로그와 `wire_response` 로그가 남습니다. 서비스 로그의 구간별 시간은 모두 밀리초입니다.
   - `imageDownloadMs`는 이미지 출처 검사와 이미지 본문 다운로드에 걸린 시간입니다.
