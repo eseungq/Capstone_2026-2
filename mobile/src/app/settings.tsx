@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // Mock 모드와 실제 서버 세션을 분리하여 표시합니다.
 type Role = 'WORKER' | 'ADMIN';
 type Mode = 'live' | 'mock';
+type VerifiedFocus = { epoch: number };
 
 const color = {
   background: '#F5F7FB',
@@ -89,39 +90,47 @@ export default function SettingsScreen() {
   const [checkingSession, setCheckingSession] = useState(mode === 'live');
   const [loggingOut, setLoggingOut] = useState(false);
   const logoutLock = useRef(false);
+  const verifiedFocus = useRef<VerifiedFocus | null>(null);
 
   // 실서버 권한은 URL role 파라미터가 아니라 SecureStore의 로그인 세션으로 확인합니다.
   useFocusEffect(useCallback(() => {
+    verifiedFocus.current = null;
     if (mode !== 'live') {
       setCheckingSession(false);
       return;
     }
     let active = true;
+    const focus = { epoch: authV4.sessionEpoch() };
     setCheckingSession(true);
     void authV4.restore().then((session) => {
       if (!active) return;
-      const verified = session.signedIn &&
+      const verified = authV4.sessionEpoch() === focus.epoch && session.signedIn &&
         (session.role === 'WORKER' || session.role === 'ADMIN') ? session.role : null;
+      verifiedFocus.current = verified ? focus : null;
       setLiveRole(verified);
     }).catch(() => {
       if (active) setLiveRole(null);
     }).finally(() => {
       if (active) setCheckingSession(false);
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+      verifiedFocus.current = null;
+    };
   }, [mode]));
 
   const role: Role | null = mode === 'live' ? liveRole : mockRole;
   const isAdmin = role === 'ADMIN';
 
-  const performLiveLogout = async () => {
-    if (logoutLock.current) return;
+  const performLiveLogout = async (origin: VerifiedFocus) => {
+    if (logoutLock.current || verifiedFocus.current !== origin || authV4.sessionEpoch() !== origin.epoch) return;
     logoutLock.current = true;
     setLoggingOut(true);
+    let logoutEpoch = origin.epoch;
     try {
       // 서버 Refresh Token 폐기를 시도하고, 실패해도 기기의 SecureStore는 삭제합니다.
       const completion = authV4.logout();
-      const logoutEpoch = authV4.sessionEpoch();
+      logoutEpoch = authV4.sessionEpoch();
       const { remoteRevoked } = await completion;
       // Local logout already reset the stack; a later account must not receive this alert.
       if (!remoteRevoked && authV4.sessionEpoch() === logoutEpoch) {
@@ -132,10 +141,12 @@ export default function SettingsScreen() {
       }
     } catch {
       // SecureStore 삭제가 실패할 경우 로그아웃됐다고 표시하거나 화면을 이동하지 않습니다.
-      Alert.alert(
-        '로그아웃을 완료하지 못했습니다',
-        '기기에 저장된 로그인 정보 삭제를 확인할 수 없습니다. 다시 시도해 주세요.',
-      );
+      if (authV4.sessionEpoch() === logoutEpoch) {
+        Alert.alert(
+          '로그아웃을 완료하지 못했습니다',
+          '기기에 저장된 로그인 정보 삭제를 확인할 수 없습니다. 다시 시도해 주세요.',
+        );
+      }
     } finally {
       setLoggingOut(false);
       logoutLock.current = false;
@@ -155,12 +166,14 @@ export default function SettingsScreen() {
       );
       return;
     }
+    const origin = verifiedFocus.current;
+    if (!origin || authV4.sessionEpoch() !== origin.epoch) return;
     Alert.alert(
       '로그아웃',
       '이 기기에서 로그아웃할까요?',
       [
         { text: '취소', style: 'cancel' },
-        { text: '로그아웃', style: 'destructive', onPress: () => { void performLiveLogout(); } },
+        { text: '로그아웃', style: 'destructive', onPress: () => { void performLiveLogout(origin); } },
       ],
     );
   };

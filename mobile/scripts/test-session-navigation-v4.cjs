@@ -121,3 +121,102 @@ test('the installed Expo screen dispatches a concrete reset and native Back cann
   assert.deepEqual(reset.routes.map(({ name }) => name), ['index']);
   assert.equal(stack.getStateForAction(reset, goBack(), config), RouterActionHandling.Unhandled);
 });
+
+// Render the Settings function with controllable focus, hooks, alerts and auth.
+// Native confirmation callbacks can outlive both their screen and account.
+function settingsFixture() {
+  const slots = [];
+  const alerts = [];
+  let cursor = 0, epoch = 1, focusEffect, blur, completion;
+  function slot(initial) {
+    const index = cursor++;
+    return slots[index] ??= { current: initial };
+  }
+  const authV4 = {
+    restore: async () => worker,
+    sessionEpoch: () => epoch,
+    logout() {
+      epoch++;
+      return new Promise((resolve, reject) => { completion = { resolve, reject }; });
+    },
+  };
+  const mocks = {
+    react: {
+      useRef: slot, useCallback: (callback) => callback,
+      useState(initial) {
+        const state = slot(initial);
+        return [state.current, (value) => { state.current = value; }];
+      },
+    },
+    'expo-router': {
+      Stack: { Screen: 'Screen' }, useFocusEffect: (effect) => { focusEffect = effect; },
+      useLocalSearchParams: () => ({ mode: 'live' }),
+    },
+    'react-native': {
+      Alert: { alert: (...args) => alerts.push(args) }, StyleSheet: { create: (styles) => styles },
+      ActivityIndicator: 'ActivityIndicator', View: 'View', Text: 'Text', ScrollView: 'ScrollView',
+    },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    '../api/backendV4/authRuntime': { authV4 },
+    '../components/TouchPressable': 'Pressable',
+  };
+  const filename = path.join(__dirname, '../src/app/settings.tsx');
+  const screen = new Module(filename, module);
+  screen.require = (id) => mocks[id] ?? require(id);
+  const { outputText } = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    fileName: filename, compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+  });
+  screen._compile(outputText, filename);
+  function render() { cursor = 0; return screen.exports.default(); }
+  function logoutButton(node) {
+    if (Array.isArray(node)) return node.map(logoutButton).find(Boolean);
+    if (!node?.props) return;
+    if (node.type === 'Pressable' && node.props.children?.props?.children === '로그아웃') return node;
+    return logoutButton(node.props.children);
+  }
+  return {
+    async focus() { render(); blur = focusEffect(); await flush(); },
+    blur: () => blur(),
+    confirm() {
+      logoutButton(render()).props.onPress();
+      return alerts.pop()[2].find((button) => button.style === 'destructive').onPress;
+    },
+    changeAccount: () => { epoch++; },
+    get completion() { return completion; },
+    alerts,
+  };
+}
+
+test('a pending native logout confirmation loses authority on blur, refocus, or account change', async () => {
+  const settings = settingsFixture();
+  await settings.focus();
+  const previousFocus = settings.confirm();
+  settings.blur();
+  previousFocus();
+  assert.equal(settings.completion, undefined);
+  await settings.focus();
+  previousFocus();
+  assert.equal(settings.completion, undefined);
+  const previousAccount = settings.confirm();
+  settings.changeAccount();
+  previousAccount();
+  assert.equal(settings.completion, undefined);
+});
+
+test('logout completion can notify after blur, but neither offline nor storage errors notify a newer account', async () => {
+  for (const newerAccount of [false, true]) {
+    for (const storageError of [false, true]) {
+      const settings = settingsFixture();
+      await settings.focus();
+      settings.confirm()();
+      settings.blur();
+      if (newerAccount) settings.changeAccount();
+      if (storageError) settings.completion.reject(new Error('vault unavailable'));
+      else settings.completion.resolve({ remoteRevoked: false });
+      await flush();
+      assert.deepEqual(settings.alerts.map(([title]) => title), newerAccount ? [] :
+        [storageError ? '로그아웃을 완료하지 못했습니다' : '이 기기에서 로그아웃됨']);
+    }
+  }
+});
