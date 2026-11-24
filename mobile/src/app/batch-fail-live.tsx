@@ -12,7 +12,7 @@ import type { QueueItemV4 } from '../api/backendV4/inspectionReadCore';
 import type { InspectionViewV4 } from '../api/backendV4/types';
 import {
   batchFailResultLabelV4, MAX_BATCH_FAIL_V4,
-  selectableReviewForBatchV4,
+  selectableReviewForBatchV4, canReviewBatchImagesV4, type BatchReviewImageStateV4,
   type BatchFailReplyV4, type BatchFailSelectionV4,
 } from '../api/backendV4/batchFailCoreV4';
 import { createBatchFailServiceV4 } from '../api/backendV4/batchFailServiceV4';
@@ -40,6 +40,9 @@ export default function BatchFailLiveScreen() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [reviewed, setReviewed] = useState(false);
+  const [originalState,setOriginalState] = useState<BatchReviewImageStateV4>('loading');
+  const [camState,setCamState] = useState<BatchReviewImageStateV4>('loading');
+  const previewItem = useRef<QueueItemV4 | null>(null);
   const [selected, setSelected] = useState<BatchFailSelectionV4[]>([]);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -101,6 +104,7 @@ export default function BatchFailLiveScreen() {
   // 닫은 뒤 늦게 도착한 서버 응답이 모달을 다시 열지 않도록 요청 세대를 무효화합니다.
   const closeDetail = () => {
     detailRequestId.current += 1;
+    previewItem.current = null;
     setPreview(null);
     setPreviewError(null);
     setReviewed(false);
@@ -110,6 +114,9 @@ export default function BatchFailLiveScreen() {
   const openDetail = async (item: QueueItemV4) => {
     if (previewLoading || submitting) return;
     const serial = ++detailRequestId.current;
+    previewItem.current = item;
+    setOriginalState('loading');
+    setCamState('loading');
     setPreview(null);
     setPreviewError(null);
     setReviewed(false);
@@ -126,8 +133,19 @@ export default function BatchFailLiveScreen() {
     }
   };
 
+  const imageSerial=detailRequestId.current;
+  const imagesReady=!!preview&&canReviewBatchImagesV4(preview.originalImageUrl??null,originalState,preview.gradcamImageUrl??null,camState);
+  const imageResult=(kind:'original'|'cam',state:BatchReviewImageStateV4)=>{
+    if(!mountedRef.current || imageSerial!==detailRequestId.current) return;
+    if(kind==='original')setOriginalState(state);else setCamState(state);
+    if(state!=='loaded')setReviewed(false);
+  };
+  const retryDetail=()=>{
+    if(previewItem.current&&!previewLoading)void openDetail(previewItem.current);
+  };
+
   const addSelection = () => {
-    if (!preview || !reviewed || role !== 'WORKER' || !preview.originalImageUrl) return;
+    if (!preview || !reviewed || role !== 'WORKER' || !imagesReady) return;
     try {
       const item = selectableReviewForBatchV4(preview);
       setSelected(old => {
@@ -292,7 +310,10 @@ export default function BatchFailLiveScreen() {
             <View style={s.card}>
               <Text style={s.cardTitle}>검사 상세 검토</Text>
               {previewLoading && <ActivityIndicator />}
-              {previewError && <Text style={s.error}>상세 조회 실패: {previewError}</Text>}
+              {previewError && <>
+                <Text style={s.error}>상세 조회 실패: {previewError}</Text>
+                <Pressable accessibilityRole="button" style={s.outline} onPress={retryDetail}><Text style={s.outlineText}>상세 다시 조회</Text></Pressable>
+              </>}
               {!preview && !previewLoading && !previewError && (
                 <Text style={s.muted}>위 목록에서 '상세 검토'를 눌러 원본과 AI 정보를 먼저 확인하세요.</Text>
               )}
@@ -304,21 +325,35 @@ export default function BatchFailLiveScreen() {
                   <Text style={s.muted}>현재 판정: {preview.finalJudgement ?? '미판정'}</Text>
                   <Text style={s.strong}>원본 사진</Text>
                   {preview.originalImageUrl ? (
-                    <Image style={s.photo} resizeMode="contain" source={{uri:preview.originalImageUrl}} />
+                    <>
+                      {originalState==='loading'&&<Text style={s.muted}>원본 사진을 불러오는 중…</Text>}
+                      <Image key={`original-${imageSerial}`} style={s.photo} resizeMode="contain" source={{uri:preview.originalImageUrl}}
+                        onLoad={()=>imageResult('original','loaded')} onError={()=>imageResult('original','failed')}/>
+                      {originalState==='failed'&&<Text style={s.error}>원본 사진 표시 실패. 이미지 다시 조회가 필요합니다.</Text>}
+                    </>
                   ) : <Text style={s.error}>원본 사진을 제공받지 못해 일괄 선택할 수 없습니다.</Text>}
                   <Text style={s.strong}>AI 판단 근거 이미지</Text>
                   {preview.gradcamImageUrl ? (
-                    <Image style={s.photo} resizeMode="contain" source={{uri:preview.gradcamImageUrl}} />
+                    <>
+                      {camState==='loading'&&<Text style={s.muted}>AI 판단 근거를 불러오는 중…</Text>}
+                      <Image key={`cam-${imageSerial}`} style={s.photo} resizeMode="contain" source={{uri:preview.gradcamImageUrl}}
+                        onLoad={()=>imageResult('cam','loaded')} onError={()=>imageResult('cam','failed')}/>
+                      {camState==='failed'&&<Text style={s.error}>AI 판단 근거 표시 실패. 이미지 다시 조회가 필요합니다.</Text>}
+                    </>
                   ) : <Text style={s.muted}>AI 판단 근거 이미지 없음 또는 제공 대상 아님</Text>}
+                  <Pressable accessibilityRole="button" style={s.outline} disabled={previewLoading} onPress={retryDetail}>
+                    <Text style={s.outlineText}>이미지 다시 조회</Text>
+                  </Pressable>
+                  {!imagesReady && <Text style={s.muted}>원본과 제공된 AI 판단 근거가 모두 표시되어야 검토 확인 및 선택할 수 있습니다.</Text>}
                   {preview.displayState === 'REVIEW_PENDING' && preview.originalImageUrl && (
                     <>
                       <Pressable accessibilityRole="checkbox"
-                        accessibilityState={{checked:reviewed}}
-                        style={s.line} onPress={()=>setReviewed(value=>!value)}>
+                        accessibilityState={{checked:reviewed,disabled:!imagesReady}} disabled={!imagesReady}
+                        style={[s.line,!imagesReady&&s.disabled]} onPress={()=>{if(imagesReady)setReviewed(value=>!value);}}>
                         <Text style={s.strong}>{reviewed ? '☑' : '□'} 이 검사의 원본과 AI 결과를 직접 검토했습니다.</Text>
                       </Pressable>
-                      <Pressable accessibilityRole="button" style={[s.action, !reviewed && s.disabled]}
-                        disabled={!reviewed || selected.length >= MAX_BATCH_FAIL_V4 ||
+                      <Pressable accessibilityRole="button" style={[s.action, (!reviewed||!imagesReady) && s.disabled]}
+                        disabled={!reviewed || !imagesReady || selected.length >= MAX_BATCH_FAIL_V4 ||
                           selected.some(x=>x.inspectionId === preview.inspectionId)}
                         onPress={addSelection}>
                         <Text style={s.actionText}>

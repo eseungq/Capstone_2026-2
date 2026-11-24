@@ -7,6 +7,15 @@ import type { BackendRole } from './authCore';
 import { assertWriteUuidV4, WriteV4ValidationError } from './inspectionWriteCore';
 
 export const MAX_BATCH_FAIL_V4 = 50;
+export type BatchReviewImageStateV4 = 'loading' | 'loaded' | 'failed';
+/** A returned image URL is not proof that the worker can actually see the image. */
+export function canReviewBatchImagesV4(
+  originalUrl: string | null, original: BatchReviewImageStateV4,
+  gradcamUrl: string | null, gradcam: BatchReviewImageStateV4,
+): boolean {
+  return !!originalUrl && original === 'loaded' &&
+    (!gradcamUrl || gradcam === 'loaded');
+}
 export interface BatchFailSelectionV4 {
   inspectionId: string;
   inspectionNo: string;
