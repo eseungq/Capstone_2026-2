@@ -2,8 +2,8 @@
 
 담당: 김남균
 
-실제 서버에 적용되는 스키마는 백엔드의 Flyway 마이그레이션입니다: [backend/src/main/resources/db/migration](../backend/src/main/resources/db/migration) (V1~V9 적용됨).
-설계를 바꿀 때는 **이미 적용된 V1~V9는 수정하지 않고** 다음 버전(V10~) 파일로 추가합니다. 이 폴더의 SQL은 Flyway에 넣지 않습니다.
+실제 서버에 적용되는 스키마는 백엔드의 Flyway 마이그레이션입니다: [backend/src/main/resources/db/migration](../backend/src/main/resources/db/migration) (V1~V14 적용됨).
+설계를 바꿀 때는 **이미 적용된 V1~V14는 수정하지 않고** 다음 버전(V15~) 파일로 추가합니다. 이 폴더의 SQL은 Flyway에 넣지 않습니다.
 
 저장 구조 기준: 계약 v4 9장(11/18 갱신) · 명세서 4.3 개정 문안(11/11) · [수동 판정 결정안](../docs/수동판정_결정안.md)
 
@@ -44,6 +44,6 @@
 
 ## 남은 확인
 
-- V10 예정 (2차 시험 전, 이승규 11/20): V9 `chk_insp_recheck_rule` NULL 구멍 보강, 추출 결정 일관성(sampled = draw_value < 비율), 시각 순서(재확인 ≥ 추출, 확인함 ≥ 재확인) CHECK 추가. 확인함 제약(chk_recheck_ack)의 NULL 구멍도 V10에서 보강. 그 전까지 무결성 점검 I18·I20·I21·I22로 확인. V10 적용 후 01_schema·03 위반 테스트에 반영
+- V10~V14는 적용됐지만 이 폴더의 `01_schema.sql`·`03_negative_tests.sql`·`04_integrity_checks.sql`·ERD는 아직 V9 기준입니다. 반영 대상: V10 재확인 CHECK 보강, V11 `batch_id`, V12 판정 확인 요청(대기 1건 UNIQUE), V13·V14 자동 불량(`auto_fail_enabled`·`fail_threshold`·`fail_threshold_applied`, `chk_insp_auto_fail`). 일괄 FAIL·판정 확인 요청 무결성 점검은 PR #61에서 리뷰 중
 - 표본 재확인 장기 비율·불확실성 표시 (TBD-16), 재확인 FAIL 후속 조치 (TBD-17)
 - 검사항목 코드는 11/17 `UNIFIED`로 확정·V7 적용 (TBD-04 해소)
