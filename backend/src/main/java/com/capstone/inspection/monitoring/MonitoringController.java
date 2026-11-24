@@ -1,6 +1,7 @@
 package com.capstone.inspection.monitoring;
 
 import com.capstone.inspection.common.api.ApiResponse;
+import com.capstone.inspection.domain.inspection.PredictedQuality;
 import com.capstone.inspection.monitoring.dto.PartMonitoringResponse;
 import com.capstone.inspection.monitoring.dto.QueueResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,8 +34,10 @@ public class MonitoringController {
     @GetMapping("/queue")
     public ApiResponse<QueueResponse> queue(@RequestParam(defaultValue = "ALL") QueueType type,
                                             @RequestParam(required = false) String partCode,
+                                            @RequestParam(required = false) PredictedQuality predictedQuality,
+                                            @RequestParam(defaultValue = "RECEIVED") QueueSort sort,
                                             @RequestParam(required = false) String cursor,
                                             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.of(monitoringService.queue(type, partCode, cursor, size));
+        return ApiResponse.of(monitoringService.queue(type, partCode, predictedQuality, sort, cursor, size));
     }
 }
