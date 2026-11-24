@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.capstone.inspection.common.time.Times;
 
 // 자동 통과·자동 불량 정책 1개 버전. 관리자가 기준을 바꾸면 행을 고치지 않고 새 버전을 만듦 (계약 v4 6.9)
 @Entity
@@ -89,7 +90,7 @@ public class AutomationPolicy {
         this.active = false;
         this.autoFailEnabled = false; // 자동 불량은 기본 꺼짐 (계약 4.1)
         this.basedOnPolicyId = basedOnPolicyId;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Times.now();
     }
 
     // 기준치 조정 새 버전: 통과 기준만 바꾸고 자동 불량 값은 이어받음 (계약 6.9)

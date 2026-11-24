@@ -22,6 +22,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @TestPropertySource(properties = {"app.recheck.enabled=true", "app.recheck.near-rate=1.0", "app.recheck.mid-rate=1.0", "app.recheck.low-rate=0"})
 class AutoFailIntegrationTest extends IntegrationTestBase {
 
+    // 시드(db/seed-dev) 정책. 다른 테스트가 만든 정책(자동 불량 켬)은 세지 않음
+    private static final String SEED_POLICIES = "'example-door-p1','example-door-demo-30','example-door-demo-0084',"
+            + "'example-door-demo-0092','frame-e08-demo-0367','cowl-e08-demo-0163','door-e02-demo-0092','door-e02-demo-0084'";
+
     private static final String POLICIES = "/api/v1/admin/policies";
 
     // 자동 통과 0.03(검증 0.02~0.08) 정책 등록
@@ -177,8 +181,8 @@ class AutoFailIntegrationTest extends IntegrationTestBase {
         assertThat(detail.path("displayState").asText()).isEqualTo("REVIEW_PENDING");
         assertThat(detail.at("/policy/policyVersion").asText()).isEqualTo("example-door-p1");
         assertThat(jdbc.queryForObject(
-                "select count(*) from automation_policy where auto_fail_enabled = true and policy_version not like 'example-af-%'",
-                Long.class)).isZero();
+                "select count(*) from automation_policy where auto_fail_enabled = true and policy_version in ("
+                        + SEED_POLICIES + ")", Long.class)).isZero();
     }
 
     @Test

@@ -65,7 +65,7 @@ abstract class IntegrationTestBase {
 
     private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("inspection").withUsername("inspection").withPassword("inspection")
-            .withUrlParam("serverTimezone", "Asia/Seoul").withUrlParam("characterEncoding", "UTF-8")
+            .withUrlParam("serverTimezone", "Asia/Seoul").withUrlParam("preserveInstants", "false").withUrlParam("characterEncoding", "UTF-8")
             .withCommand("--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci");
 
     static {

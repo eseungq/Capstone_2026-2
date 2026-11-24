@@ -2,7 +2,8 @@ spring:
   application:
     name: inspection-backend
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:inspection}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    # preserveInstants=false: 드라이버가 JVM 시간대→서울 변환을 하지 않음. 저장 값은 Times.now()(서울 시각) 그대로 (JVM이 UTC여도 같음)
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:inspection}?serverTimezone=Asia/Seoul&preserveInstants=false&characterEncoding=UTF-8
     username: ${DB_USER:inspection}
     password: ${DB_PASSWORD:inspection}
   jpa:

@@ -71,6 +71,18 @@ public interface JudgementRequestRepository extends JpaRepository<JudgementReque
     Page<JudgementRequest> searchRecent(Collection<JudgementRequestStatus> statuses, String partCode,
                                         Pageable pageable);
 
+    // 날짜별 이력(계약 6.13)용: 한 부품·접수 기간 검사들의 요청 상태만
+    record RequestFact(String inspectionId, String requestId, JudgementRequestStatus status,
+                       Judgement claimedJudgement, LocalDateTime resolvedAt) {
+    }
+
+    @Query("""
+            select new com.capstone.inspection.domain.inspection.JudgementRequestRepository$RequestFact(
+              i.id, r.id, r.status, r.claimedJudgement, r.resolvedAt)
+            from JudgementRequest r join r.inspection i
+            where i.part.id = :partId and i.receivedAt >= :from and i.receivedAt < :to""")
+    List<RequestFact> findFactsByPartAndReceived(String partId, LocalDateTime from, LocalDateTime to);
+
     // 처리 기록. 대기 중일 때만 갱신되므로 동시 처리 중 1건만 1을 받음
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

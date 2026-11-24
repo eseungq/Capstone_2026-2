@@ -141,7 +141,7 @@ public class AdminPolicyService {
             return toResponse(policy);
         }
         policyRepository.deactivateOthers(model.getId(), policy.getId());
-        policy.activate(LocalDateTime.now());
+        policy.activate(Times.now());
         try {
             policyRepository.saveAndFlush(policy);
         } catch (DataIntegrityViolationException e) {

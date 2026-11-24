@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import com.capstone.inspection.common.time.Times;
 
 // REVIEW 검사에 대한 작업자 최종 판정 (AI 결과와 분리 저장)
 @Entity
@@ -64,6 +65,6 @@ public class WorkerConfirmation {
         this.comment = comment;
         this.screenTiming = screenTiming;
         this.batchId = batchId;
-        this.confirmedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
+        this.confirmedAt = Times.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
     }
 }

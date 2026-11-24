@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 import java.util.List;
+import com.capstone.inspection.common.time.Times;
 
 // 판정 확인 요청·정정 (계약 6.12). 표본 재확인(6.11)과는 별도 기록
 //   - 대상은 시스템 판정(judgedBy = SYSTEM) 건만. 최초 판정(inspection.final_judgement·judged_by)은 바꾸지 않음
@@ -136,7 +137,7 @@ public class JudgementRequestService {
         if (r.getStatus() != JudgementRequestStatus.OPEN) {
             return replayResolved(r, decision);
         }
-        LocalDateTime at = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
+        LocalDateTime at = Times.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
         if (requestRepository.markResolved(requestId, decision.status(),
                 userRepository.getReferenceById(admin.userId()), at, note) != 1) {
             return null;

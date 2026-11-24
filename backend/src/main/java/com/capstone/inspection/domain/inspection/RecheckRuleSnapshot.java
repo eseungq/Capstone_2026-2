@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import com.capstone.inspection.common.time.Times;
 
 // 표본 재확인 추출 규칙 기록 (계약 6.11, V9 recheck_rule). 같은 값·같은 시험 이름이면 같은 행
 //   AUTO_PASS 판정 때 검사에 연결하고(inspection.recheck_rule_id), 추출 결정도 이 규칙으로 함
@@ -57,7 +58,7 @@ public class RecheckRuleSnapshot {
         this.nearRate = rule.nearRate();
         this.midRate = rule.midRate();
         this.lowRate = rule.lowRate();
-        this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
+        this.createdAt = Times.now().truncatedTo(ChronoUnit.MICROS);
     }
 
     public RecheckRule toRule() {
