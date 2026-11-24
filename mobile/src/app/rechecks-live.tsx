@@ -25,9 +25,9 @@ function formatTime(value: string | null): string {
 function describeError(cause: unknown): string {
   if (cause instanceof ApiV4RequestError) {
     if (cause.httpStatus === 404) {
-      return '서버에 해당 재확인 API가 아직 배포되지 않았거나, 요청한 검사/기록이 없습니다. (HTTP 404)';
+      return '재확인 기록을 불러올 수 없습니다. 잠시 후 다시 조회해 주세요.';
     }
-    return cause.message + ' (' + cause.code + ', HTTP ' + cause.httpStatus + ')';
+    return cause.message;
   }
   return cause instanceof Error ? cause.message : '재확인 목록을 불러오지 못했습니다.';
 }
@@ -87,7 +87,7 @@ export default function RechecksLiveScreen() {
         </Pressable>
         <Text style={styles.title}>AUTO_PASS 표본 재확인</Text>
         <Text style={styles.sub}>
-          SERVER · {role === 'ADMIN' ? '관리자 조회/확인함' : role === 'WORKER' ? '작업자 조회/재확인' : '권한 확인 중'}
+          {role === 'ADMIN' ? '관리자 조회 · 확인함 처리' : role === 'WORKER' ? '작업자 조회 · 재확인' : '권한 확인 중'}
         </Text>
       </View>
       <ScrollView contentContainerStyle={styles.body}>

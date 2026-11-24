@@ -52,6 +52,7 @@ export default function LoginScreen() {
         AUTH_INVALID_CREDENTIALS: '아이디와 비밀번호를 다시 확인해 주세요.',
         AUTH_ACCOUNT_LOCKED: '로그인 시도가 반복되어 계정이 잠겼습니다. 관리자에게 잠금 해제를 요청해 주세요.',
         NETWORK_ERROR: '서버에 연결할 수 없습니다. 네트워크를 확인해 주세요.',
+        REQUEST_TIMEOUT: '서버 응답이 지연됩니다. 연결 상태를 확인한 뒤 다시 로그인해 주세요.',
       };
       const reason = error instanceof ApiV4RequestError ? reasons[error.code] : undefined;
       Alert.alert('로그인 실패', reason ?? '로그인할 수 없습니다. 잠시 후 다시 시도해 주세요.');

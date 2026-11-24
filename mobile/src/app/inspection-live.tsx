@@ -68,7 +68,7 @@ function actionErrorMessage(error: unknown): string {
     return guidance;
   }
   if (error instanceof WriteV4ValidationError) {
-    return `${writeErrorLabelV4(error.code)}\n${error.message} (${error.code})`;
+    return `${writeErrorLabelV4(error.code)}\n${error.message}`;
   }
   return error instanceof Error ? error.message : '검사 처리에 실패했습니다.';
 }

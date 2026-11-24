@@ -20,9 +20,9 @@ const summaryService = createRecheckSummaryServiceV4(authV4);
 function safeError(cause: unknown): string {
   if (cause instanceof ApiV4RequestError) {
     if (cause.httpStatus === 404) {
-      return '관리자 표본 재확인 요약 API가 아직 서버에 배포되지 않았을 수 있습니다. (HTTP 404)';
+      return '표본 재확인 요약을 불러올 수 없습니다. 잠시 후 다시 조회해 주세요.';
     }
-    return cause.message + ' (HTTP ' + cause.httpStatus + ', ' + cause.code + ')';
+    return cause.message;
   }
   return cause instanceof Error ? cause.message : '재확인 시험 요약을 불러오지 못했습니다.';
 }
@@ -192,7 +192,7 @@ export default function RecheckSummaryLiveScreen() {
           <Text style={styles.link}>‹ 뒤로</Text>
         </Pressable>
         <Text style={styles.title}>AUTO_PASS 표본 재확인 요약</Text>
-        <Text style={styles.muted}>SERVER · ADMIN 전용 · 조회만 가능</Text>
+        <Text style={styles.muted}>관리자 전용 · 조회만 가능</Text>
       </View>
       <ScrollView contentContainerStyle={styles.body}>
         <Notice>

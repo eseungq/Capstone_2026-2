@@ -184,6 +184,7 @@ export function writeErrorLabelV4(code: string): string {
     ORIGINAL_IMAGE_MISSING: '원본 사진이 없어 수동 판정으로 전환할 수 없습니다. 재촬영 후 새 검사로 접수해 주세요.',
     REQUEST_IN_PROGRESS_LOCAL: '처리 중입니다. 중복 제출하지 마세요.',
     NETWORK_ERROR: '서버 연결을 확인한 뒤 검사 상세에서 처리 여부를 먼저 확인해 주세요.',
+    REQUEST_TIMEOUT: '서버 응답이 지연되어 저장 여부를 확인하지 못했습니다. 검사 상세에서 처리 여부를 먼저 확인해 주세요.',
     NOT_LOGGED_IN: '로그인이 필요합니다.',
   };
   return labels[code] ?? '검사 처리에 실패했습니다. 최신 상태를 조회해 주세요.';

@@ -59,6 +59,7 @@ function errorText(error: unknown): string {
       POLICY_NOT_FOUND: '정책이 변경되거나 삭제됐습니다. 목록을 다시 조회해 주세요.',
       POLICY_VERSION_DUPLICATE: '동시에 다른 버전이 생성됐을 수 있습니다. 목록을 확인해 주세요.',
       NETWORK_ERROR: '연결 불확실: 새 요청 전에 정책 목록에서 생성·적용 여부를 확인해 주세요.',
+      REQUEST_TIMEOUT: '서버 응답이 지연됩니다. 새 요청 전에 정책 목록에서 생성·적용 여부를 확인해 주세요.',
     };
     if (error.httpStatus === 401) return '로그인이 만료됐습니다. 다시 로그인해 주세요.';
     if (error.httpStatus === 403) return '정책을 관리할 권한이 없습니다.';
