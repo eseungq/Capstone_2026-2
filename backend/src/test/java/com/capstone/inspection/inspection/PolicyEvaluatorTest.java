@@ -159,4 +159,91 @@ class PolicyEvaluatorTest {
         assertThat(d.action()).isEqualTo(RecommendedAction.REVIEW);
         assertThat(d.reviewReason()).isEqualTo(ReviewReason.CALIBRATION_UNAVAILABLE);
     }
+
+    // ---- 자동 불량 AUTO_FAIL (계약 4.1) ----
+
+    // 자동 통과 0.05 + 자동 불량 기준 0.8
+    private static AutomationPolicy autoFailPolicy(boolean enabled, Double failThreshold) {
+        AutomationPolicy p = policy("cal-v1", 0.05);
+        ReflectionTestUtils.setField(p, "autoFailEnabled", enabled);
+        ReflectionTestUtils.setField(p, "failThreshold", failThreshold);
+        return p;
+    }
+
+    private static final List<AutomationPolicy> AUTO_FAIL_ON = List.of(autoFailPolicy(true, 0.8));
+
+    @Test
+    @DisplayName("DEFECT + 자동 불량 켜짐 + 보정 확률 ≥ 기준 → AUTO_FAIL, 사유 없음, 두 기준 스냅숏")
+    void autoFailAboveThreshold() {
+        var d = PolicyEvaluator.evaluate(PredictedQuality.DEFECT, 0.93, "cal-v1", AUTO_FAIL_ON);
+        assertThat(d.action()).isEqualTo(RecommendedAction.AUTO_FAIL);
+        assertThat(d.reviewReason()).isNull();
+        assertThat(d.policy()).isNotNull();
+        assertThat(d.passThreshold()).isEqualTo(0.05);
+        assertThat(d.failThreshold()).isEqualTo(0.8);
+    }
+
+    @Test
+    @DisplayName("기준과 같은 값도 AUTO_FAIL (≥, 반올림 전 값 비교)")
+    void autoFailAtBoundary() {
+        assertThat(PolicyEvaluator.evaluate(PredictedQuality.DEFECT, 0.8, "cal-v1", AUTO_FAIL_ON).action())
+                .isEqualTo(RecommendedAction.AUTO_FAIL);
+        assertThat(PolicyEvaluator.evaluate(PredictedQuality.DEFECT, 0.7999999, "cal-v1", AUTO_FAIL_ON).reviewReason())
+                .isEqualTo(ReviewReason.DEFECT_PREDICTED);
+    }
+
+    @Test
+    @DisplayName("DEFECT + 자동 불량 켜짐 + 보정 확률 < 기준 → REVIEW(DEFECT_PREDICTED), 불량 기준 스냅숏은 기록")
+    void autoFailBelowThreshold() {
+        var d = PolicyEvaluator.evaluate(PredictedQuality.DEFECT, 0.6, "cal-v1", AUTO_FAIL_ON);
+        assertThat(d.action()).isEqualTo(RecommendedAction.REVIEW);
+        assertThat(d.reviewReason()).isEqualTo(ReviewReason.DEFECT_PREDICTED);
+        assertThat(d.failThreshold()).isEqualTo(0.8);
+    }
+
+    @Test
+    @DisplayName("자동 불량 꺼짐이면 기준이 있어도 REVIEW, 불량 기준 스냅숏 null")
+    void autoFailDisabled() {
+        var d = PolicyEvaluator.evaluate(PredictedQuality.DEFECT, 0.99, "cal-v1", List.of(autoFailPolicy(false, 0.8)));
+        assertThat(d.reviewReason()).isEqualTo(ReviewReason.DEFECT_PREDICTED);
+        assertThat(d.failThreshold()).isNull();
+    }
+
+    @Test
+    @DisplayName("불량 기준이 없으면 켜짐 표시여도 REVIEW")
+    void autoFailWithoutThreshold() {
+        var d = PolicyEvaluator.evaluate(PredictedQuality.DEFECT, 0.99, "cal-v1", List.of(autoFailPolicy(true, null)));
+        assertThat(d.reviewReason()).isEqualTo(ReviewReason.DEFECT_PREDICTED);
+        assertThat(d.failThreshold()).isNull();
+    }
+
+    @Test
+    @DisplayName("보정 확률 null이면 자동 불량 정책이어도 REVIEW(DEFECT_PREDICTED)")
+    void autoFailCalibrationNull() {
+        var d = PolicyEvaluator.evaluate(PredictedQuality.DEFECT, null, null, AUTO_FAIL_ON);
+        assertThat(d.reviewReason()).isEqualTo(ReviewReason.DEFECT_PREDICTED);
+        assertThat(d.policy()).isNull();
+        assertThat(d.failThreshold()).isNull();
+    }
+
+    @Test
+    @DisplayName("ready·active 정책이 없거나 보정기가 다르면 자동 불량 없음")
+    void autoFailNoCompatiblePolicy() {
+        assertThat(PolicyEvaluator.evaluate(PredictedQuality.DEFECT, 0.99, "cal-v1", List.of()).reviewReason())
+                .isEqualTo(ReviewReason.DEFECT_PREDICTED);
+        var mismatch = PolicyEvaluator.evaluate(PredictedQuality.DEFECT, 0.99, "cal-v2", AUTO_FAIL_ON);
+        assertThat(mismatch.action()).isEqualTo(RecommendedAction.REVIEW);
+        assertThat(mismatch.failThreshold()).isNull();
+    }
+
+    @Test
+    @DisplayName("자동 불량 정책에서 GOOD 예측은 AUTO_PASS 규칙 그대로, 불량 기준 스냅숏만 함께 기록")
+    void autoFailPolicyGoodUnchanged() {
+        var pass = PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.02, "cal-v1", AUTO_FAIL_ON);
+        assertThat(pass.action()).isEqualTo(RecommendedAction.AUTO_PASS);
+        assertThat(pass.failThreshold()).isEqualTo(0.8);
+        // GOOD은 보정 확률이 불량 기준 이상이어도 자동 불량이 아님
+        var high = PolicyEvaluator.evaluate(PredictedQuality.GOOD, 0.9, "cal-v1", AUTO_FAIL_ON);
+        assertThat(high.reviewReason()).isEqualTo(ReviewReason.ABOVE_THRESHOLD);
+    }
 }

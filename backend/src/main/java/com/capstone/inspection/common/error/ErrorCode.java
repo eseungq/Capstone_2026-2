@@ -44,6 +44,7 @@ public enum ErrorCode {
     NOT_RECHECKABLE(HttpStatus.CONFLICT, "표본 재확인 대상이 아닌 검사입니다.", false),
     ALREADY_RECHECKED(HttpStatus.CONFLICT, "이미 다른 결과로 재확인된 검사입니다.", false),
     NOT_ACKNOWLEDGEABLE(HttpStatus.CONFLICT, "재확인 결과가 FAIL인 건만 확인함으로 표시할 수 있습니다.", false),
+    AUTO_FAIL_NOT_CONFIGURED(HttpStatus.CONFLICT, "불량 기준(failThreshold)이 없는 정책은 자동 불량을 켤 수 없습니다.", false),
     NOT_REQUESTABLE(HttpStatus.CONFLICT, "시스템 판정 건만 판정 확인을 요청할 수 있습니다.", false),
     REQUEST_ALREADY_OPEN(HttpStatus.CONFLICT, "이 검사에 처리 대기 중인 판정 확인 요청이 이미 있습니다.", false),
     REQUEST_ALREADY_RESOLVED(HttpStatus.CONFLICT, "이미 다른 결정으로 처리된 요청입니다.", false),

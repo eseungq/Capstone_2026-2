@@ -45,8 +45,9 @@ public record InspectionDetailResponse(String inspectionId,
                      Double rawDefectProbability, Double calibratedDefectProbability, Integer inferenceTimeMs) {
     }
 
+    // failThreshold: 판정 당시 자동 불량 기준, 꺼져 있었으면 null (계약 6.5·4.1)
     public record Policy(boolean automationPolicyReady, String policyVersion, Double passThreshold,
-                         RecommendedAction recommendedAction, ReviewReason reviewReason) {
+                         Double failThreshold, RecommendedAction recommendedAction, ReviewReason reviewReason) {
     }
 
     public record JudgementBlock(Judgement finalJudgement, JudgedBy judgedBy, String confirmedBy,

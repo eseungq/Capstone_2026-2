@@ -20,7 +20,7 @@ public final class TestProps {
                 new AppProperties.Inspection(2, 500),
                 new AppProperties.Monitoring(10),
                 new AppProperties.Policy(0),
-                new AppProperties.Push(false, "http://localhost:9/push", 3000, 10000),
+                new AppProperties.Push(false, false, "http://localhost:9/push", 3000, 10000),
                 new AppProperties.Recheck(true, 0.8, 0.4, 1.0, 0.3, 0.1, null));
     }
 }
