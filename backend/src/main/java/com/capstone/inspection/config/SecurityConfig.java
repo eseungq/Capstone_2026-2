@@ -54,6 +54,7 @@ public class SecurityConfig {
                                 API + "/inspections/confirm-batch").hasRole("WORKER")
                         .requestMatchers(HttpMethod.POST, API + "/inspections/*/manual").hasRole("WORKER")
                         .requestMatchers(HttpMethod.POST, API + "/inspections/*/recheck").hasRole("WORKER")
+                        .requestMatchers(HttpMethod.POST, API + "/inspections/*/judgement-requests").hasRole("WORKER")
                         // FAILED 재검사: WORKER·ADMIN
                         .requestMatchers(HttpMethod.POST, API + "/inspections/*/retry").hasAnyRole("WORKER", "ADMIN")
                         // 조회: WORKER·ADMIN
