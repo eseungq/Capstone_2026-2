@@ -1,4 +1,4 @@
-import React,{useCallback,useEffect,useRef,useState} from 'react';
+import React,{useCallback,useRef,useState} from 'react';
 import {router,Stack,useFocusEffect} from 'expo-router';
 import {ActivityIndicator,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -6,10 +6,10 @@ import {authV4} from '../api/backendV4/authRuntime';
 import {createDailyHistoryServiceV4} from '../api/backendV4/adminDailyHistoryServiceV4';
 import {
  dailyAiReviewRateV4,kstCalendarTodayV4,oppositeEvidenceTextV4,plusDaysV4,
- validateDailyRangeV4,validateDailyBandV4,
  type AutomationDailyPartV4,type DailyHistoryRowV4,type DailyDetailV4,
  type DailyBandV4,
 } from '../api/backendV4/adminDailyHistoryCoreV4';
+import {createDailyHistoryReadsV4,idleDailyRead,type DailyReadState} from '../components/adminDailyHistoryReadsV4';
 
 const service=createDailyHistoryServiceV4(authV4);
 const parts:AutomationDailyPartV4[]=['DOOR','FRAME','COWL_COVER'];
@@ -48,27 +48,21 @@ export default function AdminDailyLiveScreen(){
  const [to,setTo]=useState(plusDaysV4(today,1));
  const [band,setBand]=useState('0.05');
  const [access,setAccess]=useState<'checking'|'admin'|'denied'>('checking');
- const [rows,setRows]=useState<DailyHistoryRowV4[]|null>(null);
- const [loading,setLoading]=useState(false);
- const [error,setError]=useState<string|null>(null);
+ const [listState,setListState]=useState<DailyReadState<DailyHistoryRowV4[]>>(idleDailyRead);
+ const [detailState,setDetailState]=useState<DailyReadState<DailyDetailV4>>(idleDailyRead);
  const [selected,setSelected]=useState<DailyHistoryRowV4|null>(null);
- const [detail,setDetail]=useState<DailyDetailV4|null>(null);
- const [detailLoading,setDetailLoading]=useState(false);
- const [detailError,setDetailError]=useState<string|null>(null);
- const serial=useRef(0),detailSerial=useRef(0);
+ const [reads]=useState(()=>createDailyHistoryReadsV4(service,setListState,setDetailState));
+ const {value:rows,loading,error}=listState;
+ const {value:detail,loading:detailLoading,error:detailError}=detailState;
 
- const load=useCallback(async()=>{
-   const current=++serial.current;
-   detailSerial.current++;
-   setSelected(null);setDetail(null);setDetailError(null);
-   setLoading(true);setError(null);setRows(null);
-   try{
-     validateDailyRangeV4(part,from,to);
-     const result=await service.daily(part,from,to);
-     if(current===serial.current)setRows(result);
-   }catch(e){if(current===serial.current)setError(e instanceof Error?e.message:'서버 통계 조회 실패');}
-   finally{if(current===serial.current)setLoading(false);}
- },[part,from,to]);
+ const clearResults=useCallback(()=>{
+   reads.reset();
+   setSelected(null);
+ },[reads]);
+ const load=useCallback(()=>{
+   setSelected(null);
+   return reads.loadRows(part,from,to);
+ },[reads,part,from,to]);
  const loadRef=useRef(load);
  loadRef.current=load;
  useFocusEffect(useCallback(()=>{
@@ -79,22 +73,16 @@ export default function AdminDailyLiveScreen(){
      setAccess(authorized?'admin':'denied');
      if(authorized)void loadRef.current();
    }).catch(()=>{if(active)setAccess('denied');});
-   return()=>{active=false;serial.current++;detailSerial.current++;};
- },[]));
- const viewDetail=async(row:DailyHistoryRowV4)=>{
-   const current=++detailSerial.current;
-   setSelected(row);setDetail(null);setDetailError(null);
-   if(!row.policyId){
-     setDetailError('정책이 없는 행은 기준 상세를 조회할 수 없습니다.');
-     return;
-   }
-   setDetailLoading(true);
-   try{
-     validateDailyBandV4(band);
-     const result=await service.detail(part,row.date,row.policyId,band);
-     if(current===detailSerial.current)setDetail(result);
-   }catch(e){if(current===detailSerial.current)setDetailError(e instanceof Error?e.message:'기준 상세 조회 실패');}
-   finally{if(current===detailSerial.current)setDetailLoading(false);}
+   return()=>{
+     active=false;
+     clearResults();
+     setAccess('checking');
+   };
+ },[clearResults]));
+ const viewDetail=(row:DailyHistoryRowV4)=>{
+   if(!row.policyId)return;
+   setSelected(row);
+   return reads.loadDetail(part,row.date,row.policyId,band);
  };
  const openInspection=(id:string)=>router.push({pathname:'/inspection-live',params:{inspectionId:id}});
  return <SafeAreaView style={s.root}>
@@ -116,17 +104,17 @@ export default function AdminDailyLiveScreen(){
          <Text style={s.strong}>부품 선택</Text>
          <View style={s.chips}>{parts.map(p=><Pressable key={p} accessibilityRole="button"
            accessibilityState={{selected:part===p}}
-           onPress={()=>{setPart(p);setRows(null);setSelected(null);setDetail(null);}} style={[s.chip,part===p&&s.chipActive]}>
+           onPress={()=>{if(p!==part){clearResults();setPart(p);}}} style={[s.chip,part===p&&s.chipActive]}>
            <Text style={[s.chipText,part===p&&s.chipTextActive]}>{p}</Text>
          </Pressable>)}</View>
          <Text style={s.strong}>접수 날짜 범위 (서울 기준 · 시작 포함 / 종료 제외)</Text>
          <Text style={s.muted}>YYYY-MM-DD · 최대 92일. 오늘까지 포함하려면 종료일을 내일로 설정하세요.</Text>
          <View style={s.chips}>
            <View style={s.dateCell}><Text style={s.muted}>시작일 (from)</Text>
-             <TextInput value={from} onChangeText={x=>{setFrom(x);setRows(null);setSelected(null);setDetail(null);}} style={s.input} autoCorrect={false}
+             <TextInput value={from} onChangeText={x=>{clearResults();setFrom(x);}} style={s.input} autoCorrect={false}
                placeholder="YYYY-MM-DD" maxLength={10}/></View>
            <View style={s.dateCell}><Text style={s.muted}>종료일 (to, 미포함)</Text>
-             <TextInput value={to} onChangeText={x=>{setTo(x);setRows(null);setSelected(null);setDetail(null);}} style={s.input} autoCorrect={false}
+             <TextInput value={to} onChangeText={x=>{clearResults();setTo(x);}} style={s.input} autoCorrect={false}
                placeholder="YYYY-MM-DD" maxLength={10}/></View>
          </View>
          <Pressable style={s.primary} accessibilityRole="button" disabled={loading}
@@ -164,7 +152,7 @@ export default function AdminDailyLiveScreen(){
        {selected&&<View style={s.card}>
          <Text style={s.strong}>기준 상세 · {selected.date} · {selected.policyVersion??'정책 없음'}</Text>
          <Text style={s.muted}>구간 폭(band)은 확률 차입니다. 예: 0.05 = 5%p. 기본 0.05, 허용 0.001~0.5.</Text>
-         <TextInput value={band} onChangeText={setBand} style={s.input}
+         <TextInput value={band} onChangeText={x=>{reads.resetDetail();setBand(x);}} style={s.input}
            keyboardType="decimal-pad" placeholder="0.05" />
          <Pressable style={s.outline} accessibilityRole="button" disabled={detailLoading}
            onPress={()=>{void viewDetail(selected);}}>
@@ -174,12 +162,12 @@ export default function AdminDailyLiveScreen(){
          {detailError&&<Text style={s.error}>{detailError}</Text>}
          {detail&&<>
            <Line label="정책/기준" value={`${detail.policyVersion} · ${fraction(detail.passThreshold,4)} / ${fraction(detail.failThreshold,4)}`}/>
-           <Line label="판정 참고 자료" value={detail.reference===null?'자료 없음':'자료 확인'}/>
+           <Line label="실물 판정 참고 자료" value={detail.reference===null?'자료 없음':'자료 확인'}/>
            <Band title="통과 기준 바로 위 GOOD REVIEW" band={detail.passBand} onOpen={openInspection}/>
            <Band title="불량 기준 바로 아래 DEFECT REVIEW" band={detail.failBand} onOpen={openInspection}/>
          </>}
        </View>}
-       <Text style={s.muted}>통계의 '판정 완료'는 조회 시점 기준입니다. 정책 변경이 과거 검사를 소급 변경하지 않습니다. 확인 자료 없음은 실물 기준 정답이 없다는 의미이며, 품질 정확도나 미검출률을 단정하지 않습니다.</Text>
+       <Text style={s.muted}>통계의 '판정 완료'는 조회 시점 기준입니다. 정책 변경이 과거 검사를 소급 변경하지 않습니다. 집계의 ‘확인 자료 없음’은 관리자가 유지 또는 정정 처리한 검사가 0건이라는 뜻입니다. 기준 상세의 ‘자료 없음’은 실물 판정 참고 자료가 없다는 뜻입니다. 실물 기준으로 확인한 자료가 있어야 품질 정확도나 미검출률을 평가할 수 있습니다.</Text>
      </>}
    </ScrollView>
  </SafeAreaView>;
