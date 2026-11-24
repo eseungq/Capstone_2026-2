@@ -34,8 +34,8 @@ export function makeAutoFailThresholdEditV4(
   return {failThreshold:threshold,failValidatedMin:min,failValidatedMax:max};
 }
 export function ensureAutoFailToggleV4(base:AdminPolicyV4,enabled:boolean):void {
-  if(base.partCode!=='COWL_COVER'||!base.ready||!base.active)
-    throw new Error('준비된 활성 COWL_COVER 정책에서만 자동 불량 설정을 변경할 수 있습니다.');
+  if(base.partCode!=='COWL_COVER'||!base.ready)
+    throw new Error('준비된 COWL_COVER 정책에서만 자동 불량 설정을 변경할 수 있습니다.');
   if(base.autoFailEnabled===null)
     throw new Error('현재 서버가 자동 불량 설정을 지원하지 않습니다.');
   if(enabled===base.autoFailEnabled)

@@ -71,7 +71,6 @@ export default function PolicyLiveScreen() {
   const [failPercent, setFailPercent] = useState('');
   const [failMinPercent, setFailMinPercent] = useState('');
   const [failMaxPercent, setFailMaxPercent] = useState('');
-  const [evidenceConfirmed, setEvidenceConfirmed] = useState(false);
   const editedFailInput = useRef(false);
   const [writing, setWriting] = useState<WriteAction | null>(null);
   const refreshSerial = useRef(0);
@@ -169,9 +168,7 @@ export default function PolicyLiveScreen() {
   }
   const evidencePresent = !!active?.metrics && !!active.metrics.autoFail &&
     typeof active.metrics.autoFail === 'object';
-  const canToggleOn = active?.autoFailEnabled===false &&
-    active.failThreshold!=null && active.failValidatedMin!=null &&
-    active.failValidatedMax!=null && evidencePresent && evidenceConfirmed;
+  const canToggleOn = active?.ready===true && active.autoFailEnabled===false && active.failThreshold!=null;
   const canToggleOff = active?.autoFailEnabled===true;
 
   /** 다른 관리자의 동시 변경을 확인해 이전 화면 상태로 POST하지 않습니다. */
@@ -235,7 +232,7 @@ export default function PolicyLiveScreen() {
     const expectedActive = active;
     Alert.alert(
       target.policyId === root?.policyId ? '실서버 원래 정책 복귀' : '실서버 정책 적용',
-      `${target.policyVersion} (${percentageTextV4(target.passThreshold)})을(를) 적용할까요?\n\n실제로 서버의 활성 정책이 변경되고 같은 모델의 다른 정책은 중지됩니다. 과거 검사 판정은 바뀌지 않습니다.`,
+      `${target.policyVersion} (통과 ${percentageTextV4(target.passThreshold)}, 자동 불량 ${target.autoFailEnabled===null?'미지원':target.autoFailEnabled?'켜짐':'꺼짐'}, 불량 기준 ${percentageTextV4(target.failThreshold,4)})을(를) 적용할까요?\n\n실제로 서버의 활성 정책이 변경되고 같은 모델의 다른 정책은 중지됩니다. 과거 검사 판정은 바뀌지 않습니다.${target.autoFailEnabled&&!target.metrics?.autoFail?'\n\n검증 자료 없음: 승인된 시험 범위에서만 적용하세요.':''}`,
       [
         { text: '취소', style: 'cancel' },
         { text: '실제 서버에 적용', onPress: () => {
@@ -282,28 +279,25 @@ export default function PolicyLiveScreen() {
       }}]);
   };
 
-  const confirmAutoFailToggle = (enabled:boolean) => {
-    if (!active || !canWrite) return;
-    const base=active;
+  const confirmAutoFailToggle = (enabled:boolean, target?:AdminPolicyV4) => {
+    const base=target??active;
+    if (!base || !canWrite || !active || base.modelVersion!==active.modelVersion) return;
+    const expectedActive=active;
     try {ensureAutoFailToggleV4(base,enabled);}catch(cause){setActionError(errorText(cause));return;}
-    if(enabled && (!evidencePresent || !evidenceConfirmed)){
-      setActionError('자동 불량 켜기는 AI 검증 자료 등록 및 팀 승인 확인 후에만 진행할 수 있습니다.');
-      return;
-    }
+    const hasEvidence=!!base.metrics?.autoFail && typeof base.metrics.autoFail==='object';
+    const warning=enabled&&!hasEvidence?'\n\n검증 자료 없음: 품질 정확도나 미검출률이 검증되었다는 뜻이 아닙니다. 팀 승인 시험 범위에서만 사용하세요.':'';
     Alert.alert(enabled?'자동 불량 켜기 · 새 버전':'자동 불량 끄기 · 새 버전',
-      `${base.policyVersion}에서 자동 불량을 ${enabled?'켜는':'끄는'} 새 비활성 버전을 만들까요?\n\n실제 적용은 생성된 버전을 관리자가 별도로 활성화할 때만 변경됩니다.`,
+      `${base.policyVersion}에서 자동 불량을 ${enabled?'켜는':'끄는'} 새 비활성 버전을 만들까요?\n\n실제 적용은 생성된 버전을 관리자가 별도로 활성화할 때만 변경됩니다.${warning}`,
       [{text:'취소',style:'cancel'},{text:'새 비활성 버전 저장',onPress:()=>{
         void runWrite('auto-fail',async()=>{
-          const current=(await assertLatest(base)).find(p=>p.policyId===base.policyId);
-          if(!current?.active || current.autoFailEnabled!==base.autoFailEnabled ||
-            current.failThreshold!==base.failThreshold)
-            throw new Error('활성 정책의 자동 불량 상태가 변경됐습니다. 다시 확인해 주세요.');
+          const current=(await assertLatest(expectedActive)).find(p=>p.policyId===base.policyId);
+          if(!current || current.modelVersion!==expectedActive.modelVersion ||
+            current.autoFailEnabled!==base.autoFailEnabled || current.failThreshold!==base.failThreshold ||
+            current.failValidatedMin!==base.failValidatedMin || current.failValidatedMax!==base.failValidatedMax)
+            throw new Error('대상 정책의 자동 불량 상태가 변경됐습니다. 다시 확인해 주세요.');
           ensureAutoFailToggleV4(current,enabled);
-          if(enabled && (!current.metrics?.autoFail || !evidenceConfirmed))
-            throw new Error('AI 검증 근거 또는 승인 확인이 누락됐습니다.');
           const saved=await autoFailService.saveToggle(current,enabled);
           setSavedPolicy(saved);
-          setEvidenceConfirmed(false);
           setActionNotice(`${saved.policyVersion} 자동 불량 ${enabled?'켜기':'끄기'} 버전을 비활성 상태로 저장했습니다. 기존 활성 정책은 변경되지 않았습니다.`);
           await load(false);
         });
@@ -372,7 +366,7 @@ export default function PolicyLiveScreen() {
                 <Row label="현재 자동 불량" value={active.autoFailEnabled===null?'서버 미지원 / 배포 전':active.autoFailEnabled?'켜짐':'꺼짐'} />
                 <Row label="불량 기준" value={percentageTextV4(active.failThreshold,4)} />
                 <Row label="불량 검증 범위" value={`${percentageTextV4(active.failValidatedMin,4)} ~ ${percentageTextV4(active.failValidatedMax,4)}`} />
-                <Row label="AI 검증 근거" value={evidencePresent?'정책 metrics.autoFail 있음':'정책 metrics.autoFail 미등록'} />
+                <Row label="AI 검증 근거" value={evidencePresent?'정책 metrics.autoFail 있음':'검증 자료 없음'} />
                 {active.autoFailEnabled===null && (
                   <Text style={s.errorText}>서버가 AUTO_FAIL 정책 필드를 아직 제공하지 않습니다. 신규 설정 요청을 보내지 않습니다.</Text>
                 )}
@@ -395,13 +389,7 @@ export default function PolicyLiveScreen() {
                   <Text style={[s.hint,!failEditValid&&s.errorText]}>{failEditHint}</Text>
                   <Button title="불량 기준 새 비활성 버전 저장" onPress={confirmSaveFail}
                     disabled={!canWrite||!failEditValid}/>
-                  <Pressable accessibilityRole="checkbox" accessibilityState={{checked:evidenceConfirmed}}
-                    disabled={!canWrite} onPress={()=>setEvidenceConfirmed(v=>!v)}
-                    style={s.evidenceCheck}>
-                    <Text style={s.muted}>
-                      {evidenceConfirmed?'☑':'□'} 김도현 AI 검증 결과와 팀의 자동 불량 켜기 승인 여부를 별도로 확인했습니다.
-                    </Text>
-                  </Pressable>
+                  {!evidencePresent && <Text style={s.errorText}>검증 자료 없음: 팀 승인 시험 범위에서만 사용하세요. 품질 정확도를 보장하지 않습니다.</Text>}
                   <Button title="자동 불량 켜기 버전 저장 · 적용 아님"
                     onPress={()=>confirmAutoFailToggle(true)}
                     disabled={!canWrite||!canToggleOn}/>
@@ -409,7 +397,7 @@ export default function PolicyLiveScreen() {
                     onPress={()=>confirmAutoFailToggle(false)}
                     disabled={!canWrite||!canToggleOff}/>
                   <Text style={s.muted}>
-                    근거가 없으면 켜기 버튼이 비활성화됩니다. 저장된 모든 새 버전은 기존 정책 적용 기능에서 별도 검토합니다.
+                    불량 기준이 등록된 정책에서 켜기 버전을 저장할 수 있습니다. 새 비활성 기준 버전은 아래 정책 목록에서 바로 켜기 버전을 만들 수 있으며, 적용은 별도입니다.
                   </Text>
                 </>}
               </>}
@@ -463,6 +451,11 @@ export default function PolicyLiveScreen() {
                     <Row label="상태" value={`${policy.ready ? 'ready' : '미준비'} · ${policy.active ? 'active' : '비활성'}`} />
                     <Row label="자동 불량" value={policy.autoFailEnabled===null?'미지원':policy.autoFailEnabled?'켜짐':'꺼짐'} />
                     <Row label="불량 기준" value={percentageTextV4(policy.failThreshold,4)} />
+                    {policy.failThreshold!=null && <Row label="AI 검증 근거" value={policy.metrics?.autoFail && typeof policy.metrics.autoFail==='object'?'등록됨':'검증 자료 없음'}/>}
+                    {canActivate && policy.autoFailEnabled!==null && policy.failThreshold!=null && (
+                      <Button secondary title={policy.autoFailEnabled?'이 버전에서 자동 불량 끄기 버전 저장':'이 버전에서 자동 불량 켜기 버전 저장'}
+                        onPress={()=>confirmAutoFailToggle(!policy.autoFailEnabled,policy)} disabled={!canWrite}/>
+                    )}
                     {isOriginal && <Text style={s.muted}>원본 정책 버전</Text>}
                     {canActivate && (
                       <Button secondary

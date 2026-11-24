@@ -133,3 +133,15 @@ test('existing admin policy GET preserves pre-V13 list and no AUTO_FAIL POST',as
  assert.equal(list[0].autoFailEnabled,false);
  assert.equal(calls[0].opts.method,'GET');
 });
+
+test('fixed 99.66% threshold and inactive version can enable AUTO_FAIL without metrics evidence',async()=>{
+ const fixed={...registered,failValidatedMin:0.9966,failValidatedMax:0.9966,metrics:{sampleCount:148}};
+ assert.deepEqual(makeAutoFailThresholdEditV4(base,'99.66','99.66','99.66'),{failThreshold:0.9966,failValidatedMin:0.9966,failValidatedMax:0.9966});
+ const source=decodeAdminPolicyV4(fixed);
+ assert.doesNotThrow(()=>ensureAutoFailToggleV4(source,true));
+ const response={...fixed,policyId:on.policyId,policyVersion:on.policyVersion,basedOnPolicyId:fixed.policyId,autoFailEnabled:true};
+ const {value,calls}=transport({answer:response});
+ const saved=await createAutoFailPolicyServiceV4(value).saveToggle(source,true);
+ assert.equal(saved.active,false);assert.equal(saved.autoFailEnabled,true);
+ assert.equal(calls.length,1);assert.deepEqual(calls[0],{route:`/admin/policies/${fixed.policyId}/auto-fail`,opts:{method:'POST',body:{enabled:true}}});
+});
