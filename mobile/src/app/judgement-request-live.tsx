@@ -1,7 +1,7 @@
 import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
 import React,{useCallback,useRef,useState} from 'react';
 import {router,Stack,useFocusEffect,useLocalSearchParams} from 'expo-router';
-import {ActivityIndicator,Alert,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Alert,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {authV4} from '../api/backendV4/authRuntime';
 import type {BackendRole} from '../api/backendV4/authCore';
@@ -29,6 +29,17 @@ function JudgementRequestForm({id}:{id:string}){
   const [claim,setClaim]=useState<FinalJudgementV4>('FAIL');
   const [submitting,setSubmitting]=useState(false);
   const [submittedRequestId,setSubmittedRequestId]=useState<string|null>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const areaRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const reasonRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  const revealFocusedInput = () => {
+    const field = [areaRef.current, reasonRef.current].find(input => input?.isFocused());
+    const content = scrollRef.current?.getInnerViewRef();
+    if (!field || !content) return;
+    field.measureLayout(content, (_x, y) => {
+      if (field.isFocused()) scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: false });
+    });
+  };
   const submittingRef=useRef(false),serial=useRef(0),mounted=useRef(false);
   const visitEpoch = useRef(authV4.sessionEpoch());
   const isCurrent = useCallback((revision:number) =>
@@ -112,59 +123,65 @@ function JudgementRequestForm({id}:{id:string}){
   };
   return <SafeAreaView style={s.root}>
     <Stack.Screen options={{headerShown:false}}/>
-    <View style={s.top}>
-      <Pressable onPress={()=>router.back()}><Text style={s.link}>‹ 검사 상세로 돌아가기</Text></Pressable>
-      <Text style={s.title}>시스템 판정 확인 요청</Text>
-      <Text style={s.muted}>실물·추가 자료와 다른 시스템 판정이 의심될 때만 요청합니다. 최초 판정은 그대로 보존됩니다.</Text>
-    </View>
-    <ScrollView style={{flex:1}} contentContainerStyle={s.body}
-      automaticallyAdjustKeyboardInsets={true}
-      keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-      {loading&&<ActivityIndicator/>}
-      {error&&<Text style={s.error}>{error}</Text>}
-      {!loading&&!submitting&&<Pressable style={s.outline} onPress={()=>{void refresh(submittedRequestId);}}><Text style={s.link}>최신 검사 다시 조회</Text></Pressable>}
-      {submittedRequestId&&<View style={s.card}><Text style={s.success}>
-        {pendingRequest?.requestId===submittedRequestId?'판정 확인 요청이 접수되었습니다. 관리자 검토를 기다려 주세요.':'판정 확인 요청이 접수되었습니다.'}
-      </Text></View>}
-      {detail&&<View style={s.card}>
-        <Text style={s.strong}>{detail.inspectionNo} · {detail.partCode}</Text>
-        <Text style={s.muted}>최초 판정: {detail.finalJudgement??'미확정'} · {actorLabelV4(detail.judgedBy)}</Text>
-        <Text style={s.muted}>현재 판정: {currentJudgementV4(detail.finalJudgement,detail.correction)??'미확정'}</Text>
-        {detail.correction&&<Text style={s.muted}>기존 정정: {detail.correction.correctedJudgement} · {detail.correction.correctedBy} ({detail.correction.note})</Text>}
-        {detail.judgementRequests.map(r=><View key={r.requestId} style={s.history}>
-          <Text style={s.strong}>{judgementRequestStatusLabelV4(r.status)} · 주장 {r.claimedJudgement}</Text>
-          <Text style={s.muted}>{r.requestedBy}: {r.reason}</Text>
-          {r.resolveNote&&<Text style={s.muted}>관리자 처리: {r.resolveNote}</Text>}
-        </View>)}
-        {role!=='WORKER'&&<Text style={s.error}>작업자 계정에서만 요청할 수 있습니다.</Text>}
-        {role==='WORKER'&&detail.judgedBy!=='SYSTEM'&&<Text style={s.error}>시스템 판정 건이 아니므로 요청 대상이 아닙니다.</Text>}
-        {pendingRequest&&pendingRequest.requestId!==submittedRequestId&&<Text style={s.muted}>관리자 검토 대기 중입니다.</Text>}
-      </View>}
-      {available&&<View style={s.card}>
-        <Text style={s.strong}>요청할 판정 (현재 판정과 달라야 함)</Text>
-        <View style={s.row}>
-          {(['PASS','FAIL'] as const).map(value=><Pressable key={value}
-            style={[s.choice,claim===value&&s.choiceOn,value===current&&s.disabled]} disabled={value===current || submitting} onPress={()=>setClaim(value)}
-            accessibilityRole="button" accessibilityState={{selected:claim===value,disabled:value===current || submitting}}>
-            <Text style={[s.choiceText,claim===value&&s.choiceOnText]}>{value}</Text>
-          </Pressable>)}
+    <KeyboardAvoidingView style={s.flex} behavior={Platform.OS==='ios'?'padding':undefined}>
+      <ScrollView ref={scrollRef} style={s.flex} contentContainerStyle={s.body}
+        onLayout={revealFocusedInput} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
+        <View style={s.top}>
+          <Pressable onPress={()=>router.back()}><Text style={s.link}>‹ 검사 상세로 돌아가기</Text></Pressable>
+          <Text style={s.title}>시스템 판정 확인 요청</Text>
+          <Text style={s.muted}>실물·추가 자료와 다른 시스템 판정이 의심될 때만 요청합니다. 최초 판정은 그대로 보존됩니다.</Text>
         </View>
-        <Text style={s.strong}>확인 부위 (선택, 최대 100자)</Text>
-        <TextInput value={area} onChangeText={setArea} maxLength={100}
-          placeholder="예: 고정핀" placeholderTextColor="#64748B" style={s.input}/>
-        <Text style={s.strong}>판정 확인 근거 (필수, 1~500자)</Text>
-        <TextInput value={reason} onChangeText={setReason} maxLength={500} multiline
-          placeholder="실물 관찰 근거를 구체적으로 작성하세요." placeholderTextColor="#64748B" style={[s.input,s.multi]}/>
-        <Text style={s.muted}>근거 사진 첨부는 이번 버전의 지원 범위 밖입니다.</Text>
-        <Pressable disabled={submitting} style={[s.submit,submitting&&s.disabled]} onPress={confirm}>
+        {loading&&<ActivityIndicator/>}
+        {error&&<Text style={s.error}>{error}</Text>}
+        {!loading&&!submitting&&<Pressable style={s.outline} onPress={()=>{void refresh(submittedRequestId);}}><Text style={s.link}>최신 검사 다시 조회</Text></Pressable>}
+        {submittedRequestId&&<View style={s.card}><Text style={s.success}>
+          {pendingRequest?.requestId===submittedRequestId?'판정 확인 요청이 접수되었습니다. 관리자 검토를 기다려 주세요.':'판정 확인 요청이 접수되었습니다.'}
+        </Text></View>}
+        {detail&&<View style={s.card}>
+          <Text style={s.strong}>{detail.inspectionNo} · {detail.partCode}</Text>
+          <Text style={s.muted}>최초 판정: {detail.finalJudgement??'미확정'} · {actorLabelV4(detail.judgedBy)}</Text>
+          <Text style={s.muted}>현재 판정: {currentJudgementV4(detail.finalJudgement,detail.correction)??'미확정'}</Text>
+          {detail.correction&&<Text style={s.muted}>기존 정정: {detail.correction.correctedJudgement} · {detail.correction.correctedBy} ({detail.correction.note})</Text>}
+          {detail.judgementRequests.map(r=><View key={r.requestId} style={s.history}>
+            <Text style={s.strong}>{judgementRequestStatusLabelV4(r.status)} · 주장 {r.claimedJudgement}</Text>
+            <Text style={s.muted}>{r.requestedBy}: {r.reason}</Text>
+            {r.resolveNote&&<Text style={s.muted}>관리자 처리: {r.resolveNote}</Text>}
+          </View>)}
+          {role!=='WORKER'&&<Text style={s.error}>작업자 계정에서만 요청할 수 있습니다.</Text>}
+          {role==='WORKER'&&detail.judgedBy!=='SYSTEM'&&<Text style={s.error}>시스템 판정 건이 아니므로 요청 대상이 아닙니다.</Text>}
+          {pendingRequest&&pendingRequest.requestId!==submittedRequestId&&<Text style={s.muted}>관리자 검토 대기 중입니다.</Text>}
+        </View>}
+        {available&&<View style={s.card}>
+          <Text style={s.strong}>요청할 판정 (현재 판정과 달라야 함)</Text>
+          <View style={s.row}>
+            {(['PASS','FAIL'] as const).map(value=><Pressable key={value}
+              style={[s.choice,claim===value&&s.choiceOn,value===current&&s.disabled]} disabled={value===current || submitting} onPress={()=>setClaim(value)}
+              accessibilityRole="button" accessibilityState={{selected:claim===value,disabled:value===current || submitting}}>
+              <Text style={[s.choiceText,claim===value&&s.choiceOnText]}>{value}</Text>
+            </Pressable>)}
+          </View>
+          <Text style={s.strong}>확인 부위 (선택, 최대 100자)</Text>
+          <TextInput ref={areaRef} onFocus={revealFocusedInput} value={area} onChangeText={setArea} maxLength={100}
+            placeholder="예: 고정핀" placeholderTextColor="#64748B" style={s.input}/>
+          <Text style={s.strong}>판정 확인 근거 (필수, 1~500자)</Text>
+          <TextInput ref={reasonRef} onFocus={revealFocusedInput} value={reason} onChangeText={setReason} maxLength={500} multiline
+            placeholder="실물 관찰 근거를 구체적으로 작성하세요." placeholderTextColor="#64748B" style={[s.input,s.multi]}/>
+          <Text style={s.muted}>근거 사진 첨부는 이번 버전의 지원 범위 밖입니다.</Text>
+        </View>}
+      </ScrollView>
+      {available&&<View style={s.footer}>
+        <Pressable accessibilityRole="button" accessibilityState={{disabled:submitting}}
+          disabled={submitting} style={[s.submit,submitting&&s.disabled]} onPress={confirm}>
           <Text style={s.submitText}>{submitting?'요청 제출 중…':'관리자 판정 확인 요청'}</Text>
         </Pressable>
       </View>}
-    </ScrollView>
+    </KeyboardAvoidingView>
   </SafeAreaView>;
 }
 const s=StyleSheet.create({
-  root:{flex:1,backgroundColor:'#F5F7FB'},top:{padding:18,gap:9},body:{paddingHorizontal:18,paddingBottom:28,gap:12},
+  root:{flex:1,backgroundColor:'#F5F7FB'},flex:{flex:1},top:{paddingVertical:18,gap:9},
+  body:{paddingHorizontal:18,paddingBottom:16,gap:12},
+  footer:{paddingHorizontal:18,paddingVertical:8,borderTopWidth:StyleSheet.hairlineWidth,borderColor:'#E4E7EC',backgroundColor:'#FFFFFF'},
   title:{fontSize:22,fontWeight:'700',color:'#111827'},muted:{fontSize:12,lineHeight:19,color:'#64748B'},
   link:{fontSize:13,fontWeight:'700',color:'#2054D8'},strong:{fontSize:13,fontWeight:'700',color:'#111827'},
   card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:15,gap:12},
