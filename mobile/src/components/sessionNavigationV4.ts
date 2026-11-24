@@ -14,10 +14,15 @@ export function requiresLiveSession(name: string, params?: Readonly<{ mode?: unk
 
 // Expo Router 58 requires the existing navigator key, route names and key counter
 // on RESET. Passing just { index, routes } is ignored by its native stack router.
-export function resetToLoginAction(current: {
-  key: string; routeNames: readonly string[]; routeKeySeq: number; stale: false;
+export function resetLiveStackToLogin(navigation: {
+  getState(): { key: string; routeNames: readonly string[]; routeKeySeq: number; stale: false };
+  dispatch(action: { type: 'RESET'; payload: object }): void;
 }) {
-  return { type: 'RESET', payload: { ...current, index: 0, routes: [{ name: 'index' }] } };
+  const current = navigation.getState();
+  navigation.dispatch({
+    type: 'RESET',
+    payload: { ...current, index: 0, routes: [{ name: 'index' }] },
+  });
 }
 
 export function observeNavigationSession(

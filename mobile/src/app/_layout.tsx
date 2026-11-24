@@ -5,7 +5,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { authV4 } from '../api/backendV4/authRuntime';
 import { AutoFailInAppAlertHostV4 } from '../components/AutoFailInAppAlertV4';
 import {
-  type NavigationSession, observeNavigationSession, requiresLiveSession, resetToLoginAction,
+  type NavigationSession, observeNavigationSession, requiresLiveSession, resetLiveStackToLogin,
 } from '../components/sessionNavigationV4';
 
 function LiveScreen({ session, resetToLogin, children }: {
@@ -32,7 +32,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}
         screenLayout={({ route, navigation, children }) => requiresLiveSession(route.name, route.params)
           ? <LiveScreen session={session}
-              resetToLogin={() => navigation.dispatch(resetToLoginAction)}>
+              resetToLogin={() => resetLiveStackToLogin(navigation)}>
               {children}
             </LiveScreen>
           : children}>

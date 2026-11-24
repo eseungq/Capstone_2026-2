@@ -13,7 +13,7 @@ Module._extensions['.ts'] = (module, filename) => {
   module._compile(outputText, filename);
 };
 
-const { requiresLiveSession, observeNavigationSession, resetToLoginAction } =
+const { requiresLiveSession, observeNavigationSession, resetLiveStackToLogin } =
   require('../src/components/sessionNavigationV4.ts');
 const worker = { signedIn: true, role: 'WORKER', loginId: 'worker' };
 const signedOut = { signedIn: false, role: null, loginId: null };
@@ -80,7 +80,7 @@ test('membership changes hide existing protected content until the new account i
   assert.equal(h.seen.length, states);
 });
 
-test('the installed Expo stack accepts the logout reset and has no previous screen for native Back', () => {
+test('the installed Expo screen dispatches a concrete reset and native Back cannot reopen old routes', () => {
   const { StackRouter } = require('expo-router/build/react-navigation/routers/StackRouter');
   const { goBack } = require('expo-router/build/react-navigation/routers/CommonActions');
   const { RouterActionHandling } = require('expo-router/build/react-navigation/routers/types');
@@ -95,7 +95,29 @@ test('the installed Expo stack accepts the logout reset and has no previous scre
     ],
   };
   const config = { routeParamList: {}, routeGetIdList: {} };
-  const { state: reset } = stack.getStateForAction(state, resetToLoginAction(state), config);
+  // Use the real screen-scoped bridge as well as the reducer. In SDK 58 the
+  // bridge spreads its argument and adds a source, so dispatching a factory loses its type.
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const { useNavigationCache } = require('expo-router/build/react-navigation/core/useNavigationCache');
+  let screenNavigation;
+  let dispatched;
+  function CaptureNavigation() {
+    const forRoute = useNavigationCache({
+      routes: state.routes,
+      routeNames: state.routeNames,
+      router: stack,
+      navigation: { getState: () => state, dispatch: (action) => { dispatched = action; } },
+      emitter: { create: () => ({}) },
+    });
+    screenNavigation = forRoute(state.routes[state.index], false);
+    return null;
+  }
+  renderToStaticMarkup(React.createElement(CaptureNavigation));
+  resetLiveStackToLogin(screenNavigation);
+  assert.equal(dispatched.source, 'settings:2');
+  assert.equal(dispatched.type, 'RESET');
+  const { state: reset } = stack.getStateForAction(state, dispatched, config);
   assert.deepEqual(reset.routes.map(({ name }) => name), ['index']);
   assert.equal(stack.getStateForAction(reset, goBack(), config), RouterActionHandling.Unhandled);
 });
