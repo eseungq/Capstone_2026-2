@@ -15,7 +15,7 @@ Module._extensions['.ts'] = (module, filename) => {
 };
 
 const api = require(path.join(__dirname, '../src/api/backendV4/recheckCoreV4.ts'));
-const { createInspectionDwellTrackerV4 } = require(
+const { createInspectionDwellTrackerV4, createSessionDwellStoreV4 } = require(
   path.join(__dirname, '../src/api/backendV4/inspectionDwellV4.ts'));
 const { makeConfirmBodyV4 } = require(
   path.join(__dirname, '../src/api/backendV4/inspectionWriteCore.ts'));
@@ -66,6 +66,28 @@ test('first focus and reentry count, background resume does not', () => {
   assert.equal(t.snapshot(id,25000).screenDwellMs,4000+3000+5000);
   assert.equal(t.snapshot(id,25000).openCount,2);
 });
+test('inspection time survives navigation only for the same operator and login session', () => {
+  const forSession = createSessionDwellStoreV4();
+  const workerA = forSession('A', 1);
+  workerA.focus(id, true, 1000);
+  workerA.blur(id, 4000);
+  const returning = forSession('A', 1);
+  returning.focus(id, true, 5000);
+  assert.equal(returning.snapshot(id, 6000).screenDwellMs, 4000);
+  returning.blur(id, 6000);
+
+  const workerB = forSession('B', 2);
+  workerB.focus(id, true, 8000);
+  assert.deepEqual(workerB.snapshot(id, 9000), {
+    screenDwellMs: 1000, openCount: 1, firstOpenedAt: new Date(8000).toISOString(),
+  });
+  // A delayed success for A cannot erase B's measurement for the same inspection.
+  workerA.clear(id);
+  assert.equal(workerB.snapshot(id, 9000).openCount, 1);
+  assert.equal(forSession('B', 3).snapshot(id), null);
+  assert.equal(forSession('A', 3).snapshot(id), null);
+});
+
 test('failed submit preserves timing and successful submit clears it', () => {
   const t=createInspectionDwellTrackerV4();
   t.focus(id,true,1000);

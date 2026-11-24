@@ -1,5 +1,6 @@
-import React,{useCallback,useEffect,useRef,useState} from 'react';
-import {router,Stack,useLocalSearchParams} from 'expo-router';
+import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
+import React,{useCallback,useRef,useState} from 'react';
+import {router,Stack,useFocusEffect,useLocalSearchParams} from 'expo-router';
 import {ActivityIndicator,Alert,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {authV4} from '../api/backendV4/authRuntime';
@@ -28,16 +29,20 @@ function JudgementRequestForm({id}:{id:string}){
   const [claim,setClaim]=useState<FinalJudgementV4>('FAIL');
   const [submitting,setSubmitting]=useState(false);
   const [submittedRequestId,setSubmittedRequestId]=useState<string|null>(null);
-  const submittingRef=useRef(false),serial=useRef(0),mounted=useRef(true);
+  const submittingRef=useRef(false),serial=useRef(0),mounted=useRef(false);
+  const visitEpoch = useRef(authV4.sessionEpoch());
+  const isCurrent = useCallback((revision:number) =>
+    mounted.current && revision === serial.current && visitEpoch.current === authV4.sessionEpoch(), []);
   const refresh=useCallback(async(expectedRequestId?:string|null)=>{
     const count=++serial.current;
     setLoading(true);setError(null);
     try{
       const session=await authV4.restore();
+      if(!isCurrent(count))return;
       if(!session.signedIn)throw new Error('서버 로그인이 필요합니다.');
       const result=await reader.detail(id);
-      if(count!==serial.current||!mounted.current)return;
-      if(result.source!=='SERVER')throw new Error('실제 서버 검사 응답이 아닙니다.');
+      if(!isCurrent(count))return;
+      if(result.source!=='SERVER'||result.value.inspectionId!==id)throw new Error('실제 서버 검사 응답이 아닙니다.');
       if(expectedRequestId && !result.value.judgementRequests.some(request=>request.requestId===expectedRequestId)){
         throw new Error('접수한 요청이 최신 이력에 아직 표시되지 않았습니다.');
       }
@@ -45,25 +50,40 @@ function JudgementRequestForm({id}:{id:string}){
       const current=currentJudgementV4(result.value.finalJudgement,result.value.correction);
       if(current)setClaim(current==='PASS'?'FAIL':'PASS');
     }catch(e){
-      if(count===serial.current&&mounted.current){
+      if(isCurrent(count)){
         setError(expectedRequestId ? `최신 이력을 다시 조회해 주세요. ${err(e)}` : err(e));
         setDetail(null);
       }
     }
-    finally{if(count===serial.current&&mounted.current)setLoading(false);}
-  },[id]);
-  useEffect(()=>{mounted.current=true;void refresh();return()=>{mounted.current=false;serial.current++};},[refresh]);
+    finally{if(isCurrent(count))setLoading(false);}
+  },[id,isCurrent]);
+  useFocusEffect(useCallback(() => {
+    mounted.current = true;
+    const nextEpoch = authV4.sessionEpoch();
+    if (visitEpoch.current !== nextEpoch) {
+      setArea(''); setReason(''); setSubmittedRequestId(null);
+    }
+    visitEpoch.current = nextEpoch;
+    setDetail(null);
+    setRole(null);
+    setSubmitting(submittingRef.current);
+    void refresh();
+    return () => { mounted.current = false; serial.current++; };
+  },[refresh]));
   const pendingRequest=detail?.judgementRequests.find(request=>request.status==='OPEN');
+  const current = detail ? currentJudgementV4(detail.finalJudgement, detail.correction) : null;
   const available=!loading&&role==='WORKER'&&detail?.judgedBy==='SYSTEM'&&detail.finalJudgement!==null&&!pendingRequest;
   const send=async(confirmedRevision:number)=>{
-    if(!mounted.current||confirmedRevision!==serial.current||submittingRef.current||!detail||!available)return;
+    if(!isCurrent(confirmedRevision)||submittingRef.current||!detail||!available)return;
     submittingRef.current=true;setSubmitting(true);setError(null);setSubmittedRequestId(null);
     try{
       const session=await authV4.restore();
-      if(!session.signedIn||session.role!=='WORKER')throw new Error('WORKER 로그인 정보를 확인하세요.');
+      if(!isCurrent(confirmedRevision))return;
+      if(!session.signedIn||session.role!=='WORKER')throw new Error('작업자 로그인 정보를 확인하세요.');
       // 전송 전 서버 최신 판정·정정·OPEN 요청을 다시 조회하여 화면의 낡은 값으로 POST하지 않습니다.
       const latest=(await reader.detail(id)).value;
-      if(!mounted.current||confirmedRevision!==serial.current)return;
+      if(!isCurrent(confirmedRevision))return;
+      if(latest.inspectionId!==id)throw new Error('선택한 검사를 확인할 수 없습니다. 다시 조회해 주세요.');
       if(latest.judgedBy!=='SYSTEM'||latest.finalJudgement!==detail.finalJudgement||
         currentJudgementV4(latest.finalJudgement,latest.correction)!==
         currentJudgementV4(detail.finalJudgement,detail.correction)||
@@ -72,17 +92,18 @@ function JudgementRequestForm({id}:{id:string}){
         throw new Error('검사 판정/요청 상태가 변경됐습니다. 최신 상세를 다시 검토해 주세요.');
       }
       const result=await writer.request(session.role,latest,claim,area,reason);
-      if(mounted.current){
+      if(isCurrent(confirmedRevision)){
         setSubmittedRequestId(result.requestId);
         setDetail(null);
         setArea('');setReason('');
         await refresh(result.requestId);
       }
-    }catch(e){if(mounted.current)setError(err(e));}
+    }catch(e){if(isCurrent(confirmedRevision))setError(err(e));}
     finally{submittingRef.current=false;if(mounted.current)setSubmitting(false);}
   };
   const confirm=()=>{
     if(!available||submitting)return;
+    if(claim===current){setError('현재 판정과 다른 판정을 선택해 주세요.');return;}
     if(!reason.trim()){setError('확인 근거를 입력해 주세요.');return;}
     const revision=serial.current;
     Alert.alert('판정 확인 요청 제출',`${detail?.inspectionNo} · 현재 ${currentJudgementV4(detail?.finalJudgement??null,detail?.correction??null)} → 주장 ${claim}\n원본 시스템 판정은 변경되지 않으며 관리자 검토를 요청합니다.`,[
@@ -107,7 +128,7 @@ function JudgementRequestForm({id}:{id:string}){
       </Text></View>}
       {detail&&<View style={s.card}>
         <Text style={s.strong}>{detail.inspectionNo} · {detail.partCode}</Text>
-        <Text style={s.muted}>최초 판정: {detail.finalJudgement??'미확정'} · {detail.judgedBy??'미제공'}</Text>
+        <Text style={s.muted}>최초 판정: {detail.finalJudgement??'미확정'} · {actorLabelV4(detail.judgedBy)}</Text>
         <Text style={s.muted}>현재 판정: {currentJudgementV4(detail.finalJudgement,detail.correction)??'미확정'}</Text>
         {detail.correction&&<Text style={s.muted}>기존 정정: {detail.correction.correctedJudgement} · {detail.correction.correctedBy} ({detail.correction.note})</Text>}
         {detail.judgementRequests.map(r=><View key={r.requestId} style={s.history}>
@@ -115,7 +136,7 @@ function JudgementRequestForm({id}:{id:string}){
           <Text style={s.muted}>{r.requestedBy}: {r.reason}</Text>
           {r.resolveNote&&<Text style={s.muted}>관리자 처리: {r.resolveNote}</Text>}
         </View>)}
-        {role!=='WORKER'&&<Text style={s.error}>WORKER 계정에서만 요청할 수 있습니다.</Text>}
+        {role!=='WORKER'&&<Text style={s.error}>작업자 계정에서만 요청할 수 있습니다.</Text>}
         {role==='WORKER'&&detail.judgedBy!=='SYSTEM'&&<Text style={s.error}>시스템 판정 건이 아니므로 요청 대상이 아닙니다.</Text>}
         {pendingRequest&&pendingRequest.requestId!==submittedRequestId&&<Text style={s.muted}>관리자 검토 대기 중입니다.</Text>}
       </View>}
@@ -123,8 +144,8 @@ function JudgementRequestForm({id}:{id:string}){
         <Text style={s.strong}>요청할 판정 (현재 판정과 달라야 함)</Text>
         <View style={s.row}>
           {(['PASS','FAIL'] as const).map(value=><Pressable key={value}
-            style={[s.choice,claim===value&&s.choiceOn]} onPress={()=>setClaim(value)}
-            accessibilityRole="button" accessibilityState={{selected:claim===value}}>
+            style={[s.choice,claim===value&&s.choiceOn,value===current&&s.disabled]} disabled={value===current || submitting} onPress={()=>setClaim(value)}
+            accessibilityRole="button" accessibilityState={{selected:claim===value,disabled:value===current || submitting}}>
             <Text style={[s.choiceText,claim===value&&s.choiceOnText]}>{value}</Text>
           </Pressable>)}
         </View>

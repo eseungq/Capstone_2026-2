@@ -22,8 +22,17 @@ import type { ManualReplyV4, RetryReplyV4 } from '../api/backendV4/inspectionWri
 import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
 import type { FinalJudgementV4, InspectionViewV4 } from '../api/backendV4/types';
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
-import { inspectionDwellV4 } from '../api/backendV4/inspectionDwellV4';
+import { inspectionDwellForSessionV4 } from '../api/backendV4/inspectionDwellV4';
 import { createRecheckServiceV4 } from '../api/backendV4/recheckServiceV4';
+
+import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
+
+type DetailVisit = {
+  id: string;
+  epoch: number;
+  loginId: string | null;
+  dwell: ReturnType<typeof inspectionDwellForSessionV4> | null;
+};
 
 const recheckService = createRecheckServiceV4(authV4);
 
@@ -42,7 +51,10 @@ function formatTime(value: string | null | undefined): string {
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiV4RequestError) {
-    return `${error.message} (${error.code})${error.traceId ? `\ntraceId: ${error.traceId}` : ''}`;
+    if (error.httpStatus === 401) return '로그인이 만료되었습니다. 다시 로그인해 주세요.';
+    if (error.httpStatus === 403) return '현재 계정으로 이 검사를 조회할 수 없습니다.';
+    if (error.httpStatus === 404) return '검사를 찾을 수 없습니다. 검사 이력을 다시 확인해 주세요.';
+    return '검사 정보를 불러오지 못했습니다. 연결 상태를 확인하고 다시 조회해 주세요.';
   }
   return error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
 }
@@ -50,7 +62,7 @@ function errorMessage(error: unknown): string {
 function actionErrorMessage(error: unknown): string {
   if (error instanceof ApiV4RequestError) {
     const guidance = writeErrorLabelV4(error.code);
-    return `${guidance}\n${error.message} (HTTP ${error.httpStatus}, ${error.code})${error.traceId ? `\ntraceId: ${error.traceId}` : ''}`;
+    return guidance;
   }
   if (error instanceof WriteV4ValidationError) {
     return `${writeErrorLabelV4(error.code)}\n${error.message} (${error.code})`;
@@ -118,53 +130,10 @@ export default function InspectionLiveScreen() {
   const [manualResult, setManualResult] = useState<ManualReplyV4 | null>(null);
   const [modelAvailable, setModelAvailable] = useState<boolean | null>(null);
   const submitLock = useRef(false);
-  const currentIdRef = useRef(id);
-  currentIdRef.current = id;
-
-  // URL/파라미터의 role 값이 아닌 보안 저장소의 로그인 역할만 사용합니다.
-  useFocusEffect(useCallback(() => {
-    let cancelled = false;
-    setRoleLoading(true);
-    void authV4.restore().then((session) => {
-      if (!cancelled) setRole(session.role);
-    }).catch(() => {
-      if (!cancelled) setRole(null);
-    }).finally(() => {
-      if (!cancelled) setRoleLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, []));
-
-  useEffect(() => {
-    setActionError(null);
-    setActionMessage(null);
-    setRetryResult(null);
-    setManualResult(null);
-    setModelAvailable(null);
-    setComment('');
-    setRecheckComment('');
-    setAcknowledgeNote('');
-  }, [id]);
-
-  // 실서버 상세가 화면 앞에 보이는 시간만 누적. 사진 확대·다른 화면·백그라운드에서는 정지.
-  useFocusEffect(useCallback(() => {
-    if (!id) return;
-    const foreground = AppState.currentState === 'active' || AppState.currentState == null;
-    inspectionDwellV4.focus(id, foreground);
-    const sub = AppState.addEventListener('change', (state) => {
-      inspectionDwellV4.setForeground(id, state === 'active');
-    });
-    return () => {
-      sub.remove();
-      inspectionDwellV4.blur(id);
-    };
-  }, [id]));
-
-  // 화면 이탈이나 앱 백그라운드 진입 시 자동 이미지 갱신을 정지합니다.
-  useFocusEffect(useCallback(() => {
-    setIsFocused(true);
-    return () => setIsFocused(false);
-  }, []));
+  const visitRef = useRef<DetailVisit | null>(null);
+  const previousVisit = useRef<{ id: string; epoch: number } | null>(null);
+  const isCurrentVisit = useCallback((visit: DetailVisit | null) =>
+    visit !== null && visitRef.current === visit && visit.epoch === authV4.sessionEpoch(), []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -174,6 +143,8 @@ export default function InspectionLiveScreen() {
   }, []);
 
   const load = useCallback(async (initial = false) => {
+    const visit = visitRef.current;
+    if (!isCurrentVisit(visit)) return;
     const serial = ++requestSerial.current;
     if (initial) {
       setLoading(true);
@@ -187,10 +158,11 @@ export default function InspectionLiveScreen() {
     }
     setError(null);
     try {
-      if (!id) throw new Error('검사 UUID가 전달되지 않았습니다.');
+      if (!id) throw new Error('조회할 검사를 다시 선택해 주세요.');
       const response = await inspectionReader.detail(id);
-      if (serial !== requestSerial.current) return;
+      if (serial !== requestSerial.current || !isCurrentVisit(visit)) return;
       const next = response.value;
+      if (next.inspectionId !== id) throw new Error('선택한 검사 정보를 확인할 수 없습니다. 다시 조회해 주세요.');
       setDetail(next);
       // 서버가 실패했던 이미지 URL을 그대로 재발급해도 성공으로 표시하지 않습니다.
       const urls = [next.originalImageUrl, next.gradcamImageUrl].filter(
@@ -198,23 +170,72 @@ export default function InspectionLiveScreen() {
       );
       const stillBroken = urls.some((url) => failedImageUrls.current.has(url));
       setImageNotice(stillBroken
-        ? '서버에서 같은 이미지 주소를 받았습니다. 계속 실패하면 서명 URL과 저장소 연결을 확인해 주세요.'
+        ? '사진을 다시 불러왔지만 표시할 수 없습니다. 잠시 후 다시 조회해 주세요.'
         : null);
     } catch (cause) {
-      if (serial !== requestSerial.current) return;
+      if (serial !== requestSerial.current || !isCurrentVisit(visit)) return;
       setError(errorMessage(cause));
     } finally {
-      if (serial === requestSerial.current) {
+      if (serial === requestSerial.current && isCurrentVisit(visit)) {
         setLoading(false);
         setRefreshing(false);
       }
     }
-  }, [id]);
+  }, [id, isCurrentVisit]);
 
-  useEffect(() => {
-    void load(true);
-    return () => { requestSerial.current += 1; };
-  }, [load]);
+  // 상세로 돌아올 때마다 요청·정정 이력을 갱신하고 이전 방문의 읽기와 제출 콜백을 무효화합니다.
+  useFocusEffect(useCallback(() => {
+    const visit: DetailVisit = { id, epoch: authV4.sessionEpoch(), loginId: null, dwell: null };
+    if (previousVisit.current?.id !== id || previousVisit.current.epoch !== visit.epoch) {
+      setComment('');
+      setRecheckComment('');
+      setAcknowledgeNote('');
+      setActionError(null);
+      setActionMessage(null);
+      setRetryResult(null);
+      setManualResult(null);
+      setModelAvailable(null);
+    }
+    previousVisit.current = { id, epoch: visit.epoch };
+    visitRef.current = visit;
+    setIsFocused(true);
+    setRole(null);
+    setRoleLoading(true);
+    setDetail(null);
+    setError(null);
+    setLoading(true);
+    setSubmitting(null);
+    void authV4.restore().then(session => {
+      if (!isCurrentVisit(visit)) return;
+      if (!session.signedIn || (session.role !== 'WORKER' && session.role !== 'ADMIN')) {
+        throw new Error('검사 상세를 보려면 작업자 또는 관리자 계정으로 로그인해 주세요.');
+      }
+      visit.loginId = session.loginId;
+      setRole(session.role);
+      if (session.role === 'WORKER' && session.loginId && id) {
+        visit.dwell = inspectionDwellForSessionV4(session.loginId, visit.epoch);
+        visit.dwell.focus(id, AppState.currentState === 'active' || AppState.currentState == null);
+      }
+      void load(true);
+    }).catch(cause => {
+      if (isCurrentVisit(visit)) {
+        setError(errorMessage(cause));
+        setLoading(false);
+      }
+    }).finally(() => {
+      if (isCurrentVisit(visit)) setRoleLoading(false);
+    });
+    const subscription = AppState.addEventListener('change', state => {
+      if (isCurrentVisit(visit)) visit.dwell?.setForeground(id, state === 'active');
+    });
+    return () => {
+      subscription.remove();
+      visit.dwell?.blur(id);
+      visitRef.current = null;
+      requestSerial.current += 1;
+      setIsFocused(false);
+    };
+  }, [id, isCurrentVisit, load]));
 
   // 화면이 활성 상태인 동안에만 만료 30초 전 상세를 다시 조회합니다.
   // 복귀 시 이미 만료됐으면 즉시 조회하되, 같은 만료 시각은 자동 재시도하지 않습니다.
@@ -244,7 +265,7 @@ export default function InspectionLiveScreen() {
     if (url !== detail?.originalImageUrl && url !== detail?.gradcamImageUrl) return;
     if (failedImageUrls.current.has(url)) return;
     failedImageUrls.current.add(url);
-    setImageNotice('이미지 접근에 실패하여 새 주소를 조회합니다. 같은 주소가 실패하면 저장소 접근을 확인해 주세요.');
+    setImageNotice('사진을 표시할 수 없어 다시 불러오는 중입니다.');
     if (!isFocused || !isForeground) {
       pendingImageRefreshOnResume.current = true;
       return;
@@ -278,9 +299,10 @@ export default function InspectionLiveScreen() {
 
   // 실제 서버 POST 이전에 GET으로 현재 상태를 확인합니다.
   // 오류나 타임아웃이 발생하면 자동 재전송하지 않습니다.
+  const displayedVisit = visitRef.current;
   const submitAction = async (action: 'confirm' | 'retry' | 'manual', judgement?: FinalJudgementV4) => {
     let manualNewInspectionId: string | null = null;
-    if (submitLock.current || !visibleDetail || !id) return;
+    if (submitLock.current || !visibleDetail || !displayedVisit || displayedVisit.id !== id || !isCurrentVisit(displayedVisit)) return;
     const submittedId = id;
     submitLock.current = true;
     setSubmitting(action);
@@ -290,18 +312,20 @@ export default function InspectionLiveScreen() {
     if (action === 'manual') setManualResult(null);
     try {
       const session = await authV4.restore();
-      if (!session.signedIn || !session.role) throw new Error('실제 서버 로그인 상태와 역할을 다시 확인해 주세요.');
+      if (!isCurrentVisit(displayedVisit)) return;
+      if (!session.signedIn || !session.role || session.loginId !== displayedVisit.loginId) throw new Error('실제 서버 로그인 상태와 역할을 다시 확인해 주세요.');
       if (action === 'confirm' && session.role !== 'WORKER') {
-        throw new Error('최종 PASS/FAIL 판정은 WORKER 계정에서만 가능합니다.');
+        throw new Error('최종 PASS/FAIL 판정은 작업자 계정에서만 가능합니다.');
       }
       if (action === 'retry' && session.role !== 'WORKER' && session.role !== 'ADMIN') {
-        throw new Error('FAILED 재검사는 WORKER 또는 ADMIN만 요청할 수 있습니다.');
+        throw new Error('FAILED 재검사는 작업자 또는 관리자만 요청할 수 있습니다.');
       }
       if (action === 'manual' && session.role !== 'WORKER') {
-        throw new Error('수동 판정 전환은 WORKER 계정에서만 가능합니다.');
+        throw new Error('수동 판정 전환은 작업자 계정에서만 가능합니다.');
       }
       const latest = (await inspectionReader.detail(submittedId)).value;
-      if (currentIdRef.current !== submittedId) return;
+      if (!isCurrentVisit(displayedVisit)) return;
+      if (latest.inspectionId !== submittedId) throw new Error('선택한 검사와 조회 결과가 다릅니다. 다시 조회해 주세요.');
       setDetail(latest);
       const origin = {
         inspectionId: latest.inspectionId,
@@ -321,17 +345,17 @@ export default function InspectionLiveScreen() {
         const reply = await writer.confirm(origin, {
           finalJudgement: judgement,
           comment,
-          ...(inspectionDwellV4.snapshot(submittedId) ?? {}),
+          ...(displayedVisit.dwell?.snapshot(submittedId) ?? {}),
         });
-        inspectionDwellV4.clear(submittedId);
-        if (currentIdRef.current !== submittedId) return;
+        displayedVisit.dwell?.clear(submittedId);
+        if (!isCurrentVisit(displayedVisit)) return;
         setActionMessage(`${reply.value.inspectionNo}: ${reply.value.finalJudgement} 판정이 서버에 저장됐습니다. (${formatTime(reply.value.confirmedAt)})`);
       } else if (action === 'retry') {
         if (!latest.canOfferRetry) {
           throw new Error('이미 후속 검사가 있거나 재검사할 수 없는 상태입니다. 최신 검사 정보를 확인해 주세요.');
         }
         const reply = await writer.retry(origin);
-        if (currentIdRef.current !== submittedId) return;
+        if (!isCurrentVisit(displayedVisit)) return;
         setRetryResult(reply.value);
         setActionMessage(`새 검사 ${reply.value.inspectionNo} 접수 완료 (RECEIVED). 원본 FAILED 기록은 유지됩니다.`);
       } else {
@@ -339,18 +363,18 @@ export default function InspectionLiveScreen() {
           throw new Error('이미 후속 검사가 있거나 수동 판정으로 전환할 수 없는 상태입니다. 최신 검사 정보를 확인해 주세요.');
         }
         const reply = await writer.manual(origin);
-        if (currentIdRef.current !== submittedId) return;
+        if (!isCurrentVisit(displayedVisit)) return;
         setManualResult(reply.value);
         manualNewInspectionId = reply.value.inspectionId;
         setActionMessage(`수동 판정 검사 ${reply.value.inspectionNo} 생성 완료. 원본 FAILED 기록은 유지됩니다.`);
       }
       // 성공 후 화면의 상태/URL을 서버에서 다시 조회합니다.
       await load(false);
-      if (manualNewInspectionId && currentIdRef.current === submittedId) {
+      if (manualNewInspectionId && isCurrentVisit(displayedVisit)) {
         router.push({ pathname: '/inspection-live', params: { inspectionId: manualNewInspectionId } });
       }
     } catch (cause) {
-      if (currentIdRef.current === submittedId) {
+      if (isCurrentVisit(displayedVisit)) {
         // 다른 기기/작업자가 먼저 원본 FAILED를 전환했다면 최신 followUp을 가져와
         // 원본 상세의 '후속 검사 상세 보기' 카드가 즉시 나타나게 합니다.
         // POST를 재전송하지 않으며, 최초 409 오류 메시지는 유지합니다.
@@ -365,7 +389,7 @@ export default function InspectionLiveScreen() {
       }
     } finally {
       submitLock.current = false;
-      if (currentIdRef.current === submittedId) setSubmitting(null);
+      if (isCurrentVisit(displayedVisit)) setSubmitting(null);
     }
   };
 
@@ -406,7 +430,7 @@ export default function InspectionLiveScreen() {
   };
 
   const submitRecheckAction = async (action: 'recheck' | 'acknowledge', result?: FinalJudgementV4) => {
-    if (submitLock.current || !visibleDetail || !id || submitting) return;
+    if (submitLock.current || !visibleDetail || !displayedVisit || displayedVisit.id !== id || !isCurrentVisit(displayedVisit) || submitting) return;
     const submittedId = id;
     submitLock.current = true;
     setSubmitting(action);
@@ -414,15 +438,17 @@ export default function InspectionLiveScreen() {
     setActionMessage(null);
     try {
       const session = await authV4.restore();
-      if (!session.signedIn || !session.role) throw new Error('실제 서버 계정으로 다시 로그인해 주세요.');
+      if (!isCurrentVisit(displayedVisit)) return;
+      if (!session.signedIn || !session.role || session.loginId !== displayedVisit.loginId) throw new Error('실제 서버 계정으로 다시 로그인해 주세요.');
       if (action === 'recheck' && session.role !== 'WORKER') {
-        throw new Error('표본 재확인 제출은 WORKER만 가능합니다.');
+        throw new Error('표본 재확인 제출은 작업자만 가능합니다.');
       }
       if (action === 'acknowledge' && session.role !== 'ADMIN') {
-        throw new Error('재확인 FAIL 확인함 처리는 ADMIN만 가능합니다.');
+        throw new Error('재확인 FAIL 확인함 처리는 관리자만 가능합니다.');
       }
       const latest = (await inspectionReader.detail(submittedId)).value;
-      if (currentIdRef.current !== submittedId) return;
+      if (!isCurrentVisit(displayedVisit)) return;
+      if (latest.inspectionId !== submittedId) throw new Error('선택한 검사와 조회 결과가 다릅니다. 다시 조회해 주세요.');
       setDetail(latest);
       if (latest.displayState !== 'AUTO_PASS' || latest.finalJudgement !== 'PASS' ||
           latest.judgedBy !== 'SYSTEM' || !latest.recheck) {
@@ -433,32 +459,32 @@ export default function InspectionLiveScreen() {
           throw new Error('이미 재확인했거나 제출할 수 없는 검사입니다.');
         }
         const reply = await recheckService.recheck(submittedId, result,
-          recheckComment, inspectionDwellV4.snapshot(submittedId));
-        if (currentIdRef.current !== submittedId) return;
-        inspectionDwellV4.clear(submittedId);
+          recheckComment, displayedVisit.dwell?.snapshot(submittedId) ?? null);
+        displayedVisit.dwell?.clear(submittedId);
+        if (!isCurrentVisit(displayedVisit)) return;
         setActionMessage(
           reply.inspectionNo + ': 재확인 ' + reply.recheck.result +
-          '이 별도로 저장됐습니다. 원래 PASS · SYSTEM 판정은 유지됩니다.',
+          '이 별도로 저장됐습니다. 원래 시스템의 PASS 판정은 유지됩니다.',
         );
       } else {
         if (latest.recheck.result !== 'FAIL' || latest.recheck.acknowledgedAt !== null) {
           throw new Error('관리자 확인함은 아직 확인하지 않은 재확인 FAIL에만 가능합니다.');
         }
         const reply = await recheckService.acknowledge(submittedId, acknowledgeNote);
-        if (currentIdRef.current !== submittedId) return;
+        if (!isCurrentVisit(displayedVisit)) return;
         setActionMessage(
           reply.inspectionNo + ': 관리자가 확인함으로 기록했습니다. 문제 해결 완료를 뜻하지 않습니다.',
         );
       }
       await load(false);
     } catch (cause) {
-      if (currentIdRef.current === submittedId) {
+      if (isCurrentVisit(displayedVisit)) {
         setActionError(actionErrorMessage(cause));
         // 오류에서는 체류 시간과 메모를 유지하며 POST를 자동 재시도하지 않습니다.
       }
     } finally {
       submitLock.current = false;
-      if (currentIdRef.current === submittedId) setSubmitting(null);
+      if (isCurrentVisit(displayedVisit)) setSubmitting(null);
     }
   };
 
@@ -583,7 +609,7 @@ export default function InspectionLiveScreen() {
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>AI 분석 없이 작업자 판정</Text>
                 <Text style={styles.muted}>
-                  AI 결과가 없는 수동 검사입니다. 원본 사진을 확인하고 WORKER가 PASS/FAIL을 직접 판정합니다.
+                  AI 결과가 없는 수동 검사입니다. 원본 사진을 확인하고 작업자가 PASS/FAIL을 직접 판정합니다.
                 </Text>
                 {visibleDetail.manualOf && (
                   <>
@@ -686,8 +712,8 @@ export default function InspectionLiveScreen() {
                   <Text style={styles.muted}>정정 근거: {visibleDetail.correction.note}</Text>
                 </>
               )}
-              <Field label="판정 주체" value={visibleDetail.judgedBy ?? '미제공'} />
-              <Field label="판정 시각" value={formatTime(visibleDetail.confirmedAt)} />
+              <Field label="최초 판정 주체" value={actorLabelV4(visibleDetail.judgedBy)} />
+              <Field label="최초 판정 시각" value={formatTime(visibleDetail.confirmedAt)} />
               {visibleDetail.errorCode && <Field label="오류 코드" value={visibleDetail.errorCode} />}
               {visibleDetail.errorMessage && <Text style={styles.errorText}>{visibleDetail.errorMessage}</Text>}
             </View>
@@ -697,7 +723,7 @@ export default function InspectionLiveScreen() {
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>AUTO_PASS 표본 재확인</Text>
                 <Text style={styles.muted}>
-                  원래 검사 판정: PASS · SYSTEM (변경하지 않음). 재확인 결과는 별도 기록입니다.
+                  원래 검사 판정: 시스템 판정 PASS. 재확인 결과는 별도 기록입니다.
                 </Text>
                 <Field label="표본 구간" value={visibleDetail.recheck.stratum} />
                 <Field label="표본 추출 비율" value={(visibleDetail.recheck.samplingRate * 100).toFixed(0) + '%'} />
@@ -713,7 +739,7 @@ export default function InspectionLiveScreen() {
                     <Text style={styles.errorText}>{visibleDetail.recheck.acknowledgedAt
                       ? '재확인 불량 · 관리자 확인함 (해결 완료 아님)'
                       : '재확인 불량 · 관리자의 추가 확인이 필요합니다.'}</Text>
-                    <Text style={styles.muted}>원래 AUTO_PASS 상태와 PASS · SYSTEM 판정은 유지됩니다.</Text>
+                    <Text style={styles.muted}>원래 AUTO_PASS 상태와 시스템의 PASS 판정은 유지됩니다.</Text>
                   </View>
                 )}
                 {visibleDetail.recheck.result === 'FAIL' && (
@@ -756,7 +782,7 @@ export default function InspectionLiveScreen() {
                   </>
                 )}
                 {!roleLoading && role === 'ADMIN' && visibleDetail.recheck.result === null && (
-                  <Text style={styles.muted}>재확인 PASS/FAIL 제출은 WORKER 전용입니다.</Text>
+                  <Text style={styles.muted}>재확인 PASS/FAIL 제출은 작업자 전용입니다.</Text>
                 )}
                 {!roleLoading && role === 'ADMIN' && visibleDetail.recheck.result === 'FAIL' &&
                   visibleDetail.recheck.acknowledgedAt === null && (
@@ -816,7 +842,7 @@ export default function InspectionLiveScreen() {
               <Text style={styles.muted}>요청 전 내용을 확인해 주세요. 중복 제출은 하지 않습니다.</Text>
               {roleLoading && <Text style={styles.muted}>로그인 역할 확인 중…</Text>}
               {!roleLoading && role !== 'WORKER' && role !== 'ADMIN' && (
-                <Text style={styles.errorText}>WORKER 또는 ADMIN 실제 서버 계정으로 로그인해 주세요.</Text>
+                <Text style={styles.errorText}>작업자 또는 관리자 계정으로 로그인해 주세요.</Text>
               )}
               {!roleLoading && role === 'ADMIN' && visibleDetail.canOfferConfirm && (
                 <Text style={styles.muted}>관리자 계정은 REVIEW를 조회할 수 있지만 PASS/FAIL 판정은 제출할 수 없습니다.</Text>
@@ -869,14 +895,14 @@ export default function InspectionLiveScreen() {
               {!visibleDetail.canOfferConfirm && !visibleDetail.canOfferRetry && !visibleDetail.canOfferManual && !visibleDetail.followUp && (
                 <Text style={styles.muted}>{visibleDetail.recheck?.result === null
                     ? (role === 'ADMIN'
-                      ? '관리자 계정은 표본 재확인 상태를 조회만 할 수 있습니다. 재확인 PASS/FAIL은 WORKER 전용입니다.'
+                      ? '관리자 계정은 표본 재확인 상태를 조회만 할 수 있습니다. 재확인 PASS/FAIL은 작업자 전용입니다.'
                       : role === 'WORKER'
                         ? '일반 REVIEW 판정이나 FAILED 후속 요청은 없습니다. 표본 재확인은 위 카드에서 제출해 주세요.'
-                        : '재확인 PASS/FAIL 제출은 WORKER 계정에서만 가능합니다.')
+                        : '재확인 PASS/FAIL 제출은 작업자 계정에서만 가능합니다.')
                     : '현재 서버 상태에서는 제출 가능한 일반 판정 또는 후속 검사 요청이 없습니다.'}</Text>
               )}
               {!roleLoading && role === 'ADMIN' && visibleDetail.canOfferManual && (
-                <Text style={styles.muted}>수동 판정으로 전환하려면 WORKER 계정으로 로그인해 주세요.</Text>
+                <Text style={styles.muted}>수동 판정으로 전환하려면 작업자 계정으로 로그인해 주세요.</Text>
               )}
               {submitting && (
                 <View style={styles.submitStatus}>
@@ -918,8 +944,8 @@ export default function InspectionLiveScreen() {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>사진이 보이지 않나요?</Text>
-              <Text style={styles.muted}>사진 주소가 만료되었거나 로드되지 않으면 다시 조회할 수 있습니다.</Text>
+              <Text style={styles.cardTitle}>검사 상세 새로고침</Text>
+              <Text style={styles.muted}>현재 판정과 사진을 다시 불러옵니다.</Text>
               <Pressable accessibilityRole="button"
                 style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed, refreshing && styles.disabledButton]}
                 disabled={refreshing}
@@ -927,7 +953,7 @@ export default function InspectionLiveScreen() {
                   lastAutoRefreshedExpiry.current = visibleDetail.imageUrlExpiresAt;
                   void load(false);
                 }}>
-                <Text style={styles.secondaryButtonText}>{refreshing ? '조회 중…' : '사진 다시 조회'}</Text>
+                <Text style={styles.secondaryButtonText}>{refreshing ? '조회 중…' : '검사 상세 다시 조회'}</Text>
               </Pressable>
             </View>
             <Text style={styles.muted}>

@@ -64,5 +64,15 @@ export function createInspectionDwellTrackerV4() {
   return { focus, blur, setForeground, snapshot, clear };
 }
 
-// 화면 이탈로 컴포넌트가 언마운트되어도 같은 검사 측정값은 유지합니다.
-export const inspectionDwellV4 = createInspectionDwellTrackerV4();
+// 상세 화면 사이를 이동하면 같은 로그인에서만 체류 시간을 이어서 측정합니다.
+export function createSessionDwellStoreV4() {
+  let active: { loginId: string; epoch: number; tracker: ReturnType<typeof createInspectionDwellTrackerV4> } | null = null;
+  return function forSession(loginId: string, epoch: number) {
+    if (!active || active.loginId !== loginId || active.epoch !== epoch) {
+      active = { loginId, epoch, tracker: createInspectionDwellTrackerV4() };
+    }
+    return active.tracker;
+  };
+}
+
+export const inspectionDwellForSessionV4 = createSessionDwellStoreV4();
