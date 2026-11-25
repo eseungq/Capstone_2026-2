@@ -32,7 +32,7 @@ import { createRecheckServiceV4 } from '../api/backendV4/recheckServiceV4';
 import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
 import { partLabelV4, qualityLabelV4, stratumLabelV4 } from '../components/partLabelV4';
 import { useRevealFocusedInputV4 } from '../components/useRevealFocusedInputV4';
-import { reviewAlertQueueV4 } from '../components/reviewAlertQueueV4';
+import { findNextReviewAlertV4, reviewAlertQueueV4 } from '../components/reviewAlertQueueV4';
 
 type DetailVisit = {
   id: string;
@@ -329,17 +329,11 @@ export default function InspectionLiveScreen() {
   const offerNextAlert=async(visit:DetailVisit)=>{
     const current=()=>isCurrentVisit(visit)&&reviewAlertQueueV4.matches(visit.epoch,flowToken,id);
     if(!flowToken||!current())return;
-    const findNext=async()=>{
-      for(const candidate of reviewAlertQueueV4.candidates(visit.epoch,flowToken,id)){
-        if(!current())return null;
-        const response=await inspectionReader.detail(candidate.inspectionId);
-        if(!current())return null;
-        if(response.source!=='SERVER'||response.value.inspectionId!==candidate.inspectionId)throw new Error('다음 검사 조회 응답을 확인할 수 없습니다.');
-        if(response.value.displayState==='REVIEW_PENDING'&&response.value.finalJudgement===null&&response.value.canOfferConfirm)return candidate;
-        reviewAlertQueueV4.discard(visit.epoch,flowToken,id,candidate);
-      }
-      return null;
-    };
+    const findNext=()=>findNextReviewAlertV4(reviewAlertQueueV4,visit.epoch,flowToken,id,current,async candidate=>{
+      const response=await inspectionReader.detail(candidate.inspectionId);
+      if(response.source!=='SERVER'||response.value.inspectionId!==candidate.inspectionId)throw new Error('다음 검사 조회 응답을 확인할 수 없습니다.');
+      return response.value.displayState==='REVIEW_PENDING'&&response.value.finalJudgement===null&&response.value.canOfferConfirm;
+    });
     const stop=()=>reviewAlertQueueV4.stop(visit.epoch,flowToken,id);
     try{
       const next=await findNext();

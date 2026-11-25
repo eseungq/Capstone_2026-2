@@ -89,6 +89,7 @@ const isAdmin = isLive ? verifiedRole === 'ADMIN' : role === 'ADMIN';
   const latestLiveAlert=liveBannerAlerts[0]??null;
   const openLiveAlert=()=>{
     if(!latestLiveAlert||verifiedRole!=='WORKER'||authV4.sessionEpoch()!==epoch)return;
+    if(!reviewAlertQueueV4.snapshot(epoch).some(a=>a.inspectionId===latestLiveAlert.inspectionId&&a.kind===latestLiveAlert.kind))return;
     const alertFlow=reviewAlertQueueV4.begin(epoch,latestLiveAlert);
     router.push({pathname:'/inspection-live',params:{inspectionId:latestLiveAlert.inspectionId,...(alertFlow?{alertFlow}:{})}});
   };
@@ -378,36 +379,6 @@ onPress={() =>
 const styles = StyleSheet.create({
   liveHeader: { paddingBottom: 16 },
   liveSubtitle: { fontSize: 13, lineHeight: 19 },
-  liveBanner: {
-    position: 'absolute',
-    bottom: 83,
-    left: 18,
-    right: 18,
-    zIndex: 20,
-    elevation: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderLeftWidth: 5,
-    borderColor: '#CBD5E1',
-    borderLeftColor: '#2054D8',
-    borderRadius: 14,
-    padding: 14,
-    gap: 6,
-    shadowColor: '#000000',
-    shadowOpacity: 0.14,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  liveBannerFailed: { borderLeftColor: '#B42318' },
-  liveBannerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  liveBannerTitle: { flex: 1, color: '#2054D8', fontSize: 15, fontWeight: '700' },
-  liveBannerFailedText: { color: '#B42318' },
-  liveBannerDismiss: { paddingHorizontal: 8, paddingVertical: 4 },
-  liveBannerDismissText: { color: '#64748B', fontSize: 13, fontWeight: '600' },
-  liveBannerDescription: { color: '#111827', fontSize: 13, fontWeight: '600' },
-  liveBannerNote: { color: '#64748B', fontSize: 13 },
-  liveBannerOpen: { backgroundColor: '#2054D8', borderRadius: 9, padding: 10, alignItems: 'center' },
-  liveBannerOpenText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   screen: {
     flex: 1,
     backgroundColor: '#F5F7FB',

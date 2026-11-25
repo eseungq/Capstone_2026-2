@@ -51,3 +51,18 @@ export function createReviewAlertQueueV4(){
   };
 }
 export const reviewAlertQueueV4=createReviewAlertQueueV4();
+
+/** Stop immediately on a failed read. Do not consume unresolved alerts. */
+export async function findNextReviewAlertV4(queue:ReturnType<typeof createReviewAlertQueueV4>,epoch:number,token:string,currentId:string,
+  isCurrent:()=>boolean,readEligible:(alert:MonitorAlertV4)=>Promise<boolean>){
+  const valid=()=>isCurrent()&&queue.matches(epoch,token,currentId);
+  for(const candidate of queue.candidates(epoch,token,currentId)){
+    if(!valid())return null;
+    const eligible=await readEligible(candidate);
+    if(!valid())return null;
+    if(!queue.candidates(epoch,token,currentId).some(a=>a.inspectionId===candidate.inspectionId))continue;
+    if(eligible)return candidate;
+    queue.discard(epoch,token,currentId,candidate);
+  }
+  return null;
+}

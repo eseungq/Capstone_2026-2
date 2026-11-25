@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 
 import { authV4 } from '../api/backendV4/authRuntime';
 import InspectionAlertBannerV4 from './InspectionAlertBannerV4';
+import {reviewAlertQueueV4} from './reviewAlertQueueV4';
 import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
 import {
   createAutoFailInAppControllerV4,
@@ -16,6 +17,12 @@ const reader = createInspectionReadServiceV4({ mode: 'api', transport: authV4 })
 export function AutoFailInAppAlertHostV4() {
   const pathname = usePathname();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
+  const epoch=authV4.sessionEpoch();
+  const [monitorPending,setMonitorPending]=useState(()=>reviewAlertQueueV4.snapshot(epoch).length>0);
+  useEffect(()=>{
+    setMonitorPending(reviewAlertQueueV4.snapshot(epoch).length>0);
+    return reviewAlertQueueV4.subscribe(()=>setMonitorPending(reviewAlertQueueV4.snapshot(epoch).length>0));
+  },[epoch]);
   const isLive = (
     (['/monitoring', '/history', '/settings', '/statistics', '/policy-adjust'].includes(pathname) && mode === 'live')
     || pathname.endsWith('-live')
@@ -37,11 +44,11 @@ export function AutoFailInAppAlertHostV4() {
   }, [isLive, pathname]);
 
   return isLive && sessionKey !== null
-    ? <AutoFailInAppBannerV4 key={sessionKey} isMonitoring={pathname === '/monitoring'} />
+    ? <AutoFailInAppBannerV4 key={sessionKey} hidden={(pathname==='/monitoring'&&monitorPending)||pathname==='/inspection-live'||pathname==='/inspection-image-live'} />
     : null;
 }
 
-function AutoFailInAppBannerV4({ isMonitoring }: { isMonitoring: boolean }) {
+function AutoFailInAppBannerV4({ hidden }: { hidden: boolean }) {
   const [pending, setPending] = useState<AutoFailInAppAlertV4[]>([]);
   const controller = useMemo(() => createAutoFailInAppControllerV4({
     reader,
@@ -61,7 +68,7 @@ function AutoFailInAppBannerV4({ isMonitoring }: { isMonitoring: boolean }) {
   }, [controller]);
 
   const alert = pending[0];
-  if (!alert) return null;
+  if (!alert || hidden) return null;
   const close = () => setPending((old) => old.slice(1));
   const open = () => {
     const inspectionId = alert.inspectionId;
@@ -69,5 +76,5 @@ function AutoFailInAppBannerV4({ isMonitoring }: { isMonitoring: boolean }) {
     router.push({ pathname: '/inspection-live', params: { inspectionId } });
   };
   return <InspectionAlertBannerV4 kind="autoFail" inspectionNo={alert.inspectionNo} partCode={alert.partCode}
-    count={pending.length} bottom={isMonitoring?270:92} onClose={close} onOpen={open}/>;
+    count={pending.length} bottom={83} onClose={close} onOpen={open}/>;
 }
