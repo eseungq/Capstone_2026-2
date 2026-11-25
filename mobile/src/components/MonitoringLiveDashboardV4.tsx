@@ -171,15 +171,13 @@ export default function MonitoringLiveDashboardV4({
 }) {
   const { snapshot, controller } = useMonitoringPollV4(liveMonitoringReaderV4);
 
-  // 최초 조회의 과거 대기 항목은 제외하고 새 REVIEW/FAILED 이벤트만 전달합니다.
-  useEffect(() => {
-    if (!onNewAlerts) return;
-    return controller.subscribeAlerts(onNewAlerts);
-  }, [controller, onNewAlerts]);
-
   const [partCode, setPartCode] = useState<MonitoredPart>('DOOR');
   const [verifiedRole, setVerifiedRole] = useState<'WORKER'|'ADMIN'|null>(null);
   const isAuthenticatedWorker = verifiedRole === 'WORKER';
+  useEffect(() => {
+    if (!isAuthenticatedWorker || !onNewAlerts) return;
+    return controller.subscribeAlerts(onNewAlerts);
+  }, [controller, onNewAlerts, isAuthenticatedWorker]);
   const [recheckCount,setRecheckCount] = useState<number|null>(null);
   const [recheckError,setRecheckError] = useState(false);
   useFocusEffect(useCallback(() => {

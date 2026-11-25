@@ -32,6 +32,7 @@ import { createRecheckServiceV4 } from '../api/backendV4/recheckServiceV4';
 import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
 import { partLabelV4, qualityLabelV4, stratumLabelV4 } from '../components/partLabelV4';
 import { useRevealFocusedInputV4 } from '../components/useRevealFocusedInputV4';
+import { reviewAlertQueueV4 } from '../components/reviewAlertQueueV4';
 
 type DetailVisit = {
   id: string;
@@ -109,7 +110,8 @@ function ImagePanel({
 }
 
 export default function InspectionLiveScreen() {
-  const { inspectionId } = useLocalSearchParams<{ inspectionId?: string }>();
+  const { inspectionId, alertFlow } = useLocalSearchParams<{ inspectionId?: string; alertFlow?: string }>();
+  const flowToken=typeof alertFlow==='string'?alertFlow:'';
   const id = typeof inspectionId === 'string' ? inspectionId : '';
   const [detail, setDetail] = useState<InspectionViewV4 | null>(null);
   const [loading, setLoading] = useState(true);
@@ -323,6 +325,44 @@ export default function InspectionLiveScreen() {
   // 실제 서버 POST 이전에 GET으로 현재 상태를 확인합니다.
   // 오류나 타임아웃이 발생하면 자동 재전송하지 않습니다.
   const displayedVisit = visitRef.current;
+  // Only a successful worker confirmation entered from an alert can start the next choice.
+  const offerNextAlert=async(visit:DetailVisit)=>{
+    const current=()=>isCurrentVisit(visit)&&reviewAlertQueueV4.matches(visit.epoch,flowToken,id);
+    if(!flowToken||!current())return;
+    const findNext=async()=>{
+      for(const candidate of reviewAlertQueueV4.candidates(visit.epoch,flowToken,id)){
+        if(!current())return null;
+        const response=await inspectionReader.detail(candidate.inspectionId);
+        if(!current())return null;
+        if(response.source!=='SERVER'||response.value.inspectionId!==candidate.inspectionId)throw new Error('다음 검사 조회 응답을 확인할 수 없습니다.');
+        if(response.value.displayState==='REVIEW_PENDING'&&response.value.finalJudgement===null&&response.value.canOfferConfirm)return candidate;
+        reviewAlertQueueV4.discard(visit.epoch,flowToken,id,candidate);
+      }
+      return null;
+    };
+    const stop=()=>reviewAlertQueueV4.stop(visit.epoch,flowToken,id);
+    try{
+      const next=await findNext();
+      if(!current())return;
+      if(!next){stop();return;}
+      Alert.alert('이어서 계속 판정하시겠습니까?','다음 알림의 판정 대기 검사를 확인할 수 있습니다.',[
+        {text:'아니오',style:'cancel',onPress:stop},
+        {text:'네',onPress:()=>{void (async()=>{
+          try{
+            if(!current())return;
+            const session=await authV4.restore();
+            if(!current()||!session.signedIn||session.role!=='WORKER'||session.loginId!==visit.loginId)return;
+            const latest=await findNext();
+            if(!current())return;
+            if(!latest){stop();Alert.alert('판정 대기 없음','남은 알림 중 판정 가능한 검사가 없습니다.');return;}
+            if(reviewAlertQueueV4.advance(visit.epoch,flowToken,id,latest)){
+              router.replace({pathname:'/inspection-live',params:{inspectionId:latest.inspectionId,alertFlow:flowToken}});
+            }
+          }catch{if(current()){stop();Alert.alert('다음 검사 조회 실패','현재 판정은 저장되었습니다. 모니터링에서 남은 검사를 다시 확인해 주세요.');}}
+        })();}},
+      ],{cancelable:false});
+    }catch{if(current()){stop();Alert.alert('다음 검사 조회 실패','현재 판정은 저장되었습니다. 남은 검사는 모니터링에서 확인해 주세요.');}}
+  };
   const submitAction = async (action: 'confirm' | 'retry' | 'manual', judgement?: FinalJudgementV4) => {
     let manualNewInspectionId: string | null = null;
     if (submitLock.current || !visibleDetail || !displayedVisit || displayedVisit.id !== id || !isCurrentVisit(displayedVisit)) return;
@@ -393,6 +433,7 @@ export default function InspectionLiveScreen() {
       }
       // 성공 후 화면의 상태/URL을 서버에서 다시 조회합니다.
       await load(false);
+      if(action==='confirm'&&isCurrentVisit(displayedVisit))await offerNextAlert(displayedVisit);
       if (manualNewInspectionId && isCurrentVisit(displayedVisit)) {
         router.push({ pathname: '/inspection-live', params: { inspectionId: manualNewInspectionId } });
       }

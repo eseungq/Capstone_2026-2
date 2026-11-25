@@ -3,7 +3,10 @@ import LiveBottomNavV4 from '../components/LiveBottomNavV4';
 import { useVerifiedRoleV4 } from '../components/useVerifiedRoleV4';
 
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { authV4 } from '../api/backendV4/authRuntime';
+import { reviewAlertQueueV4 } from '../components/reviewAlertQueueV4';
+import InspectionAlertBannerV4 from '../components/InspectionAlertBannerV4';
 import {
   Image,
   
@@ -15,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MonitoringDashboardV4 from '../components/MonitoringDashboardV4';
 import MonitoringLiveDashboardV4 from '../components/MonitoringLiveDashboardV4';
-import { mergeMonitorAlertsV4, dismissMonitorAlertV4, type MonitorAlertV4 } from '../api/backendV4/monitoringPollCore';
+import type { MonitorAlertV4 } from '../api/backendV4/monitoringPollCore';
 type Tab = 'monitoring' | 'history' | 'settings';
 
 // Figma에서 내려받은 이미지
@@ -32,7 +35,7 @@ const recentInspections = [
   },
   {
     no: 'INS-006',
-    label: 'REVIEW',
+    label: '판정 대기',
     color: '#A74B12',
     image: doorImage,
   },
@@ -47,12 +50,12 @@ const recentInspections = [
 const mockAlerts = [
   {
     no: 'INS-006',
-    state: 'REVIEW',
+    state: '판정 대기',
     description: 'AI 예측: 불량 쪽 · Mock / 작업자 확인 대기',
   },
   {
     no: 'INS-005',
-    state: 'REVIEW',
+    state: '판정 대기',
     description: 'AI 예측: 정상 쪽 · Mock / 정책 미충족 · 확인 대기',
   },
   {
@@ -74,27 +77,22 @@ const {role: verifiedRole} = useVerifiedRoleV4(isLive);
 const isAdmin = isLive ? verifiedRole === 'ADMIN' : role === 'ADMIN';
 
   const [activeTab, setActiveTab] = useState<Tab>('monitoring');
-  const [liveBannerAlerts, setLiveBannerAlerts] = useState<MonitorAlertV4[]>([]);
-
-  // 실제 5초 폴링에서 새로 발견된 REVIEW/FAILED만 표시합니다.
-  // 최초 서버 조회의 기존 대기 건은 controller에서 제외합니다.
-  const handleNewLiveAlerts = useCallback((alerts: MonitorAlertV4[]) => {
-    if (alerts.length) setLiveBannerAlerts(old => mergeMonitorAlertsV4(old, alerts));
-  }, []);
-
-  const latestLiveAlert = liveBannerAlerts[0] ?? null;
-  const failedLiveAlert = latestLiveAlert?.kind === 'ANALYSIS_FAILED';
-  const openLiveAlert = () => {
-    if (!latestLiveAlert) return;
-    const inspectionId = latestLiveAlert.inspectionId;
-    setLiveBannerAlerts(old => dismissMonitorAlertV4(old, latestLiveAlert));
-    router.push({
-      pathname: '/inspection-live',
-      params: { inspectionId },
-    });
+  const epoch=authV4.sessionEpoch();
+  const [liveBannerAlerts,setLiveBannerAlerts]=useState<MonitorAlertV4[]>(()=>reviewAlertQueueV4.snapshot(epoch));
+  useEffect(()=>{
+    setLiveBannerAlerts(reviewAlertQueueV4.snapshot(epoch));
+    return reviewAlertQueueV4.subscribe(()=>setLiveBannerAlerts(reviewAlertQueueV4.snapshot(epoch)));
+  },[epoch]);
+  const handleNewLiveAlerts=useCallback((alerts:MonitorAlertV4[])=>{
+    if(verifiedRole==='WORKER'&&authV4.sessionEpoch()===epoch)reviewAlertQueueV4.add(epoch,alerts);
+  },[verifiedRole,epoch]);
+  const latestLiveAlert=liveBannerAlerts[0]??null;
+  const openLiveAlert=()=>{
+    if(!latestLiveAlert||verifiedRole!=='WORKER'||authV4.sessionEpoch()!==epoch)return;
+    const alertFlow=reviewAlertQueueV4.begin(epoch,latestLiveAlert);
+    router.push({pathname:'/inspection-live',params:{inspectionId:latestLiveAlert.inspectionId,...(alertFlow?{alertFlow}:{})}});
   };
 
-  
 const showInspection = (inspectionNo: string) => {
   router.push({
     pathname: '/inspection/[id]',
@@ -139,7 +137,7 @@ const showInspection = (inspectionNo: string) => {
           <>
             {/* 73단계: 공정 요약 · 최근 접수 · 대기열 · 새 알림은 하나의 폴링 데이터 출처 공유 */}
             {isLive ? (
-  <MonitoringLiveDashboardV4 onNewAlerts={handleNewLiveAlerts} />
+  <MonitoringLiveDashboardV4 onNewAlerts={verifiedRole==='WORKER'?handleNewLiveAlerts:undefined} />
 ) : (
   <MonitoringDashboardV4 />
 )}
@@ -367,35 +365,11 @@ onPress={() =>
       </View>
       )}
 
-      {/* 실행 중 모니터링 화면에서만 보이는 앱 내부 알림. 시스템 푸시가 아닙니다. */}
-      {isLive && activeTab === 'monitoring' && latestLiveAlert && (
-        <View
-          style={[styles.liveBanner, failedLiveAlert && styles.liveBannerFailed]}
-          accessibilityLiveRegion="polite"
-        >
-          <View style={styles.liveBannerHeader}>
-            <Text style={[styles.liveBannerTitle, failedLiveAlert && styles.liveBannerFailedText]}>
-              {failedLiveAlert ? '새 AI 분석 실패' : '새 작업자 확인 필요'}
-              {liveBannerAlerts.length > 1 ? ` · 외 ${liveBannerAlerts.length - 1}건` : ''}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="새 검사 알림 닫기"
-              onPress={() => setLiveBannerAlerts(old => dismissMonitorAlertV4(old, latestLiveAlert))}
-              style={styles.liveBannerDismiss}
-            >
-              <Text style={styles.liveBannerDismissText}>닫기</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.liveBannerDescription}>
-            {latestLiveAlert.partCode} · {latestLiveAlert.inspectionNo ?? '검사번호 확인 필요'}
-            {' · '}{failedLiveAlert ? 'AI 분석 실패' : '작업자 확인 필요'}
-          </Text>
-          <Text style={styles.liveBannerNote}>앱 실행 중 확인된 새 검사입니다.</Text>
-          <Pressable accessibilityRole="button" onPress={openLiveAlert} style={styles.liveBannerOpen}>
-            <Text style={styles.liveBannerOpenText}>새 검사 상세 보기 ›</Text>
-          </Pressable>
-        </View>
+      {/* 작업자 전용 앱 내부 알림. */}
+      {isLive && verifiedRole==='WORKER' && activeTab==='monitoring' && latestLiveAlert && (
+        <InspectionAlertBannerV4 kind={latestLiveAlert.kind==='ANALYSIS_FAILED'?'failed':'review'}
+          inspectionNo={latestLiveAlert.inspectionNo} partCode={latestLiveAlert.partCode} count={liveBannerAlerts.length} bottom={83}
+          onClose={()=>reviewAlertQueueV4.dismiss(epoch,latestLiveAlert)} onOpen={openLiveAlert}/>
       )}
     </SafeAreaView>
   );

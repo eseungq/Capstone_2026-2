@@ -40,7 +40,7 @@ export default function RootLayout() {
         <Stack.Screen name="monitoring" />
         <Stack.Screen name="explore" />
       </Stack>
-      {session && <AutoFailInAppAlertHostV4 key={authV4.sessionEpoch()} />}
+      {session?.role === 'WORKER' && <AutoFailInAppAlertHostV4 key={authV4.sessionEpoch()} />}
     </View>
   );
 }
