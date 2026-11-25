@@ -307,11 +307,19 @@ export default function HistoryLiveScreenV4() {
                 {' · 접수 '}{dateText(item.receivedAt)}
               </Text>
               {(item.correctedJudgement || item.finalJudgement) && (
-                <Text style={styles.recordOutcome}>
-                  {historyJudgementLabelV4(item)}
-                </Text>
+                <View>
+                  {historyJudgementLabelV4(item)?.split('\n').map((label, lineIndex) => (
+                    <Text key={lineIndex} style={[
+                      styles.recordOutcome,
+                      (lineIndex === 0 ? item.correctedJudgement ?? item.finalJudgement : item.finalJudgement) === 'PASS'
+                        ? styles.recordPass : styles.recordFail,
+                    ]}>
+                      {label}
+                    </Text>
+                  ))}
+                </View>
               )}
-              {item.errorCode && <Text style={styles.errorText}>오류 코드: {item.errorCode}</Text>}
+              {item.errorCode && <Text style={[styles.errorText, styles.recordErrorCode]}>오류 코드: {item.errorCode}</Text>}
             </Pressable>
           ))}
         </View>
@@ -362,7 +370,10 @@ const styles = StyleSheet.create({
   stateBadge: { borderRadius: 999, minWidth: 70, paddingVertical: 6, paddingHorizontal: 8, alignItems: 'center' },
   stateBadgeText: { fontSize: 13, fontWeight: '700' },
   recordArrow: { marginLeft: 'auto', color: '#475569', fontSize: 20, fontWeight: '600' },
-  recordOutcome: { color: '#067647', fontSize: 13, fontWeight: '600' },
+  recordOutcome: { fontSize: 13, fontWeight: '600' },
+  recordPass: { color: '#2054D8' },
+  recordFail: { color: '#B42318' },
+  recordErrorCode: { fontWeight: '600' },
   cardTitle: { fontSize: 16, color: '#111827', fontWeight: '700' },
   filterSummary: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 },
   filterTitle: { fontSize: 13, fontWeight: '700', color: '#111827', marginTop: 4 },
