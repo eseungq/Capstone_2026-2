@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import com.capstone.inspection.common.time.Times;
 
 // 분석 단계별 DB 기록. AI 호출은 트랜잭션 밖에서 하고, 시작·완료·실패 기록만 짧은 트랜잭션으로 처리
 @Component
@@ -47,9 +48,19 @@ public class AnalysisResultWriter {
                           String originalImageId, String traceId) {
     }
 
-    // 결과 요약 (알림 판단용)
+    // 결과 요약 (알림·표본 재확인 판단용). action은 COMPLETED일 때만 값, FAILED면 null
     public record Outcome(String inspectionId, String inspectionNo, String partCode, InspectionStatus status,
-                          boolean reviewRequired, LocalDateTime occurredAt) {
+                          RecommendedAction action, LocalDateTime occurredAt) {
+
+        // 작업자 확인이 필요한 건 (REVIEW_REQUIRED 알림 대상). AUTO_PASS·AUTO_FAIL은 아님
+        public boolean reviewRequired() {
+            return status == InspectionStatus.COMPLETED && action == RecommendedAction.REVIEW;
+        }
+
+        // 표본 재확인 추출 대상 (AUTO_PASS만, 계약 6.11)
+        public boolean autoPass() {
+            return status == InspectionStatus.COMPLETED && action == RecommendedAction.AUTO_PASS;
+        }
     }
 
     // RECEIVED → ANALYZING. 이미 처리된 건이면 null (중복 실행 방지)
@@ -88,14 +99,14 @@ public class AnalysisResultWriter {
 
         PolicyEvaluator.Decision d = PolicyEvaluator.evaluate(quality, r.calibratedDefectProbability(),
                 r.calibratorVersion(), policyRepository.findReadyActiveByModelId(started.modelId()));
-        i.complete(d.action(), d.reviewReason(), d.policy(), d.passThreshold(), gradcamStatus);
+        i.complete(d.action(), d.reviewReason(), d.policy(), d.passThreshold(), d.failThreshold(), gradcamStatus);
         if (d.action() == RecommendedAction.AUTO_PASS) {
             i.applyRecheckRule(recheckRules.currentRuleReference()); // 꺼져 있으면 null (계약 6.11)
         }
         log.info("분석 완료 {} {} quality={} action={} reason={} gradcam={}", i.getInspectionNo(), i.getId(),
                 quality, d.action(), d.reviewReason(), gradcamStatus);
         return new Outcome(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(), i.getStatus(),
-                i.getFinalJudgement() == null, i.getCompletedAt());
+                i.getRecommendedAction(), i.getCompletedAt());
     }
 
     // FAILED 확정 (이후 변경하지 않음)
@@ -107,7 +118,7 @@ public class AnalysisResultWriter {
         }
         i.fail(errorCode, detail);
         log.warn("분석 실패 {} {} {} {}", i.getInspectionNo(), i.getId(), errorCode, detail);
-        return new Outcome(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(), i.getStatus(), false, i.getCompletedAt());
+        return new Outcome(i.getId(), i.getInspectionNo(), i.getPart().getPartCode(), i.getStatus(), null, i.getCompletedAt());
     }
 
     // DEFECT 예측의 Grad-CAM: 응답 해석(GradcamParser) 후 GENERATED만 저장. 저장 실패도 검사는 실패시키지 않고 FAILED로 기록
@@ -118,7 +129,7 @@ public class AnalysisResultWriter {
         }
         ImageInfo info = parsed.info();
         try {
-            String key = "gradcam/" + LocalDate.now().format(DATE_PATH) + "/" + i.getId() + "." + info.extension();
+            String key = "gradcam/" + Times.today().format(DATE_PATH) + "/" + i.getId() + "." + info.extension();
             storageService.save(key, parsed.bytes());
             imageRepository.save(new ImageStorage(i, ImageType.GRADCAM, key, info.contentType(), parsed.bytes().length,
                     info.width(), info.height(), Hashes.sha256(parsed.bytes())));

@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 // 관리자 모델·정책 관리 (계약 v4 6.9). 정책은 수정하지 않고 새 버전을 만듦. 모델 등록·활성화는 제공하지 않음
+// 기준치(-t)·불량 기준(-f)·자동 불량 켜고 끄기(-a) 모두 원본 이름 기준 번호로 새 버전
 @Service
 @RequiredArgsConstructor
 public class AdminPolicyService {
@@ -82,7 +83,7 @@ public class AdminPolicyService {
                 null));
     }
 
-    // 기준치 조정: 기존 행은 그대로 두고 새 버전을 만듦. active=false, ready는 승계
+    // 기준치 조정: 기존 행은 그대로 두고 새 버전을 만듦. active=false, ready·자동 불량 값은 승계
     @Transactional
     public PolicyResponse adjustThreshold(String policyId, double passThreshold) {
         AutomationPolicy base = find(policyId);
@@ -91,10 +92,38 @@ public class AdminPolicyService {
             throw new BusinessException(ErrorCode.POLICY_THRESHOLD_OUT_OF_RANGE, "검증 범위가 없는 정책은 조정할 수 없습니다.");
         }
         requireInRange(threshold, base.getValidatedMin(), base.getValidatedMax());
-        String root = rootVersion(base);
-        String version = PolicyRules.nextVersion(root, policyRepository.findVersionsStartingWith(root + "-t"));
-        return save(new AutomationPolicy(base.getModel(), base.getCalibratorVersion(), version, threshold,
-                base.getValidatedMin(), base.getValidatedMax(), base.getMetricsJson(), base.isReady(), base.getId()));
+        if (base.getFailThreshold() != null && threshold >= base.getFailThreshold()) {
+            throw new BusinessException(ErrorCode.INVALID_PARAMETER, "passThreshold는 failThreshold보다 작아야 합니다.");
+        }
+        return save(base.withPassThreshold(nextVersion(base, "t"), threshold));
+    }
+
+    // 불량 기준 등록·조정 (계약 6.9, 4.1): 새 버전, active=false. 켜짐 여부는 승계
+    @Transactional
+    public PolicyResponse adjustFailThreshold(String policyId, double failThreshold, double failValidatedMin,
+                                              double failValidatedMax) {
+        AutomationPolicy base = find(policyId);
+        double threshold = PolicyRules.round6(unitValue(failThreshold));
+        double min = PolicyRules.round6(unitValue(failValidatedMin));
+        double max = PolicyRules.round6(unitValue(failValidatedMax));
+        if (min > max) {
+            throw new BusinessException(ErrorCode.INVALID_PARAMETER, "failValidatedMin은 failValidatedMax보다 클 수 없습니다.");
+        }
+        requireInRange(threshold, min, max);
+        if (base.getPassThreshold() != null && threshold <= base.getPassThreshold()) {
+            throw new BusinessException(ErrorCode.INVALID_PARAMETER, "failThreshold는 passThreshold보다 커야 합니다.");
+        }
+        return save(base.withFailThreshold(nextVersion(base, "f"), threshold, min, max));
+    }
+
+    // 자동 불량 켜고 끄기 (계약 6.9, 4.1): 새 버전, active=false. 적용은 activate로
+    @Transactional
+    public PolicyResponse setAutoFail(String policyId, boolean enabled) {
+        AutomationPolicy base = find(policyId);
+        if (enabled && base.getFailThreshold() == null) {
+            throw new BusinessException(ErrorCode.AUTO_FAIL_NOT_CONFIGURED);
+        }
+        return save(base.withAutoFail(nextVersion(base, "a"), enabled));
     }
 
     // 적용 시작. 모델 행을 잠가 같은 모델의 동시 적용을 줄 세움 (uq_policy_active_model)
@@ -112,7 +141,7 @@ public class AdminPolicyService {
             return toResponse(policy);
         }
         policyRepository.deactivateOthers(model.getId(), policy.getId());
-        policy.activate(LocalDateTime.now());
+        policy.activate(Times.now());
         try {
             policyRepository.saveAndFlush(policy);
         } catch (DataIntegrityViolationException e) {
@@ -131,6 +160,12 @@ public class AdminPolicyService {
     private AutomationPolicy find(String policyId) {
         return policyRepository.findById(policyId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.POLICY_NOT_FOUND));
+    }
+
+    // 새 버전 이름: 원본 이름 + -접미어번호 (PolicyRules.nextVersion)
+    private String nextVersion(AutomationPolicy base, String suffix) {
+        String root = rootVersion(base);
+        return PolicyRules.nextVersion(root, suffix, policyRepository.findVersionsStartingWith(root + "-" + suffix));
     }
 
     // based_on 연결을 끝까지 따라가 원본 이름을 찾음
@@ -190,7 +225,8 @@ public class AdminPolicyService {
         }
         return new PolicyResponse(p.getId(), p.getPolicyVersion(), p.getItem().getPart().getPartCode(),
                 p.getModel().getModelVersion(), p.getCalibratorVersion(), p.getPassThreshold(), p.getValidatedMin(),
-                p.getValidatedMax(), p.isReady(), p.isActive(), metrics, p.getBasedOnPolicyId(),
+                p.getValidatedMax(), p.isAutoFailEnabled(), p.getFailThreshold(), p.getFailValidatedMin(),
+                p.getFailValidatedMax(), p.isReady(), p.isActive(), metrics, p.getBasedOnPolicyId(),
                 Times.toOffset(p.getCreatedAt()), Times.toOffset(p.getActivatedAt()));
     }
 }

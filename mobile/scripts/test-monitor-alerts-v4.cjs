@@ -25,6 +25,7 @@ Module._extensions['.ts'] = (module, filename) => {
 const {
   createMonitoringPollControllerV4,
   MONITOR_POLL_INTERVAL_V4,
+  mergeMonitorAlertsV4, dismissMonitorAlertV4, monitorAlertFromQueueV4,
 } = require(path.join(__dirname, '../src/api/backendV4/monitoringPollCore.ts'));
 
 function queueItem(id, displayState = 'REVIEW_PENDING') {
@@ -181,4 +182,28 @@ test('one successful poll can notify more than one new item without a second req
     'REVIEW_REQUIRED', 'ANALYSIS_FAILED', 'REVIEW_REQUIRED',
   ]);
   h.controller.stop();
+});
+
+test('manual conversion stays in the REVIEW queue but never creates a notification', async () => {
+  const h = harness();
+  h.controller.start(); await h.tick();
+  const manual = {...queueItem(21), predictedQuality:null, reviewReason:'AI_UNAVAILABLE'};
+  h.updateQueue([manual, queueItem(22)]);
+  await h.tick();
+  assert.equal(h.controller.getSnapshot().queue.length, 2);
+  assert.deepEqual(h.receivedEvents.map(e=>e.inspectionId), [queueItem(22).inspectionId]);
+  await h.tick();
+  assert.equal(h.receivedEvents.length, 1);
+  h.controller.stop();
+});
+
+test('new alerts are merged with pending alerts, deduplicated and consumed one at a time', () => {
+  const a = monitorAlertFromQueueV4(queueItem(1));
+  const b = monitorAlertFromQueueV4({...queueItem(2), receivedAt:'2026-11-11T09:00:05Z'});
+  const c = monitorAlertFromQueueV4({...queueItem(3,'FAILED'), receivedAt:'2026-11-11T09:00:10Z'});
+  const merged = mergeMonitorAlertsV4([b,a], [b,c]);
+  assert.deepEqual(merged, [c,b,a]);
+  assert.deepEqual(dismissMonitorAlertV4(merged,c), [b,a]);
+  assert.deepEqual(dismissMonitorAlertV4(merged,b), [c,a]);
+  assert.deepEqual(dismissMonitorAlertV4([c,a],b), [c,a]);
 });

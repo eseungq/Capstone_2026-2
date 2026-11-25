@@ -4,6 +4,7 @@ import com.capstone.inspection.common.time.Times;
 import com.capstone.inspection.config.AppProperties;
 import com.capstone.inspection.config.AsyncConfig;
 import com.capstone.inspection.domain.inspection.InspectionStatus;
+import com.capstone.inspection.domain.inspection.RecommendedAction;
 import com.capstone.inspection.notification.PushService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,20 +13,25 @@ import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
-// 알림 발송 지점 (계약 v4 8장). REVIEW → REVIEW_REQUIRED, FAILED → ANALYSIS_FAILED, AUTO_PASS는 발송 안 함
+// 알림 발송 지점 (계약 v4 8장). REVIEW → REVIEW_REQUIRED, FAILED → ANALYSIS_FAILED, AUTO_FAIL → AUTO_FAILED, AUTO_PASS는 발송 안 함
+// 분석 결과를 저장할 때 검사당 한 번만 호출되므로 같은 검사에 같은 알림이 두 번 가지 않음
 // 결과 저장 커밋 후 호출됨. 발송은 전용 스레드에서 해서 분석 스레드를 잡지 않고, 실패해도 분석 결과에 영향 없음
 @Component
 public class InspectionNotifier {
 
     private static final Logger log = LoggerFactory.getLogger(InspectionNotifier.class);
 
+    private static final String AUTO_FAILED = "AUTO_FAILED";
+
     private final boolean pushEnabled;
+    private final boolean autoFailedPush;
     private final PushService pushService;
     private final ThreadPoolTaskExecutor executor;
 
     public InspectionNotifier(AppProperties props, PushService pushService,
                               @Qualifier(AsyncConfig.PUSH_EXECUTOR) ThreadPoolTaskExecutor executor) {
         this.pushEnabled = props.push().enabled();
+        this.autoFailedPush = props.push().autoFailed();
         this.pushService = pushService;
         this.executor = executor;
     }
@@ -35,7 +41,7 @@ public class InspectionNotifier {
         if (notice == null) {
             return;
         }
-        if (!pushEnabled) {
+        if (!sendsRemotely(notice.type(), pushEnabled, autoFailedPush)) {
             log.info("[알림 로그] {} {} {} {}", notice.type(), notice.inspectionNo(), notice.partCode(),
                     notice.inspectionId());
             return;
@@ -53,6 +59,11 @@ public class InspectionNotifier {
         }
     }
 
+    // 원격 푸시 여부. AUTO_FAILED는 이벤트 정의만 두고 기본은 보내지 않음 (앱이 폴링으로 표시, 계약 8.2)
+    static boolean sendsRemotely(String type, boolean pushEnabled, boolean autoFailedPush) {
+        return pushEnabled && (autoFailedPush || !AUTO_FAILED.equals(type));
+    }
+
     // 알림 대상이 아니면 null
     static PushService.Notice noticeFor(AnalysisResultWriter.Outcome outcome) {
         if (outcome == null) {
@@ -61,10 +72,14 @@ public class InspectionNotifier {
         if (outcome.status() == InspectionStatus.FAILED) {
             return notice("ANALYSIS_FAILED", outcome, "분석 실패", "다시 검사가 필요합니다.");
         }
-        if (outcome.status() == InspectionStatus.COMPLETED && outcome.reviewRequired()) {
+        if (outcome.reviewRequired()) {
             return notice("REVIEW_REQUIRED", outcome, "확인 필요", "작업자 확인이 필요합니다.");
         }
-        return null;
+        // 자동 불량은 재판정 없이 발생 사실만 알림. 오판이 의심되면 판정 확인 요청(6.12) [제안 11/23 김도현]
+        if (outcome.action() == RecommendedAction.AUTO_FAIL) {
+            return notice(AUTO_FAILED, outcome, "자동 불량", "자동 불량으로 판정됐습니다.");
+        }
+        return null; // AUTO_PASS는 발송 안 함
     }
 
     private static PushService.Notice notice(String type, AnalysisResultWriter.Outcome o, String title, String message) {

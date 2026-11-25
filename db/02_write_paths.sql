@@ -293,7 +293,8 @@ SELECT inspection_no, policy_id, pass_threshold_applied FROM inspection WHERE id
 SELECT id FROM inspection WHERE status = 'RECEIVED' ORDER BY received_at;
 
 UPDATE inspection SET status = 'FAILED', error_code = 'INTERNAL_SERVER_ERROR',
-       error_detail = '서버 재시작으로 분석 결과 확인 불가', completed_at = NOW(6)
+       error_detail = '서버 재시작으로 분석 결과 확인 불가',
+       completed_at = UTC_TIMESTAMP(6) + INTERVAL 9 HOUR   -- DB 시각은 서울 시각 (계약 2장). NOW()는 MySQL 서버 시간대라 쓰지 않음
 WHERE status = 'ANALYZING';
 
 -- =====================================================================

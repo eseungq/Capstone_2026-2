@@ -3,6 +3,7 @@
 -- 11/05: N27(FAILED 예측값)·N28(GOOD+NO_ACTIVATION) 추가, DEFECT+NO_ACTIVATION 정상 행 추가
 -- 11/11: V6 수동 판정 반영. N10 제약 이름 v6로 변경, 정상 수동 판정 행 추가, N29~N33 추가 (33건)
 -- 11/20: V8·V9 표본 재확인 반영. 정상 규칙·AUTO_PASS·재확인 행 추가, N34~N43 추가 (43건)
+-- 11/24: V10 반영. 결정 행 없는 AUTO_PASS 4건 추가, N44~N49 추가 (49건)
 -- 테스트용 행은 v5t- 접두어로 따로 만들고, 마지막 ROLLBACK으로 모두 지운다. 기존 데이터는 건드리지 않는다.
 -- 예상 오류: 3819(CHECK 위반), 1062(중복), 1452(외래키). [ ] 안은 걸려야 하는 제약 이름 (|는 그중 하나)
 
@@ -63,6 +64,31 @@ INSERT INTO auto_pass_recheck (id, inspection_id, sampled, stratum, sampling_rat
   screen_dwell_ms, first_opened_at, open_count)
 VALUES ('v5t-rc-1', 'v5t-insp-ap', TRUE, 'MID', 0.300000, '2026-10-28 10:01:53', 'FAIL', NULL, 'v5t-user-worker',
   '2026-10-28 10:02:30', 'v5t-rule-1', 0.6, 0.1, 'v5t-user-admin', '2026-10-28 10:03:00', NULL, 9000, '2026-10-28 10:02:20', 1);
+-- V10 위반 테스트용: 결정 행 없는 AUTO_PASS 4건 (테스트마다 다른 검사)
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, policy_id, status, predicted_quality,
+  raw_defect_probability, calibrated_defect_probability, calibrator_version, automation_policy_ready, pass_threshold_applied,
+  recommended_action, final_judgement, judged_by, gradcam_status, recheck_rule_id, received_at, completed_at)
+VALUES ('v5t-insp-ap2', 'V5T-000006', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'v5t-policy-a',
+  'COMPLETED', 'GOOD', 0.040000, 0.030000, 'v5t-cal', TRUE, 0.050000, 'AUTO_PASS', 'PASS', 'SYSTEM', 'NOT_REQUIRED',
+  'v5t-rule-1', '2026-10-28 10:01:50', '2026-10-28 10:01:52');
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, policy_id, status, predicted_quality,
+  raw_defect_probability, calibrated_defect_probability, calibrator_version, automation_policy_ready, pass_threshold_applied,
+  recommended_action, final_judgement, judged_by, gradcam_status, recheck_rule_id, received_at, completed_at)
+VALUES ('v5t-insp-ap3', 'V5T-000007', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'v5t-policy-a',
+  'COMPLETED', 'GOOD', 0.040000, 0.030000, 'v5t-cal', TRUE, 0.050000, 'AUTO_PASS', 'PASS', 'SYSTEM', 'NOT_REQUIRED',
+  'v5t-rule-1', '2026-10-28 10:01:50', '2026-10-28 10:01:52');
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, policy_id, status, predicted_quality,
+  raw_defect_probability, calibrated_defect_probability, calibrator_version, automation_policy_ready, pass_threshold_applied,
+  recommended_action, final_judgement, judged_by, gradcam_status, recheck_rule_id, received_at, completed_at)
+VALUES ('v5t-insp-ap4', 'V5T-000008', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'v5t-policy-a',
+  'COMPLETED', 'GOOD', 0.040000, 0.030000, 'v5t-cal', TRUE, 0.050000, 'AUTO_PASS', 'PASS', 'SYSTEM', 'NOT_REQUIRED',
+  'v5t-rule-1', '2026-10-28 10:01:50', '2026-10-28 10:01:52');
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, policy_id, status, predicted_quality,
+  raw_defect_probability, calibrated_defect_probability, calibrator_version, automation_policy_ready, pass_threshold_applied,
+  recommended_action, final_judgement, judged_by, gradcam_status, recheck_rule_id, received_at, completed_at)
+VALUES ('v5t-insp-ap5', 'V5T-000009', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'v5t-policy-a',
+  'COMPLETED', 'GOOD', 0.040000, 0.030000, 'v5t-cal', TRUE, 0.050000, 'AUTO_PASS', 'PASS', 'SYSTEM', 'NOT_REQUIRED',
+  'v5t-rule-1', '2026-10-28 10:01:50', '2026-10-28 10:01:52');
 
 -- ---------------- 거부되어야 하는 문장 ----------------
 
@@ -308,6 +334,37 @@ VALUES ('v5t-n42', 'v5t-insp-ap', FALSE, 'LOW', 0.100000, '2026-10-28 10:07:00')
 -- EXPECT ERROR: N43 비율 0인 구간에서 뽑힘 [chk_recheck_rate]
 INSERT INTO auto_pass_recheck (id, inspection_id, sampled, stratum, sampling_rate, sampled_at)
 VALUES ('v5t-n43', 'v5t-insp-failed', TRUE, 'LOW', 0.000000, '2026-10-28 10:07:00');
+
+-- ---------------- V10 표본 재확인 CHECK 보강 (11/24) ----------------
+
+-- EXPECT ERROR: N44 접수 상태(recommended_action NULL) 검사에 재확인 규칙 연결 (V9의 NULL 구멍) [chk_insp_recheck_rule]
+INSERT INTO inspection (id, inspection_no, user_id, source, part_id, item_id, model_id, status, automation_policy_ready,
+  recheck_rule_id, received_at)
+VALUES ('v5t-n44', 'V5T-N44', 'v5t-user-device', 'DEVICE', 'v5t-part-a', 'v5t-item-a', 'v5t-model-a', 'RECEIVED', FALSE,
+  'v5t-rule-1', '2026-10-28 10:08:00');
+
+-- EXPECT ERROR: N45 추출 값이 비율 이상인데 뽑힘으로 기록 [chk_recheck_draw]
+INSERT INTO auto_pass_recheck (id, inspection_id, sampled, stratum, sampling_rate, sampled_at, rule_id, ratio, draw_value)
+VALUES ('v5t-n45', 'v5t-insp-ap2', TRUE, 'MID', 0.300000, '2026-10-28 10:08:00', 'v5t-rule-1', 0.6, 0.5);
+
+-- EXPECT ERROR: N46 추출 값이 비율보다 작은데 안 뽑힘으로 기록 [chk_recheck_draw]
+INSERT INTO auto_pass_recheck (id, inspection_id, sampled, stratum, sampling_rate, sampled_at, rule_id, ratio, draw_value)
+VALUES ('v5t-n46', 'v5t-insp-ap3', FALSE, 'MID', 0.300000, '2026-10-28 10:08:00', 'v5t-rule-1', 0.6, 0.1);
+
+-- EXPECT ERROR: N47 재확인 시각이 추출 결정 시각보다 앞섬 [chk_recheck_order]
+INSERT INTO auto_pass_recheck (id, inspection_id, sampled, stratum, sampling_rate, sampled_at, result, rechecked_by,
+  rechecked_at, rule_id, ratio, draw_value)
+VALUES ('v5t-n47', 'v5t-insp-ap4', TRUE, 'MID', 0.300000, '2026-10-28 10:08:00', 'PASS', 'v5t-user-worker',
+  '2026-10-28 10:07:00', 'v5t-rule-1', 0.6, 0.1);
+
+-- EXPECT ERROR: N48 관리자 확인함이 재확인보다 앞섬 [chk_recheck_order]
+UPDATE auto_pass_recheck SET acknowledged_at = '2026-10-28 10:02:00' WHERE id = 'v5t-rc-1';
+
+-- EXPECT ERROR: N49 재확인 전(result NULL)인데 관리자 확인함 (V9의 NULL 구멍) [chk_recheck_ack|chk_recheck_order]
+INSERT INTO auto_pass_recheck (id, inspection_id, sampled, stratum, sampling_rate, sampled_at, rule_id, ratio, draw_value,
+  acknowledged_by, acknowledged_at)
+VALUES ('v5t-n49', 'v5t-insp-ap5', TRUE, 'MID', 0.300000, '2026-10-28 10:08:00', 'v5t-rule-1', 0.6, 0.1,
+  'v5t-user-admin', '2026-10-28 10:09:00');
 
 -- ---------------- 정리 ----------------
 ROLLBACK;

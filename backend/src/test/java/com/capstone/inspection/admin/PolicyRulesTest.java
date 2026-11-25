@@ -42,8 +42,17 @@ class PolicyRulesTest {
     @Test
     @DisplayName("조정 버전은 원본 이름 기준으로 번호가 늘어남")
     void nextVersion() {
-        assertThat(PolicyRules.nextVersion("example-door-p1", List.of())).isEqualTo("example-door-p1-t1");
-        assertThat(PolicyRules.nextVersion("example-door-p1", List.of("example-door-p1-t1", "example-door-p1-t3",
+        assertThat(PolicyRules.nextVersion("example-door-p1", "t", List.of())).isEqualTo("example-door-p1-t1");
+        assertThat(PolicyRules.nextVersion("example-door-p1", "t", List.of("example-door-p1-t1", "example-door-p1-t3",
                 "example-door-p1-trial", "example-door-p1-t2-x"))).isEqualTo("example-door-p1-t4");
+    }
+
+    @Test
+    @DisplayName("불량 기준(-f)·자동 불량(-a) 버전도 원본 이름 기준으로 접미어마다 번호가 따로 늘어남")
+    void nextVersionPerSuffix() {
+        List<String> existing = List.of("example-door-p1-t1", "example-door-p1-t2", "example-door-p1-f1", "example-door-p1-a3");
+        assertThat(PolicyRules.nextVersion("example-door-p1", "f", existing)).isEqualTo("example-door-p1-f2");
+        assertThat(PolicyRules.nextVersion("example-door-p1", "a", existing)).isEqualTo("example-door-p1-a4");
+        assertThat(PolicyRules.nextVersion("example-door-p1", "t", existing)).isEqualTo("example-door-p1-t3");
     }
 }

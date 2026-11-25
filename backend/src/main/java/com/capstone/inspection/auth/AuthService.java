@@ -22,6 +22,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
+import com.capstone.inspection.common.time.Times;
 
 // 로그인·토큰 재발급·로그아웃 (FR-BE-01)
 @Service
@@ -58,7 +59,7 @@ public class AuthService {
     public TokenResponse refresh(String refreshToken) {
         RefreshToken saved = refreshTokenRepository.findByTokenHashWithUser(hash(refreshToken))
                 .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_TOKEN_INVALID));
-        if (!saved.isUsable(LocalDateTime.now())) {
+        if (!saved.isUsable(Times.now())) {
             throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID);
         }
         User user = saved.getUser();
@@ -84,7 +85,7 @@ public class AuthService {
     private TokenResponse issueTokens(User user) {
         String accessToken = tokenProvider.createAccessToken(user.getId(), user.getLoginId(), user.getRole());
         String refreshToken = newRefreshToken();
-        LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(props.auth().refreshTokenTtlSeconds());
+        LocalDateTime expiresAt = Times.now().plusSeconds(props.auth().refreshTokenTtlSeconds());
         refreshTokenRepository.save(new RefreshToken(user, hash(refreshToken), expiresAt));
         return new TokenResponse(accessToken, refreshToken, "Bearer", tokenProvider.getAccessTtlSeconds(),
                 new TokenResponse.UserInfo(user.getId(), user.getLoginId(), user.getRole()));

@@ -23,6 +23,7 @@ Module._extensions['.ts'] = (module, filename) => {
 const {
   COWL_PART_CODE_V4,
   createAdminPolicyServiceV4,
+  createPolicyVisitV4,
   findEquivalentPolicyVersionV4,
   decodeAdminPolicyV4,
   decodeCowlPolicyListV4,
@@ -94,6 +95,118 @@ test('equivalent policy check requires same model, calibrator, part and ready st
     assert.equal(findEquivalentPolicyVersionV4([variant], ORIGINAL, 0.01), null);
   }
   assert.equal(findEquivalentPolicyVersionV4([t1], ORIGINAL, Number.NaN), null);
+});
+
+test('a pass-only change cannot reuse a version with different automatic FAIL settings, bounds or evidence', () => {
+  const active = decodeAdminPolicyV4({
+    ...ORIGINAL, autoFailEnabled: true, failThreshold: 0.9966, failValidatedMin: 0.99, failValidatedMax: 1,
+    metrics: { autoFail: { count: 50, tested: true }, strata: [1, 2] },
+  });
+  const candidate = { ...active, policyId: 'new-id', active: false, passThreshold: 0.01 };
+  for (const change of [
+    { autoFailEnabled: false }, { autoFailEnabled: null }, { failThreshold: 0.997 },
+    { failValidatedMin: 0.98 }, { failValidatedMax: 0.999 }, { validatedMin: 0.009 },
+    { validatedMax: 0.02 }, { metrics: null }, { metrics: { ...active.metrics, strata: [2, 1] } },
+  ]) {
+    assert.equal(findEquivalentPolicyVersionV4([{ ...candidate, ...change }], active, 0.01), null);
+  }
+  const same = { ...candidate, metrics: { strata: [1, 2], autoFail: { tested: true, count: 50 } } };
+  assert.equal(findEquivalentPolicyVersionV4([same], active, 0.01), same);
+  const alsoSame = { ...same, passThreshold: active.passThreshold };
+  assert.equal(findEquivalentPolicyVersionV4([alsoSame, active], active, active.passThreshold), active);
+  const legacy = decodeAdminPolicyV4(ORIGINAL);
+  const disabled = { ...legacy, autoFailEnabled: false, passThreshold: 0.01 };
+  assert.equal(findEquivalentPolicyVersionV4([disabled], legacy, 0.01), null);
+});
+
+test('pass threshold save requires the server to preserve automatic FAIL settings', async () => {
+  const base = decodeAdminPolicyV4({
+    ...ORIGINAL, autoFailEnabled: true, failThreshold: 0.9966, failValidatedMin: 0.9966, failValidatedMax: 0.9966,
+  });
+  const reply = { ...base, passThreshold: 0.012, basedOnPolicyId: base.policyId, active: false, policyId: 'saved' };
+  const { transport, calls } = fakeTransport({ thresholdReply: { ...reply, autoFailEnabled: false } });
+  await assert.rejects(createAdminPolicyServiceV4(transport).saveNewVersion(base, '1.20'), /승계한 설정/);
+  assert.equal(calls.length, 1);
+  const valid = fakeTransport({ thresholdReply: reply });
+  assert.equal((await createAdminPolicyServiceV4(valid.transport).saveNewVersion(base, '1.20')).autoFailEnabled, true);
+});
+
+test('a pass threshold at or above the automatic FAIL threshold is rejected before saving', async () => {
+  const base = { ...ORIGINAL, failThreshold: 0.015, autoFailEnabled: false };
+  const { transport, calls } = fakeTransport();
+  for (const percent of ['1.50', '1.60']) {
+    await assert.rejects(createAdminPolicyServiceV4(transport).saveNewVersion(base, percent), /자동 불량 기준보다 낮아야/);
+  }
+  assert.equal(calls.length, 0);
+});
+
+test('four-decimal percent matches exact server bounds and rejects equality with automatic FAIL', async () => {
+  const boundary = 0.009005;
+  const base = { ...ORIGINAL, passThreshold: 0.009006, validatedMin: boundary, validatedMax: 0.009007,
+    failThreshold: 0.009007, failValidatedMin: 0.009007, failValidatedMax: 0.009007 };
+  const reply = { ...base, policyId: 'new-boundary', basedOnPolicyId: base.policyId,
+    active: false, passThreshold: boundary };
+  const { transport, calls } = fakeTransport({ thresholdReply: reply });
+  const service = createAdminPolicyServiceV4(transport);
+
+  const saved = await service.saveNewVersion(base, '0.9005');
+  assert.equal(calls[0].options.body.passThreshold, boundary);
+  assert.equal(percentageTextV4(saved.passThreshold, 4), '0.9005%');
+  assert.throws(() => parsePolicyPercentInputV4('0.9004', base), /0\.9005%~0\.9007%/);
+  assert.equal(parsePolicyPercentInputV4('0.9007', { ...base, failThreshold: null }), base.validatedMax);
+  const touchingFail = { ...base, passThreshold: 0.009004, validatedMin: 0.009003,
+    failThreshold: boundary, failValidatedMin: boundary };
+  await assert.rejects(service.saveNewVersion(touchingFail, '0.9005'), /자동 불량 기준보다 낮아야/);
+  assert.equal(calls.length, 1);
+});
+
+test('a confirmation from a closed policy screen cannot submit after refocus or re-login', async () => {
+  const { transport, calls } = fakeTransport({ activateReply: { ...EXISTING_T1, active: true } });
+  let epoch = 1;
+  const auth = { ...transport, sessionEpoch: () => epoch };
+  const oldVisit = createPolicyVisitV4(auth);
+  const oldService = createAdminPolicyServiceV4(oldVisit.transport);
+  oldVisit.close();
+  const currentVisit = createPolicyVisitV4(auth);
+  await assert.rejects(oldService.activate(EXISTING_T1), /정책 화면/);
+  assert.equal(calls.length, 0);
+  const nextService = createAdminPolicyServiceV4(currentVisit.transport);
+  await nextService.activate(EXISTING_T1);
+  epoch++;
+  await assert.rejects(nextService.activate(EXISTING_T1), /정책 화면/);
+  assert.equal(calls.length, 1);
+});
+
+test('a delayed policy preflight and the last role check before POST stay bound to the initiating visit', async () => {
+  let epoch = 1;
+  let finishList;
+  let posts = 0;
+  const auth = {
+    sessionEpoch: () => epoch,
+    async restore() { return { signedIn: true, role: 'ADMIN', loginId: 'admin' }; },
+    authorizedRequest(path, options) {
+      if (options.method === 'GET') return new Promise(resolve => { finishList = resolve; });
+      posts++;
+      return Promise.resolve({ ...EXISTING_T1, active: true });
+    },
+  };
+  const oldVisit = createPolicyVisitV4(auth);
+  const oldService = createAdminPolicyServiceV4(oldVisit.transport);
+  const oldFlow = oldService.list().then(() => oldService.activate(EXISTING_T1));
+  await new Promise(resolve => setImmediate(resolve));
+  oldVisit.close();
+  finishList([ORIGINAL, EXISTING_T1]);
+  await assert.rejects(oldFlow, /정책 화면/);
+
+  const newVisit = createPolicyVisitV4(auth);
+  const newService = createAdminPolicyServiceV4(newVisit.transport);
+  let finishRestore;
+  auth.restore = () => new Promise(resolve => { finishRestore = resolve; });
+  const pendingPost = newService.activate(EXISTING_T1);
+  epoch++;
+  finishRestore({ signedIn: true, role: 'ADMIN', loginId: 'next-admin' });
+  await assert.rejects(pendingPost, /정책 화면/);
+  assert.equal(posts, 0);
 });
 
 test('refresh before POST detects a policy version created since the initial screen load', () => {
@@ -169,7 +282,7 @@ test('out-of-range and unready threshold writes are blocked before POST', async 
   await assert.rejects(() => service.saveNewVersion(ORIGINAL, '0.80'), /허용 범위/);
   await assert.rejects(() => service.saveNewVersion({ ...ORIGINAL, ready: false }, '1.20'), /활성·준비/);
   await assert.rejects(() => service.saveNewVersion({ ...ORIGINAL, active: false }, '1.20'), /활성·준비/);
-  await assert.rejects(() => service.saveNewVersion({ ...ORIGINAL, partCode: 'DOOR' }, '1.20'), /COWL_COVER/);
+  await assert.rejects(() => service.saveNewVersion({ ...ORIGINAL, partCode: 'DOOR' }, '1.20'), /선택한 부품/);
   assert.equal(calls.length, 0);
 });
 
@@ -200,7 +313,7 @@ test('inactive or mismatched activate response is rejected, never considered suc
   const next = fakeTransport({ activateReply: { ...EXISTING_T1, active: true, policyId: 'another-id' } });
   await assert.rejects(() => createAdminPolicyServiceV4(next.transport).activate(EXISTING_T1), /정책 ID/);
   const foreign = fakeTransport();
-  await assert.rejects(() => createAdminPolicyServiceV4(foreign.transport).activate({ ...EXISTING_T1, partCode: 'DOOR' }), /COWL_COVER/);
+  await assert.rejects(() => createAdminPolicyServiceV4(foreign.transport).activate({ ...EXISTING_T1, partCode: 'DOOR' }), /선택한 부품/);
   assert.equal(foreign.calls.length, 0);
 });
 
@@ -243,4 +356,50 @@ test('server-side 403 propagates; UI must not treat it as a successful activatio
   };
   await assert.rejects(() => createAdminPolicyServiceV4(transport).activate(EXISTING_T1), /403 FORBIDDEN/);
   assert.equal(calls.length, 1);
+});
+
+for (const partCode of ['DOOR', 'FRAME', 'COWL_COVER']) {
+  test(partCode + ' policy service scopes reads and writes and rejects other-part responses', async () => {
+    const base = {...ORIGINAL, partCode};
+    const saved = {...EXISTING_T1, partCode};
+    const h = fakeTransport({list:[base,saved], thresholdReply:saved, activateReply:{...saved,active:true}});
+    const service = createAdminPolicyServiceV4(h.transport,partCode);
+    assert.equal((await service.list())[0].partCode,partCode);
+    assert.equal(h.calls[0].path,'/admin/policies?partCode='+partCode);
+    assert.equal(findEquivalentPolicyVersionV4([saved],base,0.01),saved);
+    assert.equal((await service.saveNewVersion(base,'1.00')).partCode,partCode);
+    assert.equal((await service.activate(saved)).partCode,partCode);
+    const otherPart = partCode==='DOOR'?'FRAME':'DOOR';
+    const count=h.calls.length;
+    await assert.rejects(service.saveNewVersion({...base,partCode:otherPart},'1.00'),/선택한 부품/);
+    await assert.rejects(service.activate({...saved,partCode:otherPart}),/선택한 부품/);
+    assert.equal(h.calls.length,count);
+    const wrong=fakeTransport({list:[{...base,partCode:otherPart}],thresholdReply:{...saved,partCode:otherPart},activateReply:{...saved,partCode:otherPart,active:true}});
+    const wrongService=createAdminPolicyServiceV4(wrong.transport,partCode);
+    await assert.rejects(wrongService.list(),/부품/);
+    await assert.rejects(wrongService.saveNewVersion(base,'1.00'),/승계한 설정/);
+    await assert.rejects(wrongService.activate(saved),/활성 상태/);
+  });
+}
+test('unsupported policy parts are rejected before transport access', () => {
+  assert.throws(()=>createAdminPolicyServiceV4(fakeTransport().transport,'UNKNOWN'),/지원하지 않는/);
+});
+test('changing policy part invalidates old preflight and old confirmation without POST', async () => {
+  const h=fakeTransport({list:[ORIGINAL]});
+  const auth={...h.transport,sessionEpoch:()=>1};
+  const oldVisit=createPolicyVisitV4(auth);
+  const oldService=createAdminPolicyServiceV4(oldVisit.transport,'COWL_COVER');
+  const pending=oldService.list();
+  oldVisit.close();
+  await assert.rejects(pending,/정책 화면/);
+  await assert.rejects(oldService.saveNewVersion(ORIGINAL,'1.20'),/정책 화면/);
+  assert.equal(h.calls.filter(c=>c.options.method==='POST').length,0);
+});
+test('policy part selector uses Korean labels and resets the full visit on switch', () => {
+  const source=fs.readFileSync(path.join(__dirname,'../src/app/policy-live.tsx'),'utf8');
+  assert.match(source, /<PolicyPartScreen key={partCode}/);
+  assert.match(source, /focusedVisit.current\?\.close\(\)/);
+  assert.match(source, /partLabelV4\(code\)/);
+  assert.match(source, /createAdminPolicyServiceV4\(visit.transport, partCode\)/);
+  assert.match(source, /writing!==null \|\| writeLock.current/);
 });

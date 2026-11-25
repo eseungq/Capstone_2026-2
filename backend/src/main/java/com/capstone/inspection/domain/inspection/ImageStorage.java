@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.capstone.inspection.common.time.Times;
 
 // 검사 이미지 1건 (원본 또는 Grad-CAM). 검사당 원본 1, Grad-CAM 최대 1
 @Entity
@@ -69,6 +70,6 @@ public class ImageStorage {
         this.width = width;
         this.height = height;
         this.checksum = checksum;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Times.now();
     }
 }

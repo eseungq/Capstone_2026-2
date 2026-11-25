@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import com.capstone.inspection.common.time.Times;
 
 // REVIEW 검사에 대한 작업자 최종 판정 (AI 결과와 분리 저장)
 @Entity
@@ -52,14 +53,18 @@ public class WorkerConfirmation {
     @Embedded
     private ScreenTiming screenTiming; // 화면 체류 시간 (선택, V9). 보내지 않았으면 null
 
+    @Column(length = 36)
+    private String batchId;            // 일괄 FAIL 묶음 ID (V11, 계약 6.7.1). 단건 확인이면 null
+
     public WorkerConfirmation(Inspection inspection, User worker, Judgement finalJudgement, String comment,
-                              ScreenTiming screenTiming) {
+                              ScreenTiming screenTiming, String batchId) {
         this.id = UUID.randomUUID().toString();
         this.inspection = inspection;
         this.worker = worker;
         this.finalJudgement = finalJudgement;
         this.comment = comment;
         this.screenTiming = screenTiming;
-        this.confirmedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
+        this.batchId = batchId;
+        this.confirmedAt = Times.now().truncatedTo(ChronoUnit.MICROS); // DB DATETIME(6)과 같은 정밀도
     }
 }

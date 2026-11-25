@@ -37,6 +37,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import com.capstone.inspection.common.time.Times;
 
 // 사진 접수 (계약 v4 6.2). 입력 검증 → 원본 저장 → RECEIVED 기록 → 커밋 후 분석 시작
 @Service
@@ -107,7 +108,7 @@ public class InspectionIntakeService {
                 blankToNull(lineCode), capturedAt, key, null, MDC.get(TraceIdFilter.MDC_KEY));
         inspectionRepository.save(inspection);
 
-        String storageKey = "original/" + LocalDate.now().format(DATE_PATH) + "/" + inspection.getId() + "." + info.extension();
+        String storageKey = "original/" + Times.today().format(DATE_PATH) + "/" + inspection.getId() + "." + info.extension();
         try {
             storageService.save(storageKey, image);
         } catch (IOException e) {

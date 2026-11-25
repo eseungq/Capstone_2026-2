@@ -15,6 +15,7 @@ import java.util.List;
 
 // 같은 검사들에 현재 기준치와 후보 기준치를 대입해 판정이 바뀌는 건을 셈 (계약 6.9.1)
 //   판정 규칙은 PolicyEvaluator와 같음: DEFECT 예측은 기준치와 무관하게 REVIEW, GOOD은 보정 확률 ≤ 기준치면 AUTO_PASS
+//   자동 불량(AUTO_FAIL, 계약 4.1)도 DEFECT 예측이라 defectPredictedCount로 셈. 통과 기준 비교만 하므로 불량 기준은 보지 않음
 //   실제 라벨은 작업자 판정, 그다음 AUTO_PASS 표본 재확인 결과(6.11). PASS·SYSTEM만 있는 건은 미확인으로 셈
 //   예상 재확인 건수: 그 기준치로 AUTO_PASS가 되는 건마다 현재 재확인 규칙의 구간 비율을 더한 값 (기대값)
 public final class PolicySimulation {

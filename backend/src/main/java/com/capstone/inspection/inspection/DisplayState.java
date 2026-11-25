@@ -7,6 +7,7 @@ import com.capstone.inspection.domain.inspection.RecommendedAction;
 public enum DisplayState {
     ANALYZING,       // RECEIVED·ANALYZING
     AUTO_PASS,       // COMPLETED + AUTO_PASS
+    AUTO_FAIL,       // COMPLETED + AUTO_FAIL (계약 4.1)
     REVIEW_PENDING,  // COMPLETED + REVIEW, 작업자 확인 전
     REVIEW_DONE,     // COMPLETED + REVIEW, 작업자 확인 완료
     FAILED;
@@ -15,8 +16,11 @@ public enum DisplayState {
         return switch (i.getStatus()) {
             case RECEIVED, ANALYZING -> ANALYZING;
             case FAILED -> FAILED;
-            case COMPLETED -> i.getRecommendedAction() == RecommendedAction.AUTO_PASS ? AUTO_PASS
-                    : (i.getFinalJudgement() == null ? REVIEW_PENDING : REVIEW_DONE);
+            case COMPLETED -> switch (i.getRecommendedAction()) {
+                case AUTO_PASS -> AUTO_PASS;
+                case AUTO_FAIL -> AUTO_FAIL;
+                case REVIEW -> i.getFinalJudgement() == null ? REVIEW_PENDING : REVIEW_DONE;
+            };
         };
     }
 }

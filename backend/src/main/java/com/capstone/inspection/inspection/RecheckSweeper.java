@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import com.capstone.inspection.common.time.Times;
 
 // 추출 결정이 저장되지 않은 AUTO_PASS를 다시 처리 (계약 6.11)
 //   분석 직후 추출(RecheckSampler)이 실패하면 결정 행이 없음 → 주기적으로 찾아 다시 결정
@@ -46,7 +47,7 @@ public class RecheckSweeper {
         if (config == null || !config.enabled()) {
             return 0;
         }
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = Times.now();
         List<String> ids = recheckRepository.findUndecidedAutoPass(now.minus(LOOKBACK), now.minus(SETTLE),
                 PageRequest.of(0, BATCH_SIZE));
         int done = 0;

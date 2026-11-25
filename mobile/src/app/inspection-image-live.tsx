@@ -1,3 +1,4 @@
+import { createImageErrorRefreshBudgetV4, imageExpiryRefreshDelayV4 } from '../api/backendV4/imageRefreshBudgetV4';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, AppState, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -17,7 +18,7 @@ function imageUrl(detail: InspectionViewV4, kind: ImageKind): string | null {
 
 function missingImageText(detail: InspectionViewV4, kind: ImageKind): string {
   if (kind === 'original') return '원본 이미지가 제공되지 않았습니다.';
-  if (detail.gradcamStatus === 'NOT_REQUIRED') return 'GOOD 예측에 대한 판단 근거 이미지는 생성되지 않았습니다.';
+  if (detail.gradcamStatus === 'NOT_REQUIRED') return '정상 예측에 대한 판단 근거 이미지는 생성되지 않았습니다.';
   if (detail.gradcamStatus === 'NO_ACTIVATION') return 'AI의 위치별 강조 반응이 없어 판단 근거 이미지를 제공할 수 없습니다.';
   if (detail.gradcamStatus === 'FAILED') return 'AI 판단 근거 이미지 생성에 실패했습니다.';
   return 'AI 판단 근거 이미지를 제공하지 않았습니다.';
@@ -26,7 +27,7 @@ function missingImageText(detail: InspectionViewV4, kind: ImageKind): string {
 function getErrorText(error: unknown): string {
   if (error instanceof ApiV4RequestError) {
     return error.code === 'IMAGE_NOT_AVAILABLE'
-      ? '이미지 파일을 제공받지 못했습니다. (IMAGE_NOT_AVAILABLE)'
+      ? '이 검사에서 사진을 제공받지 못했습니다.'
       : '서버에서 사진 정보를 조회하지 못했습니다. 연결 상태를 확인해 주세요.';
   }
   return error instanceof Error ? error.message : '검사 상세를 불러오지 못했습니다.';
@@ -49,6 +50,9 @@ export default function InspectionImageLiveScreen() {
   const [zoom, setZoom] = useState(1);
   const { width } = useWindowDimensions();
   const failedUrls = useRef(new Set<string>());
+  const imageErrorBudget = useRef(createImageErrorRefreshBudgetV4());
+  const lastExpiryAttempt = useRef<number | null>(null);
+  const pendingImageRefresh = useRef(false);
   const requestSerial = useRef(0);
   const lastExpiryRefresh = useRef<string | null>(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -62,17 +66,26 @@ export default function InspectionImageLiveScreen() {
       setLoading(true);
       setDetail(null);
       failedUrls.current.clear();
+      imageErrorBudget.current.reset();
+      lastExpiryAttempt.current = null;
+      pendingImageRefresh.current = false;
       lastExpiryRefresh.current = null;
     } else {
       setRefreshing(true);
     }
-    if (manualRetry) failedUrls.current.clear();
+    if (manualRetry) {
+      failedUrls.current.clear();
+      imageErrorBudget.current.reset();
+      lastExpiryAttempt.current = null;
+      pendingImageRefresh.current = false;
+    }
     setError(null);
     setNotice(null);
     try {
       if (!id) throw new Error('검사 ID가 전달되지 않았습니다.');
       const result = (await reader.detail(id)).value;
       if (serial !== requestSerial.current) return;
+      if (result.inspectionId !== id) throw new Error('선택한 검사 정보를 확인할 수 없습니다. 다시 조회해 주세요.');
       setDetail(result);
       const updatedUrl = imageUrl(result, imageKindRef.current);
       if (updatedUrl && failedUrls.current.has(updatedUrl)) {
@@ -113,25 +126,38 @@ export default function InspectionImageLiveScreen() {
   useEffect(() => {
     if (!isFocused || !isForeground || loading || refreshing || !current) return;
     const expiry = current.imageUrlExpiresAt;
-    if (!expiry || expiry === lastExpiryRefresh.current) return;
+    if (!expiry || expiry === lastExpiryRefresh.current || (isFailed && imageErrorBudget.current.exhausted())) return;
     const ms = Date.parse(expiry);
     if (!Number.isFinite(ms)) return;
     const timer = setTimeout(() => {
       lastExpiryRefresh.current = expiry;
+      lastExpiryAttempt.current = Date.now();
       void load(false);
-    }, Math.max(0, ms - Date.now() - 30_000));
+    }, imageExpiryRefreshDelayV4(ms, lastExpiryAttempt.current, Date.now()));
     return () => clearTimeout(timer);
-  }, [isFocused, isForeground, loading, refreshing, current?.imageUrlExpiresAt, load]);
+  }, [isFocused, isForeground, loading, refreshing, isFailed, current?.imageUrlExpiresAt, load]);
+
+  useEffect(() => {
+    if (!pendingImageRefresh.current || !isFocused || !isForeground || loading || refreshing) return;
+    pendingImageRefresh.current = false;
+    if (imageErrorBudget.current.take()) void load(false);
+    else setNotice('사진을 표시할 수 없습니다. 이미지 다시 조회를 눌러 주세요.');
+  }, [isFocused, isForeground, loading, refreshing, notice, load]);
 
   const onPhotoError = (failedUrl: string) => {
     if (failedUrl !== uri || failedUrls.current.has(failedUrl)) return;
     failedUrls.current.add(failedUrl);
     setLoadedUrl(null);
+    if (imageErrorBudget.current.exhausted()) {
+      setNotice('사진을 표시할 수 없습니다. 이미지 다시 조회를 눌러 주세요.');
+      return;
+    }
+    pendingImageRefresh.current = true;
     setNotice('사진을 불러오지 못해 새 이미지 주소를 확인합니다.');
-    if (isFocused && isForeground && !refreshing) void load(false);
   };
 
   const selectKind = (next: ImageKind) => {
+    if (next === imageKind) return;
     setImageKind(next);
     setLoadedUrl(null);
     setZoom(1);

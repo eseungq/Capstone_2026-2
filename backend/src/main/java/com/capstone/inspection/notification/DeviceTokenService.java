@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import com.capstone.inspection.common.time.Times;
 
 // 푸시 기기 토큰 등록·해제 (계약 v4 8장)
 @Service
@@ -27,7 +28,7 @@ public class DeviceTokenService {
         if (token == null || token.length() > MAX_TOKEN_LENGTH || !EXPO_TOKEN.matcher(token).matches()) {
             throw new BusinessException(ErrorCode.INVALID_DEVICE_TOKEN);
         }
-        repository.upsert(UUID.randomUUID().toString(), userId, token, platform.name(), LocalDateTime.now());
+        repository.upsert(UUID.randomUUID().toString(), userId, token, platform.name(), Times.now());
     }
 
     // 본인 토큰만 해제. 없거나 다른 사람 토큰이면 아무 일도 하지 않음

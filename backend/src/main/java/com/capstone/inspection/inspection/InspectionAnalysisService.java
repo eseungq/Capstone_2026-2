@@ -6,7 +6,6 @@ import com.capstone.inspection.ai.AiPredictRequest;
 import com.capstone.inspection.ai.AiResponseValidator;
 import com.capstone.inspection.common.error.ErrorCode;
 import com.capstone.inspection.common.trace.TraceIdFilter;
-import com.capstone.inspection.domain.inspection.InspectionStatus;
 import com.capstone.inspection.domain.inspection.PredictedQuality;
 import com.capstone.inspection.storage.ImageUrlSigner;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +50,7 @@ public class InspectionAnalysisService {
             outcome = writer.fail(inspectionId, ErrorCode.INTERNAL_SERVER_ERROR.name(), e.toString());
         }
         notifier.notifyIfNeeded(outcome);
-        if (outcome != null && outcome.status() == InspectionStatus.COMPLETED && !outcome.reviewRequired()) {
+        if (outcome != null && outcome.autoPass()) { // AUTO_FAIL·REVIEW는 표본 재확인 대상이 아님
             sampleQuietly(outcome.inspectionId());
         }
     }
