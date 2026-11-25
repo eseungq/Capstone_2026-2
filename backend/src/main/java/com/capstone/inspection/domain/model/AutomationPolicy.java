@@ -14,8 +14,9 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.capstone.inspection.common.time.Times;
 
-// 자동 통과 정책 1개 버전. 관리자가 기준치를 조정하면 행을 고치지 않고 새 버전을 만듦 (계약 v4 6.9)
+// 자동 통과·자동 불량 정책 1개 버전. 관리자가 기준을 바꾸면 행을 고치지 않고 새 버전을 만듦 (계약 v4 6.9)
 @Entity
 @Table(name = "automation_policy")
 @Getter
@@ -46,6 +47,14 @@ public class AutomationPolicy {
 
     private Double validatedMin;        // AI가 검증한 조정 가능 범위
     private Double validatedMax;
+
+    @Column(nullable = false)
+    private boolean autoFailEnabled;    // 자동 불량 켜짐 (V13, 기본 false). 켜려면 failThreshold 필수
+
+    private Double failThreshold;       // 자동 불량 하한 (DEFECT 예측 + 보정 불량 확률 ≥ 이 값이면 AUTO_FAIL)
+
+    private Double failValidatedMin;    // AI가 검증한 불량 기준 범위
+    private Double failValidatedMax;
 
     @Column(nullable = false, columnDefinition = "json")
     private String metricsJson;         // AI 평가 근거
@@ -79,8 +88,43 @@ public class AutomationPolicy {
         this.metricsJson = metricsJson;
         this.ready = ready;
         this.active = false;
+        this.autoFailEnabled = false; // 자동 불량은 기본 꺼짐 (계약 4.1)
         this.basedOnPolicyId = basedOnPolicyId;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Times.now();
+    }
+
+    // 기준치 조정 새 버전: 통과 기준만 바꾸고 자동 불량 값은 이어받음 (계약 6.9)
+    public AutomationPolicy withPassThreshold(String newVersion, double newPassThreshold) {
+        AutomationPolicy next = nextVersion(newVersion);
+        next.passThreshold = newPassThreshold;
+        return next;
+    }
+
+    // 불량 기준 등록·조정 새 버전: 켜짐 여부는 이어받음
+    public AutomationPolicy withFailThreshold(String newVersion, double newFailThreshold, double min, double max) {
+        AutomationPolicy next = nextVersion(newVersion);
+        next.failThreshold = newFailThreshold;
+        next.failValidatedMin = min;
+        next.failValidatedMax = max;
+        return next;
+    }
+
+    // 자동 불량 켜고 끄기 새 버전: 기준은 그대로
+    public AutomationPolicy withAutoFail(String newVersion, boolean enabled) {
+        AutomationPolicy next = nextVersion(newVersion);
+        next.autoFailEnabled = enabled;
+        return next;
+    }
+
+    // 이 정책의 값을 모두 복사한 새 버전. active=false로 시작하고 basedOn은 이 정책
+    private AutomationPolicy nextVersion(String newVersion) {
+        AutomationPolicy next = new AutomationPolicy(model, calibratorVersion, newVersion, passThreshold,
+                validatedMin, validatedMax, metricsJson, ready, id);
+        next.autoFailEnabled = autoFailEnabled;
+        next.failThreshold = failThreshold;
+        next.failValidatedMin = failValidatedMin;
+        next.failValidatedMax = failValidatedMax;
+        return next;
     }
 
     public void activate(LocalDateTime at) {

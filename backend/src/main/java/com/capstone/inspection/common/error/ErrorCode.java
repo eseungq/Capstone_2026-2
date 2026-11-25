@@ -31,6 +31,7 @@ public enum ErrorCode {
     IMAGE_NOT_AVAILABLE(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없거나 접근 기간이 지났습니다.", false),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 경로가 없습니다.", false),                      // 5.7 표에 추가 필요
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다.", false), // 5.7 표에 추가 필요
+    REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "판정 확인 요청을 찾을 수 없습니다.", false),
 
     // 409 상태 충돌
     NOT_REVIEWABLE(HttpStatus.CONFLICT, "작업자 확인 대상이 아닌 검사입니다.", false),
@@ -43,6 +44,10 @@ public enum ErrorCode {
     NOT_RECHECKABLE(HttpStatus.CONFLICT, "표본 재확인 대상이 아닌 검사입니다.", false),
     ALREADY_RECHECKED(HttpStatus.CONFLICT, "이미 다른 결과로 재확인된 검사입니다.", false),
     NOT_ACKNOWLEDGEABLE(HttpStatus.CONFLICT, "재확인 결과가 FAIL인 건만 확인함으로 표시할 수 있습니다.", false),
+    AUTO_FAIL_NOT_CONFIGURED(HttpStatus.CONFLICT, "불량 기준(failThreshold)이 없는 정책은 자동 불량을 켤 수 없습니다.", false),
+    NOT_REQUESTABLE(HttpStatus.CONFLICT, "시스템 판정 건만 판정 확인을 요청할 수 있습니다.", false),
+    REQUEST_ALREADY_OPEN(HttpStatus.CONFLICT, "이 검사에 처리 대기 중인 판정 확인 요청이 이미 있습니다.", false),
+    REQUEST_ALREADY_RESOLVED(HttpStatus.CONFLICT, "이미 다른 결정으로 처리된 요청입니다.", false),
     ORIGINAL_IMAGE_MISSING(HttpStatus.CONFLICT, "원본 사진이 없어 수동 판정할 수 없습니다. 다시 촬영해 접수해 주세요.", false),
 
     // 422 모델 없음

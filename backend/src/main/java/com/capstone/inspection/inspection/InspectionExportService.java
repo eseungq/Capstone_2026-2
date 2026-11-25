@@ -40,7 +40,7 @@ public class InspectionExportService {
     private static final List<String> HEADER = List.of("inspectionNo", "partCode", "lineCode", "source",
             "originInspectionNo", "displayState", "status", "receivedAt", "completedAt", "modelVersion",
             "calibratorVersion", "predictedQuality", "rawDefectProbability", "calibratedDefectProbability",
-            "inferenceTimeMs", "policyVersion", "passThresholdApplied", "recommendedAction", "reviewReason",
+            "inferenceTimeMs", "policyVersion", "passThresholdApplied", "failThresholdApplied", "recommendedAction", "reviewReason",
             "finalJudgement", "judgedBy", "workerLoginId", "confirmedAt", "errorCode");
 
     private final InspectionQueryService queryService;
@@ -103,6 +103,7 @@ public class InspectionExportService {
         row.add(ai ? text(i.getInferenceTimeMs()) : null);
         row.add(i.getPolicy() != null ? i.getPolicy().getPolicyVersion() : null);
         row.add(number(i.getPassThresholdApplied()));
+        row.add(number(i.getFailThresholdApplied()));
         row.add(text(i.getRecommendedAction()));
         row.add(text(i.getReviewReason()));
         row.add(text(i.getFinalJudgement()));

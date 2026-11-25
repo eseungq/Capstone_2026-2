@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.capstone.inspection.common.time.Times;
 
 @Entity
 @Table(name = "users") // user는 MySQL 예약어라 users 사용
@@ -49,7 +50,7 @@ public class User {
         this.role = role;
         this.failedLoginCount = 0;
         this.locked = false;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Times.now();
     }
 
     // 로그인 실패 1회 기록. 기준 횟수에 도달하면 잠금 (TBD-10)

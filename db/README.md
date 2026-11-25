@@ -2,7 +2,7 @@
 
 담당: 김남균
 
-실제 서버에 적용되는 스키마는 백엔드의 Flyway 마이그레이션입니다: [backend/src/main/resources/db/migration](../backend/src/main/resources/db/migration) (V1~V10 적용됨, V11·V12는 PR #50·#51).
+실제 서버에 적용되는 스키마는 백엔드의 Flyway 마이그레이션입니다: [backend/src/main/resources/db/migration](../backend/src/main/resources/db/migration) (V1~V14 적용됨, V11~V14는 11/25 병합).
 설계를 바꿀 때는 **이미 적용된 마이그레이션은 수정하지 않고** 다음 버전 파일로 추가합니다. 이 폴더의 SQL은 Flyway에 넣지 않습니다.
 
 저장 구조 기준: 계약 v4 9장(11/18 갱신) · 명세서 4.3 개정 문안(11/11) · [수동 판정 결정안](../docs/수동판정_결정안.md)
@@ -45,6 +45,6 @@
 
 ## 남은 확인
 
-- V12 적용 후: 01_schema·위반 테스트·ERD에 judgement_request·batch_id 반영 예정
+- V12 적용 후: 01_schema·위반 테스트·ERD에 judgement_request·batch_id 반영 예정. V13·V14(자동 불량: `auto_fail_enabled`·`fail_threshold`·`fail_threshold_applied`, `chk_insp_auto_fail`)는 점검 파일에 아직 반영되지 않음
 - 표본 재확인 장기 비율·불확실성 표시 (TBD-16), 재확인 FAIL 후속 조치 (TBD-17)
 - 검사항목 코드는 11/17 `UNIFIED`로 확정·V7 적용 (TBD-04 해소)
