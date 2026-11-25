@@ -1,9 +1,10 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import {
-  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { partLabelV4, stratumLabelV4 } from '../components/partLabelV4';
 
 import { authV4 } from '../api/backendV4/authRuntime';
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
@@ -90,7 +91,8 @@ export default function RechecksLiveScreen() {
           {role === 'ADMIN' ? '관리자 조회 · 확인함 처리' : role === 'WORKER' ? '작업자 조회 · 재확인' : '권한 확인 중'}
         </Text>
       </View>
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView contentContainerStyle={styles.body}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={()=>{if(!loading)void load();}}/>}>
         <View style={styles.notice}>
           <Text style={styles.noticeText}>
             원래 AUTO_PASS의 PASS · SYSTEM 판정은 유지됩니다. REVIEW 업무 대기열과 재확인 대기열은 별도입니다.
@@ -123,7 +125,7 @@ export default function RechecksLiveScreen() {
               accessibilityState={{ selected: part === code }}
               onPress={() => changePart(code)}
               style={[styles.filter, part === code && styles.selected]}>
-              <Text style={[styles.filterText, part === code && styles.selectedText]}>{code}</Text>
+              <Text style={[styles.filterText, part === code && styles.selectedText]}>{partLabelV4(code)}</Text>
             </Pressable>
           ))}
         </View>
@@ -162,7 +164,7 @@ export default function RechecksLiveScreen() {
                   params: {inspectionId: item.inspectionId} })}
                 style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
                 <View style={styles.rowBetween}>
-                  <Text style={styles.itemTitle}>{item.inspectionNo} · {item.partCode}</Text>
+                  <Text style={styles.itemTitle}>{item.inspectionNo} · {partLabelV4(item.partCode)}</Text>
                   <Text style={[
                     styles.statusText,
                     item.result === 'FAIL' && styles.errorText,
@@ -170,7 +172,7 @@ export default function RechecksLiveScreen() {
                     item.result === 'PASS' ? '재확인 PASS' : '재확인 대기'}</Text>
                 </View>
                 <Text style={styles.muted}>
-                  표본 구간: {item.stratum} · 선정: {formatTime(item.sampledAt)}
+                  표본 구간: {stratumLabelV4(item.stratum)} · 선정: {formatTime(item.sampledAt)}
                 </Text>
                 {item.result === 'FAIL' && (
                   <Text style={styles.errorText}>
@@ -206,29 +208,29 @@ export default function RechecksLiveScreen() {
 const styles = StyleSheet.create({
   backTouch: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   screen: { flex: 1, backgroundColor: '#F5F7FB' },
-  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 7 },
+  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#CBD5E1' },
   title: { fontSize: 22, color: '#111827', fontWeight: '700' },
-  sub: { fontSize: 13, color: '#64748B' },
+  sub: { fontSize: 13, color: '#475569' },
   body: { paddingHorizontal: 20, paddingBottom: 28, gap: 12 },
   notice: { backgroundColor: '#EBF1FF', borderRadius: 12, padding: 12 },
   noticeText: { fontSize: 13, lineHeight: 19, color: '#2054D8' },
   sectionTitle: { fontSize: 14, color: '#111827', fontWeight: '700' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  filter: { justifyContent: 'center', minHeight: 44, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFF',
+  filter: { justifyContent: 'center', minHeight: 44, borderWidth: 1, borderColor: '#64748B', backgroundColor: '#FFF',
     borderRadius: 10, paddingHorizontal: 11, paddingVertical: 11 },
-  selected: { backgroundColor: '#2054D8', borderColor: '#2054D8' },
-  filterText: { fontSize: 12, color: '#475569', fontWeight: '600' },
+  selected: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
+  filterText: { fontSize: 13, color: '#475569', fontWeight: '600' },
   selectedText: { color: '#FFF' },
   card: { padding: 14, borderRadius: 13, borderWidth: 1, borderColor: '#E4E7EC',
     backgroundColor: '#FFF', gap: 9 },
   itemTitle: { fontSize: 14, color: '#111827', fontWeight: '700' },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  statusText: { fontSize: 12, fontWeight: '700', color: '#067647' },
-  muted: { fontSize: 13, color: '#64748B', lineHeight: 19 },
+  statusText: { fontSize: 13, fontWeight: '700', color: '#067647' },
+  muted: { fontSize: 13, color: '#475569', lineHeight: 19 },
   link: { fontSize: 14, color: '#2054D8', fontWeight: '700' },
-  errorText: { fontSize: 12, color: '#B42318', lineHeight: 18 },
+  errorText: { fontSize: 13, color: '#B42318', lineHeight: 18 },
   error: { backgroundColor: '#FFF0ED' },
-  secondaryButton: { justifyContent: 'center', minHeight: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10,
+  secondaryButton: { justifyContent: 'center', minHeight: 44, borderWidth: 1, borderColor: '#64748B', borderRadius: 10,
     paddingHorizontal: 13, paddingVertical: 11, alignItems: 'center' },
   pressed: { opacity: 0.75 },
   disabled: { opacity: 0.35 },

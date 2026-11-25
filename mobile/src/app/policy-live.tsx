@@ -3,7 +3,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { useRevealFocusedInputV4 } from '../components/useRevealFocusedInputV4';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import {
-  ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -379,7 +379,8 @@ export default function PolicyLiveScreen() {
         <Text style={s.subtitle}>관리자 · COWL_COVER</Text>
       </View>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView ref={scrollRef} onLayout={revealInput} style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <ScrollView ref={scrollRef} onLayout={revealInput} style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{if(!loading&&!refreshing&&!writing)void load(false);}}/>}>
         <View style={s.notice}>
           <Text style={s.noticeText}>
             저장은 새 비활성 버전 생성입니다. 버전 관리에서 별도로 적용해야 새 검사에 반영됩니다.
@@ -510,14 +511,14 @@ export default function PolicyLiveScreen() {
                   <Button title="불량 기준 새 비활성 버전 저장" onPress={confirmSaveFail}
                     disabled={!canWrite||!failEditValid}/>
                   {!evidencePresent && <Text style={s.errorText}>검증 자료 없음: 팀 승인 시험 범위에서만 사용하세요. 품질 정확도를 보장하지 않습니다.</Text>}
-                  <Button title="자동 불량 켜기 버전 저장 · 적용 아님"
+                  <Button title="자동 불량 켜기 버전 저장 · 적용 아님" secondary
                     onPress={()=>confirmAutoFailToggle(true)}
                     disabled={!canWrite||!canToggleOn}/>
                   <Button title="자동 불량 끄기 버전 저장 · 적용 아님" secondary
                     onPress={()=>confirmAutoFailToggle(false)}
                     disabled={!canWrite||!canToggleOff}/>
                   <Text style={s.muted}>
-                    불량 기준이 등록된 정책에서 켜기 버전을 저장할 수 있습니다. 새 비활성 기준 버전은 버전 관리에서 바로 켜기 버전을 만들 수 있으며, 적용은 별도입니다.
+                    불량 기준을 등록한 뒤 버전 관리에서도 켜기 버전을 저장할 수 있습니다.
                   </Text>
                 </>}
               </>}
@@ -602,7 +603,7 @@ const s = StyleSheet.create({
   sectionTabTextActive: { color: C.white },
   formLabel: { color: C.ink, fontSize: 13, lineHeight: 18, fontWeight: '600' },
   screen: { flex: 1, backgroundColor: C.bg },
-  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14, gap: 6 },
+  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14, gap: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#CBD5E1' },
   back: { color: C.blue, fontSize: 14, fontWeight: '600' },
   title: { color: C.ink, fontSize: 23, lineHeight: 32, fontWeight: '700' },
   subtitle: { color: C.muted, fontSize: 13, lineHeight: 18},

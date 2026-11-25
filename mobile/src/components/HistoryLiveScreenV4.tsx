@@ -1,7 +1,7 @@
 import Pressable from './TouchPressable';
 import LiveBottomNavV4 from './LiveBottomNavV4';
 import { useVerifiedRoleV4 } from './useVerifiedRoleV4';
-import { partLabelV4 } from './partLabelV4';
+import { partLabelV4, qualityLabelV4 } from './partLabelV4';
 import React, { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
@@ -300,7 +300,7 @@ export default function HistoryLiveScreenV4() {
                   ? '수동 판정 · AI 분석 없음'
                   : item.displayState === 'FAILED'
                     ? 'AI 분석 실패'
-                    : 'AI 예측 ' + (item.predictedQuality ?? '미제공')}
+                    : 'AI 예측 ' + qualityLabelV4(item.predictedQuality)}
                 {' · 접수 '}{dateText(item.receivedAt)}
               </Text>
               {(item.correctedJudgement || item.finalJudgement) && (
@@ -346,7 +346,7 @@ export default function HistoryLiveScreenV4() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F5F7FB' },
-  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
+  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#CBD5E1' },
   title: { fontSize: 23, fontWeight: '700', color: '#111827' },
   subtitle: { fontSize: 13, color: '#475569', marginTop: 5 },
   scroll: { flex: 1 },
@@ -377,10 +377,10 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.4 },
   messageBox: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 18, alignItems: 'center', gap: 12 },
   errorBox: { padding: 15, borderRadius: 12, backgroundColor: '#FFF0ED', gap: 10 },
-  errorText: { fontSize: 12, lineHeight: 18, color: '#B42318' },
-  warningText: { fontSize: 12, lineHeight: 18, color: '#92400E' },
+  errorText: { fontSize: 13, lineHeight: 18, color: '#B42318' },
+  warningText: { fontSize: 13, lineHeight: 18, color: '#92400E' },
   retryButton: { justifyContent: 'center', minHeight: 44, padding: 9, borderRadius: 8, borderWidth: 1, borderColor: '#B42318', alignSelf: 'flex-start' },
-  retryText: { color: '#B42318', fontSize: 12, fontWeight: '700' },
+  retryText: { color: '#B42318', fontSize: 13, fontWeight: '700' },
   itemCard: { backgroundColor: '#FFFFFF', borderRadius: 13, borderWidth: 1, borderColor: '#E4E7EC', padding: 14, gap: 5 },
   itemTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 6 },
   itemTitle: { fontSize: 14, fontWeight: '700', color: '#111827', flexGrow: 1, flexShrink: 1, minWidth: 0 },
@@ -389,11 +389,11 @@ const styles = StyleSheet.create({
   pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 4 },
   pageButton: { justifyContent: 'center', minHeight: 44, borderWidth: 1, borderColor: '#2054D8', borderRadius: 9, paddingHorizontal: 18, paddingVertical: 10 },
   pageButtonText: { color: '#2054D8', fontSize: 13, fontWeight: '700' },
-  pageNumber: { color: '#475569', fontSize: 12 },
-  footer: { color: '#475569', fontSize: 11, textAlign: 'center', paddingTop: 5 },
+  pageNumber: { color: '#475569', fontSize: 13 },
+  footer: { color: '#475569', fontSize: 13, textAlign: 'center', paddingTop: 5 },
   bottomNav: { height: 58, flexDirection: 'row', marginHorizontal: 20, marginBottom: 6, backgroundColor: '#FFFFFF', borderRadius: 15, borderWidth: 1, borderColor: '#E4E7EC' },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
   navIcon: { fontSize: 17, color: '#475569' },
-  navText: { fontSize: 11, color: '#475569' },
+  navText: { fontSize: 13, color: '#475569' },
   active: { color: '#2054D8', fontWeight: '700' },
 });

@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -29,7 +30,7 @@ import { inspectionDwellForSessionV4 } from '../api/backendV4/inspectionDwellV4'
 import { createRecheckServiceV4 } from '../api/backendV4/recheckServiceV4';
 
 import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
-import { partLabelV4 } from '../components/partLabelV4';
+import { partLabelV4, qualityLabelV4, stratumLabelV4 } from '../components/partLabelV4';
 import { useRevealFocusedInputV4 } from '../components/useRevealFocusedInputV4';
 
 type DetailVisit = {
@@ -536,6 +537,16 @@ export default function InspectionLiveScreen() {
     );
   };
 
+  const refreshDetail=()=>{
+    if(loading||refreshing||submitting!==null||!visibleDetail)return;
+    lastAutoRefreshedExpiry.current=visibleDetail.imageUrlExpiresAt;
+    lastExpiryAttempt.current=null;
+    imageErrorBudget.current.reset();
+    pendingImageRefreshOnResume.current=false;
+    failedImageUrls.current.clear();
+    setImageRetryRevision(value=>value+1);
+    void load(false);
+  };
   const canShowConfirm = !roleLoading && role === 'WORKER' && visibleDetail?.canOfferConfirm === true;
   const canShowRetry = !roleLoading && (role === 'WORKER' || role === 'ADMIN') &&
     visibleDetail?.canOfferRetry === true;
@@ -601,7 +612,8 @@ export default function InspectionLiveScreen() {
       </View>
 
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView ref={scrollRef} onLayout={revealInput} style={{flex:1}} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <ScrollView ref={scrollRef} onLayout={revealInput} style={{flex:1}} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshDetail}/>}>
         {refreshing && !loading && (
           <Text style={styles.muted}>서버에서 최신 상세 정보를 확인하는 중…</Text>
         )}
@@ -729,14 +741,14 @@ export default function InspectionLiveScreen() {
                 <Field label="판정 방식" value="AI 분석 없이 작업자 판정" />
               ) : (
                 <>
-                  <Field label="AI 예측" value={visibleDetail.prediction ?? '미제공'} />
+                  <Field label="AI 예측" value={qualityLabelV4(visibleDetail.prediction)} />
                   <Field
                     label="보정 불량 확률"
                     value={visibleDetail.calibratedDefectProbability === null
                       ? '미준비 / 미제공'
                       : `${(visibleDetail.calibratedDefectProbability * 100).toFixed(2)}%`}
                   />
-                  <Field label="REVIEW 사유" value={visibleDetail.reviewReasonText ?? '해당 없음'} />
+                  {visibleDetail.reviewReasonText && <Field label="확인 필요 사유" value={visibleDetail.reviewReasonText} />}
                 </>
               )}
               <Field label={visibleDetail.judgedBy === 'SYSTEM' ? '최초 시스템 판정' : '최종 작업자 판정'}
@@ -773,7 +785,7 @@ export default function InspectionLiveScreen() {
                 <Text style={styles.muted}>
                   원래 검사 판정: 시스템 판정 PASS. 재확인 결과는 별도 기록입니다.
                 </Text>
-                <Field label="표본 구간" value={visibleDetail.recheck.stratum} />
+                <Field label="표본 구간" value={stratumLabelV4(visibleDetail.recheck.stratum)} />
                 <Field label="표본 추출 비율" value={(visibleDetail.recheck.samplingRate * 100).toFixed(0) + '%'} />
                 <Field label="규칙 버전" value={visibleDetail.recheck.ruleVersion ?? '구버전 기록 / 미제공'} />
                 <Field label="시험 이름" value={visibleDetail.recheck.trialName ?? '미지정'} />
@@ -978,26 +990,12 @@ export default function InspectionLiveScreen() {
               )}
             </View>
 
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>검사 상세 새로고침</Text>
-              <Text style={styles.muted}>현재 판정과 사진을 다시 불러옵니다.</Text>
-              <Pressable accessibilityRole="button"
-                style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed, refreshing && styles.disabledButton]}
-                disabled={refreshing}
-                onPress={() => {
-                  lastAutoRefreshedExpiry.current = visibleDetail.imageUrlExpiresAt;
-                  lastExpiryAttempt.current = null;
-                  imageErrorBudget.current.reset();
-                  pendingImageRefreshOnResume.current = false;
-                  failedImageUrls.current.clear();
-                  setImageRetryRevision(value => value + 1);
-                  void load(false);
-                }}>
-                <Text style={styles.secondaryButtonText}>{refreshing ? '조회 중…' : '검사 상세 다시 조회'}</Text>
-              </Pressable>
-            </View>
+            <Pressable accessibilityRole="button" testID="inspection-refresh"
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed, (refreshing||submitting!==null)&&styles.disabledButton]}
+              disabled={refreshing||submitting!==null} onPress={refreshDetail}>
+              <Text style={styles.secondaryButtonText}>{refreshing?'조회 중…':'검사 상세 다시 조회'}</Text>
+            </Pressable>
             <Text style={styles.muted}>
-              이 화면은 실제 서버 데이터만 사용합니다. 판정·재검사·수동 전환은 서버가 최종 검증합니다.
               판단 근거 이미지는 결함 위치를 확정하는 좌표나 마스크가 아닙니다.
             </Text>
           </>
@@ -1037,7 +1035,7 @@ export default function InspectionLiveScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F5F7FB' },
-  header: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, gap: 8 },
+  header: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#CBD5E1' },
   back: { color: '#2054D8', fontSize: 14, fontWeight: '600' },
   backTouch: { justifyContent: 'center', minHeight: 44, alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, marginLeft: -8 },
   backTouchPressed: { backgroundColor: '#E9EFFC' },

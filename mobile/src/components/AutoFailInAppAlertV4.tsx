@@ -3,6 +3,7 @@ import { router, useGlobalSearchParams, usePathname } from 'expo-router';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { authV4 } from '../api/backendV4/authRuntime';
+import { partLabelV4 } from './partLabelV4';
 import { createInspectionReadServiceV4 } from '../api/backendV4/inspectionReadService';
 import {
   createAutoFailInAppControllerV4,
@@ -74,12 +75,12 @@ function AutoFailInAppBannerV4({ isMonitoring }: { isMonitoring: boolean }) {
           자동 불량{pending.length > 1 ? ` · 외 ${pending.length - 1}건` : ''}
         </Text>
         <Pressable accessibilityRole="button" accessibilityLabel="자동 불량 알림 닫기"
-          onPress={close}>
+          onPress={close} style={s.dismissButton}>
           <Text style={s.dismiss}>닫기</Text>
         </Pressable>
       </View>
       <Text style={s.description}>
-        {alert.partCode} · {alert.inspectionNo ?? '검사번호 확인 필요'} · 자동 불량
+        {partLabelV4(alert.partCode)} · {alert.inspectionNo ?? '검사번호 확인 필요'} · 자동 불량
       </Text>
       <Text style={s.note}>앱 실행 중 확인된 자동 불량입니다.</Text>
       <Pressable accessibilityRole="button" style={s.open} onPress={open}>
@@ -100,9 +101,10 @@ const s = StyleSheet.create({
   monitorBanner: { bottom: 235 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   title: { flex: 1, fontSize: 15, fontWeight: '700', color: '#B42318' },
-  dismiss: { fontSize: 12, fontWeight: '600', color: '#64748B', padding: 5 },
+  dismissButton: { minWidth:44,minHeight:44,justifyContent:'center',alignItems:'center' },
+  dismiss: { fontSize: 13, fontWeight: '600', color: '#475569', padding: 5 },
   description: { fontSize: 13, fontWeight: '600', color: '#111827' },
-  note: { fontSize: 11, color: '#64748B' },
-  open: { backgroundColor: '#B42318', borderRadius: 9, padding: 10, alignItems: 'center' },
+  note: { fontSize: 13, color: '#475569' },
+  open: { minHeight:44,justifyContent:'center',backgroundColor: '#B42318', borderRadius: 9, padding: 10, alignItems: 'center' },
   openText: { fontSize: 13, color: '#FFFFFF', fontWeight: '700' },
 });

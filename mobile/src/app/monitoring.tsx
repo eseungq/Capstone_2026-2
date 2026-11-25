@@ -429,9 +429,9 @@ const styles = StyleSheet.create({
   liveBannerTitle: { flex: 1, color: '#2054D8', fontSize: 15, fontWeight: '700' },
   liveBannerFailedText: { color: '#B42318' },
   liveBannerDismiss: { paddingHorizontal: 8, paddingVertical: 4 },
-  liveBannerDismissText: { color: '#64748B', fontSize: 12, fontWeight: '600' },
+  liveBannerDismissText: { color: '#64748B', fontSize: 13, fontWeight: '600' },
   liveBannerDescription: { color: '#111827', fontSize: 13, fontWeight: '600' },
-  liveBannerNote: { color: '#64748B', fontSize: 11 },
+  liveBannerNote: { color: '#64748B', fontSize: 13 },
   liveBannerOpen: { backgroundColor: '#2054D8', borderRadius: 9, padding: 10, alignItems: 'center' },
   liveBannerOpenText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   screen: {
@@ -441,8 +441,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingTop: 15,
-    paddingBottom: 31,
-  },
+    paddingBottom: 31, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#CBD5E1' },
   title: {
     color: '#111827',
     fontSize: 23,

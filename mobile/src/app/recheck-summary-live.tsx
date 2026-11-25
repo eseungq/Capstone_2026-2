@@ -1,7 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { router, Stack, useFocusEffect } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { partLabelV4, stratumLabelV4 } from '../components/partLabelV4';
 
 import { authV4 } from '../api/backendV4/authRuntime';
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
@@ -97,7 +98,7 @@ function RuleCard({ rule, index }: { rule: RecheckRuleSummaryV4; index: number }
     {rule.strata.map(s => (
       <View key={s.stratum} style={styles.stratumCard}>
         <View style={styles.rowBetween}>
-          <Text style={styles.itemTitle}>{s.stratum}</Text>
+          <Text style={styles.itemTitle}>{stratumLabelV4(s.stratum)}</Text>
           <Text style={styles.strong}>{formatRecheckCompletionV4(
             s.completedCount, s.sampledCount, s.completionRate,
           )}</Text>
@@ -194,7 +195,8 @@ export default function RecheckSummaryLiveScreen() {
         <Text style={styles.title}>AUTO_PASS 표본 재확인 요약</Text>
         <Text style={styles.muted}>관리자 전용 · 조회만 가능</Text>
       </View>
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView contentContainerStyle={styles.body}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={()=>{if(!loading&&authorized)void load();}}/>}>
         <Notice>
           AUTO_PASS 추정 불량률은 전체 불량률이 아닙니다. 같은 규칙이어도 부품·정책·모델·보정기 버전이 다르면 별도 결과로 표시합니다.
         </Notice>
@@ -214,7 +216,7 @@ export default function RecheckSummaryLiveScreen() {
             <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected:part === value }}
               style={[styles.filter,part === value && styles.selected]}
               onPress={() => setPart(value)}>
-              <Text style={[styles.filterLabel,part === value && styles.selectedText]}>{value}</Text>
+              <Text style={[styles.filterLabel,part === value && styles.selectedText]}>{partLabelV4(value)}</Text>
             </Pressable>
           ))}
         </View>
@@ -281,39 +283,39 @@ export default function RecheckSummaryLiveScreen() {
 const styles=StyleSheet.create({
   backTouch: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   screen:{flex:1,backgroundColor:'#F5F7FB'},
-  header:{paddingHorizontal:20,paddingTop:12,paddingBottom:12,gap:7},
+  header:{paddingHorizontal:20,paddingTop:12,paddingBottom:12,gap:7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#CBD5E1' },
   title:{fontSize:21,fontWeight:'700',color:'#111827'},
   body:{paddingHorizontal:20,paddingBottom:32,gap:12},
   row:{flexDirection:'row',flexWrap:'wrap',gap:7},
   filter:{ justifyContent: 'center', minHeight: 44,paddingVertical:11,paddingHorizontal:12,borderWidth:1,
-    borderColor:'#CBD5E1',backgroundColor:'#FFF',borderRadius:10,alignItems:'center'},
-  selected:{backgroundColor:'#2054D8',borderColor:'#2054D8'},
+    borderColor:'#64748B',backgroundColor:'#FFF',borderRadius:10,alignItems:'center'},
+  selected:{backgroundColor:'#1E293B',borderColor:'#1E293B'},
   filterLabel:{color:'#475569',fontSize: 13,fontWeight:'600'},
   selectedText:{color:'#FFF'},
   card:{backgroundColor:'#FFF',borderWidth:1,borderColor:'#E4E7EC',borderRadius:14,padding:15,gap:9},
   itemTitle:{fontSize:14,fontWeight:'700',color:'#111827',flexShrink:1},
   sectionTitle:{fontSize:14,fontWeight:'700',color:'#111827'},
   field:{flexDirection:'row',alignItems:'flex-start',justifyContent:'space-between',gap:12},
-  fieldLabel:{fontSize: 13,color:'#64748B',flexShrink:1},
+  fieldLabel:{fontSize: 13,color:'#475569',flexShrink:1},
   fieldValue:{fontSize: 13,color:'#111827',fontWeight:'600',textAlign:'right',flex:1},
-  muted:{fontSize: 13,color:'#64748B',lineHeight: 18},
+  muted:{fontSize: 13,color:'#475569',lineHeight: 18},
   link:{fontSize: 14,color:'#2054D8',fontWeight:'700'},
   divider:{height:1,backgroundColor:'#E4E7EC',marginVertical:4},
-  warning:{fontSize:12,color:'#92400E',lineHeight:19},
+  warning:{fontSize: 13,color:'#92400E',lineHeight:19},
   errorText:{fontSize:13,color:'#B42318',lineHeight:19},
   metrics:{flexDirection:'row',flexWrap:'wrap',gap:9},
   metric:{padding:10,minWidth:'46%',flexGrow:1,flexBasis:'46%',backgroundColor:'#F5F7FB',borderRadius:10,gap:4},
-  metricTitle:{fontSize: 12,color:'#64748B'},
+  metricTitle:{fontSize: 13,color:'#475569'},
   metricValue:{fontSize:17,fontWeight:'700',color:'#111827'},
   highlight:{borderWidth:1,borderColor:'#BFDBFE',backgroundColor:'#EFF6FF',borderRadius:12,padding:13,gap:5},
   highlightTitle:{fontSize:13,fontWeight:'700',color:'#1D4ED8'},
   highlightValue:{fontSize:19,fontWeight:'800',color:'#1E3A8A'},
   notice:{padding:11,borderRadius:10,borderWidth:1,borderColor:'#E8D7B6',backgroundColor:'#FFF8E8'},
-  noticeText:{color:'#92400E',fontSize:12,lineHeight:19},
+  noticeText:{color:'#92400E',fontSize: 13,lineHeight:19},
   stratumCard:{padding:11,borderRadius:10,backgroundColor:'#F7F9FC',gap:5},
   rowBetween:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',alignItems:'center',gap:5},
   strong:{color:'#111827',fontWeight:'700',fontSize: 13,flexShrink:1},
-  virtualCard:{backgroundColor:'#F8FAFC',borderWidth:1,borderColor:'#CBD5E1',padding:12,borderRadius:12,gap:9},
+  virtualCard:{backgroundColor:'#F8FAFC',borderWidth:1,borderColor:'#64748B',padding:12,borderRadius:12,gap:9},
   metricCard:{borderWidth:1,borderColor:'#E4E7EC',padding:11,borderRadius:10,gap:8},
   pressed:{opacity:0.75},
 });

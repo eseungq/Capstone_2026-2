@@ -1,6 +1,6 @@
 import React,{useCallback,useRef,useState} from 'react';
 import {router,Stack,useFocusEffect} from 'expo-router';
-import {ActivityIndicator,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,KeyboardAvoidingView,Platform,Pressable,RefreshControl,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import { partLabelV4 } from '../components/partLabelV4';
 import { DailyDateCalendarV4 } from '../components/DailyDateCalendarV4';
@@ -145,7 +145,8 @@ export default function AdminDailyLiveScreen(){
      <Text style={s.muted}>관리자 · 한국 시간 기준</Text>
    </View>
    <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-   <ScrollView style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+   <ScrollView style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+     refreshControl={<RefreshControl refreshing={loading} onRefresh={()=>{if(!loading&&access==='admin'&&from<=to)void load();}}/>}>
      {access==='checking'&&<ActivityIndicator/>}
      {access==='denied'&&<View style={s.card}>
        <Text style={s.error}>날짜별 자동 판정 이력은 관리자 계정에서 조회할 수 있습니다.</Text>

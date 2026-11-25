@@ -1,4 +1,5 @@
 import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
+import { partLabelV4 } from '../components/partLabelV4';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {router,Stack,useFocusEffect} from 'expo-router';
 import {ActivityIndicator,Alert,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
@@ -130,9 +131,9 @@ export default function JudgementRequestsAdminLiveScreen(){
           </View>
           <Text style={s.strong}>부품</Text>
           <View style={s.rowWrap}>
-            {parts.map(x=><Pressable key={x||'ALL'} style={[s.part,partCode===x&&s.partOn]}
+            {parts.map(x=><Pressable key={x||'ALL'} accessibilityRole="button" accessibilityState={{selected:partCode===x,disabled:processing}} style={[s.part,partCode===x&&s.partOn]}
               disabled={processing} onPress={()=>{if(x===partCode)return;confirmation.current++;setPartCode(x);setPage(null);setSelected(null);}}>
-              <Text style={[s.filterText,partCode===x&&s.filterTextOn]}>{x||'전체'}</Text>
+              <Text style={[s.filterText,partCode===x&&s.filterTextOn]}>{x?partLabelV4(x):'전체'}</Text>
             </Pressable>)}
           </View>
           <Pressable style={s.outline} disabled={loading||processing} onPress={()=>{confirmation.current++;void load(0,false);}}>
@@ -146,7 +147,7 @@ export default function JudgementRequestsAdminLiveScreen(){
             {page.items.length===0&&<Text style={s.muted}>선택 조건의 요청이 없습니다.</Text>}
             {page.items.map(item=><Pressable key={item.requestId} style={s.entry} disabled={processing}
               onPress={()=>{confirmation.current++;setSelected(item);setNote('');setDecision('KEEP');}}>
-              <Text style={s.strong}>{item.inspectionNo} · {item.partCode} · {judgementRequestStatusLabelV4(item.status)}</Text>
+              <Text style={s.strong}>{item.inspectionNo} · {partLabelV4(item.partCode)} · {judgementRequestStatusLabelV4(item.status)}</Text>
               <Text style={s.muted}>{item.originalJudgement} · 시스템 자동 판정 → 요청 {item.claimedJudgement}</Text>
               <Text style={s.link}>내용 검토 ›</Text>
             </Pressable>)}
@@ -182,7 +183,7 @@ export default function JudgementRequestsAdminLiveScreen(){
             </View>
             <Text style={s.strong}>관리자 처리 근거 (필수, 1~500자)</Text>
             <TextInput ref={noteRef} onFocus={revealNote} style={s.input} value={note} editable={!processing} onChangeText={text=>{confirmation.current++;setNote(text);}} multiline
-              maxLength={500} placeholder="검토 근거를 입력해 주세요." placeholderTextColor="#64748B" />
+              maxLength={500} placeholder="검토 근거를 입력해 주세요." placeholderTextColor="#475569" />
           </>:<>
             <Text style={s.success}>{judgementRequestStatusLabelV4(selected.status)}</Text>
             <Text style={s.muted}>관리자: {selected.resolvedBy??'미제공'}</Text>
@@ -211,17 +212,17 @@ const s=StyleSheet.create({
  footer:{paddingHorizontal:18,paddingVertical:8,borderTopWidth:StyleSheet.hairlineWidth,borderColor:'#E4E7EC',backgroundColor:'#FFFFFF'},
  card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:14,gap:12},
  link:{fontSize: 14,color:'#2054D8',fontWeight:'700'},strong:{fontSize: 14,color:'#111827',fontWeight:'700'},
- muted:{fontSize: 13,color:'#64748B',lineHeight:18},error:{fontSize: 13,color:'#B42318',lineHeight:18},
+ muted:{fontSize: 13,color:'#475569',lineHeight:18},error:{fontSize: 13,color:'#B42318',lineHeight:18},
  success:{color:'#067647',fontWeight:'700',fontSize: 13},
  row:{flexDirection:'row',gap:8},rowWrap:{flexDirection:'row',flexWrap:'wrap',gap:6},
- filter:{ justifyContent: 'center', minHeight: 44,flex:1,borderRadius:9,borderWidth:1,borderColor:'#CBD5E1',alignItems:'center',paddingVertical:11,paddingHorizontal:5},
- filterOn:{backgroundColor:'#2054D8',borderColor:'#2054D8'},
- filterText:{color:'#334155',fontWeight:'700',fontSize: 12},filterTextOn:{color:'#FFFFFF'},
- part:{ justifyContent: 'center', minHeight: 44,padding:9,borderRadius:8,borderWidth:1,borderColor:'#CBD5E1'},
- partOn:{backgroundColor:'#2054D8',borderColor:'#2054D8'},
+ filter:{ justifyContent: 'center', minHeight: 44,flex:1,borderRadius:9,borderWidth:1,borderColor:'#64748B',alignItems:'center',paddingVertical:11,paddingHorizontal:5},
+ filterOn:{backgroundColor:'#1E293B',borderColor:'#1E293B'},
+ filterText:{color:'#334155',fontWeight:'700',fontSize: 13},filterTextOn:{color:'#FFFFFF'},
+ part:{ justifyContent: 'center', minHeight: 44,padding:9,borderRadius:8,borderWidth:1,borderColor:'#64748B'},
+ partOn:{backgroundColor:'#1E293B',borderColor:'#1E293B'},
  outline:{ justifyContent: 'center', minHeight: 44,borderColor:'#2054D8',borderWidth:1,borderRadius:9,padding:12,alignItems:'center'},
  entry:{borderTopWidth:1,borderTopColor:'#E4E7EC',paddingVertical:12,gap:6},
- input:{borderWidth:1,borderColor:'#CBD5E1',borderRadius:10,padding:12,minHeight:90,
+ input:{borderWidth:1,borderColor:'#64748B',borderRadius:10,padding:12,minHeight:90,
    fontSize: 14,color:'#111827',textAlignVertical:'top'},
  submit:{ justifyContent: 'center', minHeight: 44,backgroundColor:'#2054D8',borderRadius:10,padding:14,alignItems:'center'},
  submitText:{color:'#FFFFFF',fontWeight:'700',fontSize: 14},disabled:{opacity:.5},

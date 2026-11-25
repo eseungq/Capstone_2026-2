@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { partLabelV4 } from './partLabelV4';
+import { partLabelV4, qualityLabelV4 } from './partLabelV4';
 import { createRecheckServiceV4 } from '../api/backendV4/recheckServiceV4';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -349,7 +349,7 @@ export default function MonitoringLiveDashboardV4({
                   ? 'AI 분석 없이 작업자 판정'
                   : item.displayState === 'FAILED'
                     ? '실패 사유는 상세에서 확인'
-                    : 'AI 예측: ' + (item.predictedQuality ?? '미제공')}
+                    : 'AI 예측: ' + qualityLabelV4(item.predictedQuality)}
               </Text>
               {item.reviewReason === 'ABOVE_THRESHOLD' && (
                 <Text style={styles.priorityHint}>자동 통과 기준 초과 · REVIEW</Text>
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 17, fontWeight: '700', color: '#111827', flexShrink: 1 },
   description: { fontSize: 13, color: '#475569', lineHeight: 19 },
   warning: { color: '#A74B12', fontSize: 13, lineHeight: 18 },
-  connection: { color: '#008454', fontSize: 12, fontWeight: '700' },
+  connection: { color: '#067647', fontSize: 13, fontWeight: '700' },
   connectionStale: { color: '#A74B12' },
   partSelector: { flexDirection: 'row', gap: 6 },
   partButton: {

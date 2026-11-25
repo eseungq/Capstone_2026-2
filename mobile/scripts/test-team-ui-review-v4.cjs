@@ -187,3 +187,14 @@ test('inspection trace information is disclosed on demand, not deleted',()=>{
   for(const field of ['partCode','judgedBy','confirmedBy','confirmedAt','modelVersion','policyVersion'])assert.ok(trace.includes('visibleDetail.'+field),field);
   assert.match(code,/setShowTrace\(false\)/);
 });
+
+test('read-only refresh gestures preserve explicit recovery and detail image refresh budgets',()=>{
+  for(const file of ['app/inspection-live.tsx','app/policy-live.tsx','app/admin-daily-live.tsx','app/rechecks-live.tsx','app/recheck-summary-live.tsx','components/HistoryLiveScreenV4.tsx']){
+    assert.match(parse(file).code,/<RefreshControl/);
+  }
+  const {code}=parse('app/inspection-live.tsx');
+  const refresh=code.slice(code.indexOf('const refreshDetail='),code.indexOf('const canShowConfirm ='));
+  for(const guard of ['loading||refreshing||submitting!==null','imageErrorBudget.current.reset()','failedImageUrls.current.clear()','void load(false)'])assert.ok(refresh.includes(guard),guard);
+  assert.match(code,/onPress=\{refreshDetail\}/);
+  assert.match(code,/판단 근거 이미지는 결함 위치를 확정하는 좌표나 마스크가 아닙니다/);
+});

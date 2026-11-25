@@ -1,4 +1,5 @@
 import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
+import { partLabelV4 } from '../components/partLabelV4';
 import React,{useCallback,useRef,useState} from 'react';
 import {router,Stack,useFocusEffect,useLocalSearchParams} from 'expo-router';
 import {ActivityIndicator,Alert,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
@@ -138,7 +139,7 @@ function JudgementRequestForm({id}:{id:string}){
           {pendingRequest?.requestId===submittedRequestId?'판정 확인 요청이 접수되었습니다. 관리자 검토를 기다려 주세요.':'판정 확인 요청이 접수되었습니다.'}
         </Text></View>}
         {detail&&<View style={s.card}>
-          <Text style={s.strong}>{detail.inspectionNo} · {detail.partCode}</Text>
+          <Text style={s.strong}>{detail.inspectionNo} · {partLabelV4(detail.partCode)}</Text>
           <Text style={s.muted}>최초 판정: {detail.finalJudgement??'미확정'} · {actorLabelV4(detail.judgedBy)}</Text>
           <Text style={s.muted}>현재 판정: {currentJudgementV4(detail.finalJudgement,detail.correction)??'미확정'}</Text>
           {detail.correction&&<Text style={s.muted}>기존 정정: {detail.correction.correctedJudgement} · {detail.correction.correctedBy} ({detail.correction.note})</Text>}
@@ -162,10 +163,10 @@ function JudgementRequestForm({id}:{id:string}){
           </View>
           <Text style={s.strong}>확인 부위 (선택, 최대 100자)</Text>
           <TextInput ref={areaRef} onFocus={revealFocusedInput} value={area} onChangeText={setArea} maxLength={100}
-            placeholder="예: 고정핀" placeholderTextColor="#64748B" style={s.input}/>
+            placeholder="예: 고정핀" placeholderTextColor="#475569" style={s.input}/>
           <Text style={s.strong}>판정 확인 근거 (필수, 1~500자)</Text>
           <TextInput ref={reasonRef} onFocus={revealFocusedInput} value={reason} onChangeText={setReason} maxLength={500} multiline
-            placeholder="실물 관찰 근거를 구체적으로 작성하세요." placeholderTextColor="#64748B" style={[s.input,s.multi]}/>
+            placeholder="실물 관찰 근거를 구체적으로 작성하세요." placeholderTextColor="#475569" style={[s.input,s.multi]}/>
           <Text style={s.muted}>근거 사진 첨부는 이번 버전의 지원 범위 밖입니다.</Text>
         </View>}
       </ScrollView>
@@ -183,14 +184,14 @@ const s=StyleSheet.create({
   root:{flex:1,backgroundColor:'#F5F7FB'},flex:{flex:1},top:{paddingVertical:18,gap:9},
   body:{paddingHorizontal:18,paddingBottom:16,gap:12},
   footer:{paddingHorizontal:18,paddingVertical:8,borderTopWidth:StyleSheet.hairlineWidth,borderColor:'#E4E7EC',backgroundColor:'#FFFFFF'},
-  title:{fontSize:22,fontWeight:'700',color:'#111827'},muted:{fontSize: 13,lineHeight:19,color:'#64748B'},
+  title:{fontSize:22,fontWeight:'700',color:'#111827'},muted:{fontSize: 13,lineHeight:19,color:'#475569'},
   link:{fontSize: 14,fontWeight:'700',color:'#2054D8'},strong:{fontSize: 14,fontWeight:'700',color:'#111827'},
   card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:15,gap:12},
   error:{color:'#B42318',fontSize:13,lineHeight:19},success:{color:'#067647',fontSize:13},
   row:{flexDirection:'row',gap:8},choice:{ justifyContent: 'center', minHeight: 44,flex:1,alignItems:'center',padding:13,borderWidth:1,
-    borderColor:'#CBD5E1',borderRadius:10},choiceOn:{backgroundColor:'#2054D8',borderColor:'#2054D8'},
+    borderColor:'#64748B',borderRadius:10},choiceOn:{backgroundColor:'#1E293B',borderColor:'#1E293B'},
   choiceText:{color:'#334155',fontWeight:'700'},choiceOnText:{color:'#FFFFFF'},
-  input:{ minHeight: 44,borderWidth:1,borderColor:'#CBD5E1',borderRadius:10,padding:12,color:'#111827',fontSize: 14},
+  input:{ minHeight: 44,borderWidth:1,borderColor:'#64748B',borderRadius:10,padding:12,color:'#111827',fontSize: 14},
   multi:{minHeight:110,textAlignVertical:'top'},history:{borderTopColor:'#E4E7EC',borderTopWidth:1,paddingTop:10,gap:5},
   outline:{ justifyContent: 'center', minHeight: 44,borderWidth:1,borderColor:'#2054D8',borderRadius:10,padding:11,alignItems:'center'},
   submit:{ justifyContent: 'center', minHeight: 44,backgroundColor:'#2054D8',padding:14,borderRadius:10,alignItems:'center'},
