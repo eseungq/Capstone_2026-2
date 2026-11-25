@@ -77,7 +77,7 @@ test('batch checked state and date input labels are explicit',()=>{
   assert.ok(checkbox);
   assert.match(checkbox.opening.getText(bs),/aria-checked=\{filters\.aiDefectOnly\}/);
   assert.match(checkbox.opening.getText(bs),/accessibilityState=\{\{checked:filters\.aiDefectOnly/);
-  for(const id of ['daily-start-date','daily-end-exclusive-date','daily-threshold-band']){
+  for(const id of ['daily-start-date','daily-end-inclusive-date','daily-threshold-band']){
     const fields=elementsByTestID(ds,id);
     assert.equal(fields.length,1);
     assert.match(fields[0].opening.getText(ds),/accessibilityLabel=/);
@@ -145,4 +145,16 @@ test('monitor counts route to exact history filters, which remain accessible in 
   assert.match(h,/accessibilityState=\{\{expanded:filtersExpanded\}\}/);
   assert.match(h,/\{filtersExpanded&&<>/);
   assert.match(h,/<RefreshControl/);
+});
+
+test('daily date selection is inclusive on screen but sends the next exclusive day to the existing reader',()=>{
+  const {code}=parse('app/admin-daily-live.tsx');
+  const calendar=parse('components/DailyDateCalendarV4.tsx').code;
+  assert.match(code,/const \[to,setTo\]=useState\(today\)/);
+  assert.match(code,/reads\.loadRows\(part,from,plusDaysV4\(to,1\)\)/);
+  assert.match(code,/disabled=\{loading\|\|from>to\}/);
+  assert.match(code,/<DailyDateCalendarV4/);
+  assert.match(calendar,/getUTCDay\(\)/);
+  assert.match(calendar,/plusDaysV4\(month,index-offset\)/);
+  assert.match(calendar,/onPress=\{\(\)=>onSelect\(day\)\}/);
 });

@@ -2,6 +2,8 @@ import React,{useCallback,useRef,useState} from 'react';
 import {router,Stack,useFocusEffect} from 'expo-router';
 import {ActivityIndicator,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import { partLabelV4 } from '../components/partLabelV4';
+import { DailyDateCalendarV4 } from '../components/DailyDateCalendarV4';
 import {authV4} from '../api/backendV4/authRuntime';
 import {createDailyHistoryServiceV4} from '../api/backendV4/adminDailyHistoryServiceV4';
 import {
@@ -91,7 +93,8 @@ export default function AdminDailyLiveScreen(){
  const today=kstCalendarTodayV4();
  const [part,setPart]=useState<AutomationDailyPartV4>('COWL_COVER');
  const [from,setFrom]=useState(plusDaysV4(today,-6));
- const [to,setTo]=useState(plusDaysV4(today,1));
+ const [to,setTo]=useState(today);
+ const [datePicker,setDatePicker]=useState<'from'|'to'|null>(null);
  const [band,setBand]=useState('0.05');
  const [access,setAccess]=useState<'checking'|'admin'|'denied'>('checking');
  const [listState,setListState]=useState<DailyReadState<DailyHistoryRowV4[]>>(idleDailyRead);
@@ -107,7 +110,8 @@ export default function AdminDailyLiveScreen(){
  },[reads]);
  const load=useCallback(()=>{
    setSelected(null);
-   return reads.loadRows(part,from,to);
+   // 표시 종료일은 포함, 서버의 계약은 다음 날 미포함으로 유지합니다.
+   return reads.loadRows(part,from,plusDaysV4(to,1));
  },[reads,part,from,to]);
  const loadRef=useRef(load);
  loadRef.current=load;
@@ -152,20 +156,31 @@ export default function AdminDailyLiveScreen(){
          <View style={s.chips}>{parts.map(p=><Pressable key={p} accessibilityRole="button"
            accessibilityState={{selected:part===p}}
            onPress={()=>{if(p!==part){clearResults();setPart(p);}}} style={[s.chip,part===p&&s.chipActive]}>
-           <Text style={[s.chipText,part===p&&s.chipTextActive]}>{p}</Text>
+           <Text style={[s.chipText,part===p&&s.chipTextActive]}>{partLabelV4(p)}</Text>
          </Pressable>)}</View>
-         <Text style={s.strong}>접수 날짜 범위 (서울 기준 · 시작 포함 / 종료 제외)</Text>
-         <Text style={s.muted}>YYYY-MM-DD · 최대 92일. 오늘까지 포함하려면 종료일을 내일로 설정하세요.</Text>
+         <Text style={s.strong}>접수 날짜 범위 (서울 기준)</Text>
+         <Text style={s.muted}>시작일과 종료일 모두 포함 · 최대 92일</Text>
          <View style={s.chips}>
            <View style={s.dateCell}><Text style={s.muted}>시작일</Text>
-             <TextInput testID="daily-start-date" accessibilityLabel="접수 시작일" value={from} onChangeText={x=>{clearResults();setFrom(x);}} style={s.input} autoCorrect={false}
-               placeholder="YYYY-MM-DD" maxLength={10}/></View>
-           <View style={s.dateCell}><Text style={s.muted}>종료일 (미포함)</Text>
-             <TextInput testID="daily-end-exclusive-date" accessibilityLabel="접수 종료일 (미포함)" value={to} onChangeText={x=>{clearResults();setTo(x);}} style={s.input} autoCorrect={false}
-               placeholder="YYYY-MM-DD" maxLength={10}/></View>
+             <Pressable testID="daily-start-date" accessibilityRole="button" accessibilityLabel={`접수 시작일 ${from}`}
+               accessibilityState={{expanded:datePicker==='from'}} style={s.dateButton} onPress={()=>setDatePicker(value=>value==='from'?null:'from')}>
+               <Text style={s.dateText}>{from} ▾</Text>
+             </Pressable></View>
+           <View style={s.dateCell}><Text style={s.muted}>종료일 (포함)</Text>
+             <Pressable testID="daily-end-inclusive-date" accessibilityRole="button" accessibilityLabel={`접수 종료일 ${to}, 포함`}
+               accessibilityState={{expanded:datePicker==='to'}} style={s.dateButton} onPress={()=>setDatePicker(value=>value==='to'?null:'to')}>
+               <Text style={s.dateText}>{to} ▾</Text>
+             </Pressable></View>
          </View>
-         <Pressable style={s.primary} accessibilityRole="button" disabled={loading}
-           onPress={()=>{void load();}}>
+         {datePicker!==null&&<DailyDateCalendarV4 key={datePicker} label={datePicker==='from'?'시작일 선택':'종료일 선택'}
+           value={datePicker==='from'?from:to} onSelect={date=>{
+             clearResults();
+             if(datePicker==='from')setFrom(date);else setTo(date);
+             setDatePicker(null);
+           }} onClose={()=>setDatePicker(null)}/>}
+         {from>to&&<Text style={s.error}>시작일은 종료일과 같거나 이전이어야 합니다.</Text>}
+         <Pressable style={[s.primary,(loading||from>to)&&s.disabled]} accessibilityRole="button" disabled={loading||from>to}
+           onPress={()=>{setDatePicker(null);void load();}}>
            <Text style={s.primaryText}>{loading?'조회 중…':'날짜별 통계 조회'}</Text>
          </Pressable>
          <Text style={s.muted}>검사 접수 날짜와 당시 적용한 정책·모델·보정기별로 집계합니다.</Text>
@@ -207,18 +222,20 @@ export default function AdminDailyLiveScreen(){
 }
 const s=StyleSheet.create({
   backTouch: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
- root:{flex:1,backgroundColor:'#F5F7FB'},header:{padding:18,gap:8},scroll:{flex:1},
+ root:{flex:1,backgroundColor:'#F5F7FB'},header:{padding:18,gap:8,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:'#CBD5E1'},scroll:{flex:1},
  body:{paddingHorizontal:18,paddingBottom:35,gap:12},title:{fontSize:22,fontWeight:'700',color:ink},
  strong:{fontSize: 14,fontWeight:'700',color:ink},muted:{color:muted,fontSize: 13,lineHeight:18},
  card:{backgroundColor:'#FFF',borderRadius:14,borderColor:'#E4E7EC',borderWidth:1,padding:14,gap:12},
  chips:{flexDirection:'row',flexWrap:'wrap',gap:6},chip:{ justifyContent: 'center', minHeight: 44,borderWidth:1,borderRadius:9,borderColor:'#64748B',padding:9},
  chipActive:{backgroundColor:'#1E293B',borderColor:'#1E293B'},chipText:{fontSize: 13,fontWeight:'700',color:'#334155'},
- chipTextActive:{color:'#FFF'},dateCell:{flex:1,minWidth:124,gap:6},
+ chipTextActive:{color:'#FFF'},dateCell:{flex:1,minWidth:118,gap:6},
+ dateButton:{minHeight:44,borderWidth:1,borderColor:'#64748B',borderRadius:9,padding:10,justifyContent:'center'},
+ dateText:{fontSize:14,color:ink,fontWeight:'600'},disabled:{opacity:0.5},
  input:{ minHeight: 44,borderWidth:1,borderColor:'#64748B',borderRadius:9,padding:11,fontSize: 14,color:ink},
  primary:{ justifyContent: 'center', minHeight: 44,backgroundColor:blue,padding:13,borderRadius:10,alignItems:'center'},
  primaryText:{color:'#FFF',fontWeight:'700',fontSize: 14},
  outline:{ justifyContent: 'center', minHeight: 44,borderWidth:1,borderColor:blue,borderRadius:10,padding:10,alignItems:'center'},
- link:{color:blue,fontSize: 13,fontWeight:'700'},error:{color:red,fontSize:12,lineHeight:20},
+ link:{color:blue,fontSize: 13,fontWeight:'700'},error:{color:red,fontSize:13,lineHeight:20},
  line:{flexDirection:'row',alignItems:'flex-start',justifyContent:'space-between',gap:10},
  lineLabel:{flex:0.56,color:muted,fontSize: 13,lineHeight: 18},
  lineValue:{flex:0.44,color:ink,fontSize: 13,fontWeight:'600',textAlign:'right',lineHeight: 18},
@@ -227,7 +244,7 @@ const s=StyleSheet.create({
  totalValue:{color:ink,fontSize:22,fontWeight:'700',flexShrink:1},
  metrics:{flexDirection:'row',gap:6},
  metric:{flex:1,minWidth:0,backgroundColor:'#F5F7FB',borderRadius:9,padding:8,gap:4},
- metricLabel:{color:muted,fontSize:12,lineHeight:17},
+ metricLabel:{color:muted,fontSize:13,lineHeight:18},
  metricValue:{color:ink,fontSize:18,fontWeight:'700'},
  passValue:{color:'#067647'},failValue:{color:red},
  detailsToggle:{minHeight:44,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,paddingHorizontal:4},
