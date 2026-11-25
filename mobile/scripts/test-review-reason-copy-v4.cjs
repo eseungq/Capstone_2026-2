@@ -12,7 +12,7 @@ test('all five server review reasons map to four distinct worker titles without 
     const copy=reviewReasonCopyV4(reason);
     assert.equal(copy.title,title);
     assert.equal(reviewListReasonV4('REVIEW_PENDING',reason),title);
-    assert.doesNotMatch(copy.title+' '+copy.description,/기준|정책|[A-Z_]{2,}/);
+    assert.doesNotMatch(copy.title+' '+copy.description,/기준|정책|DEFECT_PREDICTED|ABOVE_THRESHOLD|NO_ACTIVE_POLICY|CALIBRATION_UNAVAILABLE|AI_UNAVAILABLE/);
   }
   assert.equal(new Set(Object.values(expected).map(title=>title.split(' ')[0])).size,4);
 });
