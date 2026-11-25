@@ -7,7 +7,7 @@ import { ContractV4Error } from './adapter';
 import type { DisplayStateV4, FinalJudgementV4, InspectionSourceV4, PredictedQualityV4, ReviewReasonV4 } from './types';
 
 export const INSPECTION_UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const displayStates: readonly DisplayStateV4[] = ['ANALYZING', 'AUTO_PASS', 'REVIEW_PENDING', 'REVIEW_DONE', 'FAILED'];
+const displayStates: readonly DisplayStateV4[] = ['ANALYZING', 'AUTO_PASS', 'AUTO_FAIL', 'REVIEW_PENDING', 'REVIEW_DONE', 'FAILED'];
 const reviewReasons: readonly ReviewReasonV4[] = ['DEFECT_PREDICTED', 'NO_ACTIVE_POLICY', 'CALIBRATION_UNAVAILABLE', 'ABOVE_THRESHOLD', 'AI_UNAVAILABLE'];
 const inspectionSources: readonly InspectionSourceV4[] = ['DEVICE', 'ADMIN', 'RETRY', 'MANUAL'];
 
@@ -16,6 +16,7 @@ function record(x: unknown): x is Dict { return typeof x === 'object' && x !== n
 function nonblank(x: unknown): x is string { return typeof x === 'string' && x.trim().length > 0; }
 function optionalString(x: unknown): x is string | null | undefined { return x == null || typeof x === 'string'; }
 function nonnegativeInt(x: unknown): x is number { return typeof x === 'number' && Number.isSafeInteger(x) && x >= 0; }
+function probabilityV4(x: unknown): x is number { return typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 1; }
 function validIso(x: unknown): x is string {
   return nonblank(x) && /(Z|[+-]\d\d:\d\d)$/.test(x) && Number.isFinite(Date.parse(x));
 }
@@ -47,6 +48,7 @@ export interface HistoryRowV4 {
   errorCode: string | null;
   thumbnailUrl: string | null;
   finalJudgement: FinalJudgementV4 | null;
+  correctedJudgement?: FinalJudgementV4 | null;
   judgedBy: 'SYSTEM' | 'WORKER' | null;
   confirmedAt: string | null;
 }
@@ -69,6 +71,8 @@ export interface QueueItemV4 {
   errorCode: string | null;
   receivedAt: string;
   thumbnailUrl: string | null;
+  calibratedDefectProbability?: number | null;
+  passThresholdApplied?: number | null;
 }
 export interface QueuePageV4 { items: QueueItemV4[]; nextCursor: string | null; }
 export interface MonitoringRecentV4 {
@@ -102,6 +106,7 @@ export function decodeHistoryRowV4(value: unknown): HistoryRowV4 {
   if (!optionalString(value.inspectionNo) || !optionalPrediction(value.predictedQuality) ||
       !optionalReason(value.reviewReason) || !optionalString(value.errorCode) ||
       !optionalUrl(value.thumbnailUrl) || !optionalJudgement(value.finalJudgement) ||
+      !optionalJudgement(value.correctedJudgement) ||
       (value.source != null && !inspectionSources.includes(value.source as InspectionSourceV4)) ||
       (value.judgedBy != null && value.judgedBy !== 'WORKER' && value.judgedBy !== 'SYSTEM') ||
       (value.confirmedAt != null && !validIso(value.confirmedAt))) {
@@ -116,6 +121,7 @@ export function decodeHistoryRowV4(value: unknown): HistoryRowV4 {
     errorCode: nullableField(value.errorCode as string | null | undefined),
     thumbnailUrl: nullableField(value.thumbnailUrl as string | null | undefined),
     finalJudgement: nullableField(value.finalJudgement as FinalJudgementV4 | null | undefined),
+    correctedJudgement: nullableField(value.correctedJudgement as FinalJudgementV4 | null | undefined),
     judgedBy: nullableField(value.judgedBy as 'WORKER' | 'SYSTEM' | null | undefined),
     confirmedAt: nullableField(value.confirmedAt as string | null | undefined),
   };
@@ -159,6 +165,10 @@ export function decodeQueuePageV4(data: unknown): QueuePageV4 {
   const items = data.items.map((v: unknown): QueueItemV4 => {
     if (!record(v)) throw new ContractV4Error('확인 필요 항목 형식 오류');
     const r = decodeHistoryRowV4(v);
+    if ((v.calibratedDefectProbability != null && !probabilityV4(v.calibratedDefectProbability)) ||
+        (v.passThresholdApplied != null && !probabilityV4(v.passThresholdApplied))) {
+      throw new ContractV4Error('확인 필요 목록의 보정 확률·적용 기준은 0~1 또는 null이어야 합니다.');
+    }
     if (r.displayState !== 'REVIEW_PENDING' && r.displayState !== 'FAILED') {
       throw new ContractV4Error('확인 필요 목록에는 REVIEW_PENDING/FAILED만 허용합니다.');
     }
@@ -166,6 +176,8 @@ export function decodeQueuePageV4(data: unknown): QueuePageV4 {
       inspectionId: r.inspectionId, inspectionNo: r.inspectionNo, partCode: r.partCode,
       displayState: r.displayState, predictedQuality: r.predictedQuality, reviewReason: r.reviewReason,
       errorCode: r.errorCode, receivedAt: r.receivedAt, thumbnailUrl: r.thumbnailUrl,
+      calibratedDefectProbability: (v.calibratedDefectProbability ?? null) as number | null,
+      passThresholdApplied: (v.passThresholdApplied ?? null) as number | null,
     };
   });
   return { items, nextCursor: nullableField(data.nextCursor as string | null | undefined) };
@@ -230,12 +242,16 @@ export function makeHistoryQueryV4(params: {
   if (params.to) query.push(`to=${encodeURIComponent(params.to)}`);
   return `/inspections?${query.join('&')}`;
 }
-export function makeQueueQueryV4(params: { type?: QueueTypeV4; partCode?: string; cursor?: string | null; size?: number } = {}): string {
+export function makeQueueQueryV4(params: { type?: QueueTypeV4; partCode?: string; cursor?: string | null; size?: number; sort?: 'RECEIVED' | 'PRIORITY'; predictedQuality?: 'GOOD' | 'DEFECT' } = {}): string {
   const type = params.type ?? 'ALL'; const size = params.size ?? 20;
   if (type !== 'ALL' && type !== 'REVIEW' && type !== 'FAILED') throw new Error('queue.type 오류');
   if (!nonnegativeInt(size) || size < 1 || size > 100) throw new Error('queue.size는 1~100이어야 합니다.');
+  if (params.sort != null && params.sort !== 'RECEIVED' && params.sort !== 'PRIORITY') throw new Error('queue.sort 오류');
+  if (params.predictedQuality != null && params.predictedQuality !== 'GOOD' && params.predictedQuality !== 'DEFECT') throw new Error('queue.predictedQuality 오류');
   const query = [`type=${type}`, `size=${size}`];
   if (params.partCode) query.push(`partCode=${encodeURIComponent(params.partCode)}`);
+  if (params.sort) query.push(`sort=${params.sort}`);
+  if (params.predictedQuality) query.push(`predictedQuality=${params.predictedQuality}`);
   if (params.cursor) query.push(`cursor=${encodeURIComponent(params.cursor)}`);
   return `/monitoring/queue?${query.join('&')}`;
 }

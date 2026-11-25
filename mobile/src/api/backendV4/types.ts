@@ -3,8 +3,9 @@
  * 이 타입은 실제 API 계약을 나타내며, src/data/mockInspections.ts의 시연 모델과 분리합니다.
  * 아직 서버 Swagger의 실제 JSON으로 검증하지 않았습니다.
  */
+import type {JudgementCorrectionV4,JudgementRequestV4} from './judgementRequestCoreV4';
 export type ProcessingStatusV4 = 'RECEIVED' | 'ANALYZING' | 'COMPLETED' | 'FAILED';
-export type DisplayStateV4 = 'ANALYZING' | 'AUTO_PASS' | 'REVIEW_PENDING' | 'REVIEW_DONE' | 'FAILED';
+export type DisplayStateV4 = 'ANALYZING' | 'AUTO_PASS' | 'AUTO_FAIL' | 'REVIEW_PENDING' | 'REVIEW_DONE' | 'FAILED';
 export type PredictedQualityV4 = 'GOOD' | 'DEFECT';
 export type FinalJudgementV4 = 'PASS' | 'FAIL';
 export type InspectionSourceV4 = 'DEVICE' | 'ADMIN' | 'RETRY' | 'MANUAL';
@@ -19,7 +20,7 @@ export interface InspectionFollowUpV4 {
   inspectionNo: string;
   source: 'RETRY' | 'MANUAL';
 }
-export type RecommendedActionV4 = 'AUTO_PASS' | 'REVIEW';
+export type RecommendedActionV4 = 'AUTO_PASS' | 'AUTO_FAIL' | 'REVIEW';
 export type JudgedByV4 = 'SYSTEM' | 'WORKER';
 export type ReviewReasonV4 =
   | 'DEFECT_PREDICTED' | 'NO_ACTIVE_POLICY'
@@ -30,6 +31,22 @@ export interface ImageReferenceV4 {
   url: string;
   width?: number | null;
   height?: number | null;
+}
+
+/** AUTO_PASS 표본 재확인. 원래 PASS · SYSTEM 판정을 변경하지 않습니다. */
+export interface RecheckBlockV4 {
+  stratum: 'NEAR' | 'MID' | 'LOW';
+  samplingRate: number;
+  ruleVersion: string | null;
+  trialName: string | null;
+  sampledAt: string;
+  result: FinalJudgementV4 | null;
+  comment: string | null;
+  recheckedBy: string | null;
+  recheckedAt: string | null;
+  acknowledgedBy: string | null;
+  acknowledgedAt: string | null;
+  acknowledgeNote: string | null;
 }
 
 export interface InspectionDetailV4 {
@@ -60,6 +77,7 @@ export interface InspectionDetailV4 {
     recommendedAction: RecommendedActionV4 | null;
     reviewReason: ReviewReasonV4 | null;
   } | null;
+  recheck?: RecheckBlockV4 | null;
   judgement: {
     finalJudgement: FinalJudgementV4 | null;
     judgedBy: JudgedByV4 | null;
@@ -73,6 +91,8 @@ export interface InspectionDetailV4 {
     urlExpiresAt: string | null;
   } | null;
   error: { code: string; message: string; retryable: boolean } | null;
+  judgementRequests?: JudgementRequestV4[];
+  correction?: JudgementCorrectionV4 | null;
 }
 
 export interface ApiV4DataEnvelope<T> { data: T }
@@ -93,12 +113,14 @@ export interface InspectionViewV4 {
   calibratedDefectProbability: number | null;
   modelVersion: string | null;
   policyVersion: string | null;
+  passThresholdApplied?: number | null; // 접수 당시 detail.policy.passThreshold, 표시용
   reviewReasonCode: ReviewReasonV4 | null;
   reviewReasonText: string | null;
   errorCode: string | null;
   errorMessage: string | null;
   finalJudgement: FinalJudgementV4 | null;
   judgedBy: JudgedByV4 | null;
+  recheck: RecheckBlockV4 | null;
   confirmedBy: string | null;
   confirmedAt: string | null;
   originalImageUrl: string | null;
@@ -112,5 +134,8 @@ export interface InspectionViewV4 {
   canOfferManual: boolean; // WORKER 권한·서버 충돌 검증이 별도로 필요
   canOfferConfirm: boolean; // 화면 표시 힌트. 서버 권한 검사를 대신하지 않음.
   canOfferRetry: boolean;   // 화면 표시 힌트. 서버 409 검사 필수.
+  judgementRequests: JudgementRequestV4[];
+  correction: JudgementCorrectionV4 | null;
+  correctedJudgement: FinalJudgementV4 | null;
   isServerAutoPass: boolean; // Mock AUTO_PASS_EXAMPLE과 혼동 금지
 }

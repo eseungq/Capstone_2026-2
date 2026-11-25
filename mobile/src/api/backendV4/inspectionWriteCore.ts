@@ -4,6 +4,8 @@
  * 이 파일은 기존 Mock, AsyncStorage, 검사/통계 화면을 변경하지 않습니다.
  */
 import type { DisplayStateV4, FinalJudgementV4, PredictedQualityV4 } from './types';
+import type { InspectionDwellV4 } from './inspectionDwellV4';
+import { validateDwellFieldsV4 } from './recheckCoreV4';
 
 export type WriteRoleV4 = 'WORKER' | 'ADMIN' | 'DEVICE';
 export type WriteSourceV4 = 'CONTRACT_EXAMPLE' | 'SERVER';
@@ -18,6 +20,9 @@ export interface WriteInspectionContextV4 {
 export interface ConfirmInputV4 {
   finalJudgement: FinalJudgementV4;
   comment?: string;
+  screenDwellMs?: number;
+  firstOpenedAt?: string;
+  openCount?: number;
 }
 export interface ConfirmReplyV4 {
   inspectionId: string;
@@ -77,13 +82,32 @@ export function ensureConfirmAllowedV4(role: WriteRoleV4, inspection: WriteInspe
   if (inspection.displayState === 'REVIEW_DONE') fail('ALREADY_CONFIRMED', '기존과 다른 판정으로 재제출할 수 없습니다.');
   fail('NOT_REVIEWABLE', '작업자 확인 대기 상태에서만 판정할 수 있습니다.');
 }
-export function makeConfirmBodyV4(input: ConfirmInputV4): { finalJudgement: FinalJudgementV4; comment?: string } {
-  if (input.finalJudgement !== 'PASS' && input.finalJudgement !== 'FAIL') fail('INVALID_JUDGEMENT', 'PASS 또는 FAIL만 가능합니다.');
-  if (input.comment === undefined) return { finalJudgement: input.finalJudgement };
-  if (typeof input.comment !== 'string') fail('INVALID_COMMENT', 'comment는 문자열이어야 합니다.');
-  const comment = input.comment.trim();
-  if ([...comment].length > 200) fail('INVALID_COMMENT', 'comment는 최대 200자입니다(계약 제안사항).');
-  return comment ? { finalJudgement: input.finalJudgement, comment } : { finalJudgement: input.finalJudgement };
+export function makeConfirmBodyV4(input: ConfirmInputV4): {
+  finalJudgement: FinalJudgementV4; comment?: string;
+  screenDwellMs?: number; firstOpenedAt?: string; openCount?: number;
+} {
+  if (input.finalJudgement !== 'PASS' && input.finalJudgement !== 'FAIL') {
+    fail('INVALID_JUDGEMENT', 'PASS 또는 FAIL만 가능합니다.');
+  }
+  if (input.comment !== undefined && typeof input.comment !== 'string') {
+    fail('INVALID_COMMENT', 'comment는 문자열이어야 합니다.');
+  }
+  const comment = input.comment?.trim();
+  if (comment && [...comment].length > 200) fail('INVALID_COMMENT', 'comment는 최대 200자입니다.');
+  const count = [input.screenDwellMs, input.firstOpenedAt, input.openCount]
+    .filter((v) => v !== undefined).length;
+  if (count !== 0 && count !== 3) fail('INVALID_TIMING', '체류 시간 3개 필드는 모두 보내거나 생략해야 합니다.');
+  let timing: InspectionDwellV4 | undefined;
+  if (count === 3) {
+    try {
+      timing = validateDwellFieldsV4({
+        screenDwellMs: input.screenDwellMs!, firstOpenedAt: input.firstOpenedAt!, openCount: input.openCount!,
+      });
+    } catch (cause) {
+      fail('INVALID_TIMING', cause instanceof Error ? cause.message : '체류 시간 입력 오류');
+    }
+  }
+  return { finalJudgement: input.finalJudgement, ...(comment ? {comment} : {}), ...(timing ?? {}) };
 }
 export function ensureRetryAllowedV4(role: WriteRoleV4, inspection: WriteInspectionContextV4): void {
   assertWriteUuidV4(inspection.inspectionId);
@@ -160,6 +184,7 @@ export function writeErrorLabelV4(code: string): string {
     ORIGINAL_IMAGE_MISSING: '원본 사진이 없어 수동 판정으로 전환할 수 없습니다. 재촬영 후 새 검사로 접수해 주세요.',
     REQUEST_IN_PROGRESS_LOCAL: '처리 중입니다. 중복 제출하지 마세요.',
     NETWORK_ERROR: '서버 연결을 확인한 뒤 검사 상세에서 처리 여부를 먼저 확인해 주세요.',
+    REQUEST_TIMEOUT: '서버 응답이 지연되어 저장 여부를 확인하지 못했습니다. 검사 상세에서 처리 여부를 먼저 확인해 주세요.',
     NOT_LOGGED_IN: '로그인이 필요합니다.',
   };
   return labels[code] ?? '검사 처리에 실패했습니다. 최신 상태를 조회해 주세요.';

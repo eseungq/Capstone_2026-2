@@ -10,7 +10,7 @@ import {
   imageNeedsDetailRefetchV4, makeHistoryQueryV4, makeQueueQueryV4,
 } from './inspectionReadCore';
 import type {
-  HistoryPageV4, HistoryRowV4, InspectionReadSourceV4, MonitoringPartV4, QueuePageV4, QueueTypeV4,
+  HistoryPageV4, HistoryRowV4, InspectionReadSourceV4, MonitoringPartV4, QueueItemV4, QueuePageV4, QueueTypeV4,
 } from './inspectionReadCore';
 import {
   contractDetailExamplesV4, contractHistoryExamplesV4,
@@ -30,7 +30,7 @@ export interface HistoryRequestV4 {
   page: number; size?: number; partCode?: string;
   displayState?: DisplayStateV4; from?: string; to?: string;
 }
-export interface QueueRequestV4 { type?: QueueTypeV4; partCode?: string; cursor?: string | null; size?: number; }
+export interface QueueRequestV4 { type?: QueueTypeV4; partCode?: string; cursor?: string | null; size?: number; sort?: 'RECEIVED' | 'PRIORITY'; predictedQuality?: 'GOOD' | 'DEFECT'; }
 
 function exampleHistory(request: HistoryRequestV4): HistoryPageV4 {
   const size = request.size ?? 20;
@@ -51,8 +51,20 @@ function exampleQueue(request: QueueRequestV4): QueuePageV4 {
   const type = request.type ?? 'ALL'; const size = request.size ?? 20;
   const rows = contractQueueExamplesV4.filter((item) =>
     (!request.partCode || item.partCode === request.partCode) &&
-    (type === 'ALL' || (type === 'REVIEW' ? item.displayState === 'REVIEW_PENDING' : item.displayState === 'FAILED'))
+    (type === 'ALL' || (type === 'REVIEW' ? item.displayState === 'REVIEW_PENDING' : item.displayState === 'FAILED')) &&
+    (!request.predictedQuality || item.predictedQuality === request.predictedQuality)
   );
+  // API 계약 예시 데이터는 서버 우선순위 정렬의 실제 정당성 검증 대신 규칙 그대로만 재현.
+  if (request.sort === 'PRIORITY') {
+    rows.sort((a, b) => {
+      const priority = (r: QueueItemV4) =>
+        r.displayState === 'REVIEW_PENDING' && r.predictedQuality === 'GOOD' &&
+        r.reviewReason === 'ABOVE_THRESHOLD' ? 0 : 1;
+      const group = priority(a) - priority(b);
+      return group || Date.parse(a.receivedAt) - Date.parse(b.receivedAt) ||
+        a.inspectionId.localeCompare(b.inspectionId);
+    });
+  }
   const cursor = request.cursor ?? null;
   const match = cursor === null ? null : /^DEMO_OFFSET_(\d+)$/.exec(cursor);
   if (cursor !== null && !match) throw new Error('예시 커서 형식 오류 (실제 서버 커서와 다름)');
