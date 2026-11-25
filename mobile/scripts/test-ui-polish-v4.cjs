@@ -279,3 +279,33 @@ test('inspection photo layout uses side-by-side panels only for two available UR
   assert.match(code,/params: \{ inspectionId: id, kind: 'gradcam' \}/);
   assert.match(code,/params: \{ inspectionId: id, kind: 'original' \}/);
 });
+
+test('daily history emphasizes original per-row totals without aggregating or losing manual and failure notes', () => {
+  const code=fs.readFileSync(path.join(__dirname,'../src/app/admin-daily-live.tsx'),'utf8');
+  const source=ts.createSourceFile('admin-daily-live.tsx',code,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+  assert.equal(source.parseDiagnostics.length,0);
+  const card=code.slice(code.indexOf('function DailyRowCard'),code.indexOf('export default function AdminDailyLiveScreen'));
+  for(const expression of ['{row.total}건','{row.autoPass}건','{row.autoFail}건','{row.review.total}건'])assert.ok(card.includes(expression),expression);
+  assert.ok(card.includes('수동 전환 (작업자 확인에 포함)'));
+  assert.ok(card.includes('AI 분석 실패 (집계 제외)'));
+  assert.match(card,/oppositeEvidenceTextV4\(row\)/);
+  assert.match(card,/dailyAiReviewRateV4\(row\)/);
+  assert.match(card,/\{expanded&&<View style=\{s\.detailStats\}>/);
+  assert.match(card,/row\.confirmedOpposite\.autoPassThenFail/);
+  assert.match(card,/row\.confirmedOpposite\.autoFailThenPass/);
+  assert.match(card,/row\.openRequests/);
+  assert.match(code,/rows\.map\(\(row,index\)=>\(/);
+  assert.doesNotMatch(card,/\.reduce\(/);
+});
+test('daily threshold detail is placed under the selected policy row and retains the same read controls',()=>{
+  const code=fs.readFileSync(path.join(__dirname,'../src/app/admin-daily-live.tsx'),'utf8');
+  const rows=code.slice(code.indexOf('{rows.map((row,index)=>('),code.indexOf('통계의 \'판정 완료\''));
+  assert.match(rows,/<DailyRowCard/);
+  assert.match(rows,/\{selected===row&&<View style=\{s\.detailCard\}>/);
+  assert.ok(rows.indexOf('기준 상세')<rows.indexOf('</DailyRowCard>'));
+  assert.match(rows,/onPress=\{\(\)=>\{void viewDetail\(selected\);\}\}/);
+  assert.match(rows,/reads\.resetDetail\(\);setBand\(x\)/);
+  assert.match(code,/reads\.loadDetail\(part,row\.date,row\.policyId,band\)/);
+  assert.match(rows,/band=\{detail\.passBand\}/);
+  assert.match(rows,/band=\{detail\.failBand\}/);
+});
