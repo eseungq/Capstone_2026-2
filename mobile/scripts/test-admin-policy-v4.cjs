@@ -282,7 +282,7 @@ test('out-of-range and unready threshold writes are blocked before POST', async 
   await assert.rejects(() => service.saveNewVersion(ORIGINAL, '0.80'), /허용 범위/);
   await assert.rejects(() => service.saveNewVersion({ ...ORIGINAL, ready: false }, '1.20'), /활성·준비/);
   await assert.rejects(() => service.saveNewVersion({ ...ORIGINAL, active: false }, '1.20'), /활성·준비/);
-  await assert.rejects(() => service.saveNewVersion({ ...ORIGINAL, partCode: 'DOOR' }, '1.20'), /COWL_COVER/);
+  await assert.rejects(() => service.saveNewVersion({ ...ORIGINAL, partCode: 'DOOR' }, '1.20'), /선택한 부품/);
   assert.equal(calls.length, 0);
 });
 
@@ -313,7 +313,7 @@ test('inactive or mismatched activate response is rejected, never considered suc
   const next = fakeTransport({ activateReply: { ...EXISTING_T1, active: true, policyId: 'another-id' } });
   await assert.rejects(() => createAdminPolicyServiceV4(next.transport).activate(EXISTING_T1), /정책 ID/);
   const foreign = fakeTransport();
-  await assert.rejects(() => createAdminPolicyServiceV4(foreign.transport).activate({ ...EXISTING_T1, partCode: 'DOOR' }), /COWL_COVER/);
+  await assert.rejects(() => createAdminPolicyServiceV4(foreign.transport).activate({ ...EXISTING_T1, partCode: 'DOOR' }), /선택한 부품/);
   assert.equal(foreign.calls.length, 0);
 });
 
@@ -356,4 +356,50 @@ test('server-side 403 propagates; UI must not treat it as a successful activatio
   };
   await assert.rejects(() => createAdminPolicyServiceV4(transport).activate(EXISTING_T1), /403 FORBIDDEN/);
   assert.equal(calls.length, 1);
+});
+
+for (const partCode of ['DOOR', 'FRAME', 'COWL_COVER']) {
+  test(partCode + ' policy service scopes reads and writes and rejects other-part responses', async () => {
+    const base = {...ORIGINAL, partCode};
+    const saved = {...EXISTING_T1, partCode};
+    const h = fakeTransport({list:[base,saved], thresholdReply:saved, activateReply:{...saved,active:true}});
+    const service = createAdminPolicyServiceV4(h.transport,partCode);
+    assert.equal((await service.list())[0].partCode,partCode);
+    assert.equal(h.calls[0].path,'/admin/policies?partCode='+partCode);
+    assert.equal(findEquivalentPolicyVersionV4([saved],base,0.01),saved);
+    assert.equal((await service.saveNewVersion(base,'1.00')).partCode,partCode);
+    assert.equal((await service.activate(saved)).partCode,partCode);
+    const otherPart = partCode==='DOOR'?'FRAME':'DOOR';
+    const count=h.calls.length;
+    await assert.rejects(service.saveNewVersion({...base,partCode:otherPart},'1.00'),/선택한 부품/);
+    await assert.rejects(service.activate({...saved,partCode:otherPart}),/선택한 부품/);
+    assert.equal(h.calls.length,count);
+    const wrong=fakeTransport({list:[{...base,partCode:otherPart}],thresholdReply:{...saved,partCode:otherPart},activateReply:{...saved,partCode:otherPart,active:true}});
+    const wrongService=createAdminPolicyServiceV4(wrong.transport,partCode);
+    await assert.rejects(wrongService.list(),/부품/);
+    await assert.rejects(wrongService.saveNewVersion(base,'1.00'),/승계한 설정/);
+    await assert.rejects(wrongService.activate(saved),/활성 상태/);
+  });
+}
+test('unsupported policy parts are rejected before transport access', () => {
+  assert.throws(()=>createAdminPolicyServiceV4(fakeTransport().transport,'UNKNOWN'),/지원하지 않는/);
+});
+test('changing policy part invalidates old preflight and old confirmation without POST', async () => {
+  const h=fakeTransport({list:[ORIGINAL]});
+  const auth={...h.transport,sessionEpoch:()=>1};
+  const oldVisit=createPolicyVisitV4(auth);
+  const oldService=createAdminPolicyServiceV4(oldVisit.transport,'COWL_COVER');
+  const pending=oldService.list();
+  oldVisit.close();
+  await assert.rejects(pending,/정책 화면/);
+  await assert.rejects(oldService.saveNewVersion(ORIGINAL,'1.20'),/정책 화면/);
+  assert.equal(h.calls.filter(c=>c.options.method==='POST').length,0);
+});
+test('policy part selector uses Korean labels and resets the full visit on switch', () => {
+  const source=fs.readFileSync(path.join(__dirname,'../src/app/policy-live.tsx'),'utf8');
+  assert.match(source, /<PolicyPartScreen key={partCode}/);
+  assert.match(source, /focusedVisit.current\?\.close\(\)/);
+  assert.match(source, /partLabelV4\(code\)/);
+  assert.match(source, /createAdminPolicyServiceV4\(visit.transport, partCode\)/);
+  assert.match(source, /writing!==null \|\| writeLock.current/);
 });

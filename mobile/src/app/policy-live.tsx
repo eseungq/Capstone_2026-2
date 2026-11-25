@@ -1,3 +1,4 @@
+import {partLabelV4} from '../components/partLabelV4';
 import Pressable from '../components/TouchPressable';
 import React, { useCallback, useRef, useState } from 'react';
 import { useRevealFocusedInputV4 } from '../components/useRevealFocusedInputV4';
@@ -11,17 +12,17 @@ import { authV4 } from '../api/backendV4/authRuntime';
 import { ApiV4RequestError } from '../api/backendV4/httpCore';
 import {
   createAdminPolicyServiceV4, createPolicyVisitV4, PolicyAdminContractErrorV4, findEquivalentPolicyVersionV4,
-  parsePolicyPercentInputV4, percentageTextV4, rootPolicyForV4,
+  parsePolicyPercentInputV4, percentageTextV4, rootPolicyForV4, POLICY_PART_CODES_V4, type PolicyPartCodeV4,
 } from '../api/backendV4/adminPolicyServiceV4';
 import type { AdminPolicyV4 } from '../api/backendV4/adminPolicyServiceV4';
 import {createAutoFailPolicyServiceV4} from '../api/backendV4/autoFailPolicyServiceV4';
 import {ensureAutoFailToggleV4,makeAutoFailThresholdEditV4,autoFailRangeLabelV4} from '../api/backendV4/autoFailPolicyCoreV4';
 
-function openPolicyVisit() {
+function openPolicyVisit(partCode: PolicyPartCodeV4) {
   const visit = createPolicyVisitV4(authV4);
   return {
     ...visit,
-    service: createAdminPolicyServiceV4(visit.transport),
+    service: createAdminPolicyServiceV4(visit.transport, partCode),
     autoFailService: createAutoFailPolicyServiceV4(visit.transport),
   };
 }
@@ -87,6 +88,14 @@ function activationDetails(policy: AdminPolicyV4): string {
 }
 
 export default function PolicyLiveScreen() {
+  const [partCode, setPartCode] = useState<PolicyPartCodeV4>('COWL_COVER');
+  return <PolicyPartScreen key={partCode} partCode={partCode} onSelectPart={setPartCode} />;
+}
+
+/** A keyed screen gives each part its own visit, inputs, request sequence and dialogs. */
+function PolicyPartScreen({partCode, onSelectPart}: {
+  partCode: PolicyPartCodeV4; onSelectPart: (part: PolicyPartCodeV4) => void;
+}) {
   const [section, setSection] = useState<PolicySection>('pass');
   const [showPolicyDetails, setShowPolicyDetails] = useState(false);
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
@@ -160,7 +169,7 @@ export default function PolicyLiveScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => {
-    const visit = openPolicyVisit();
+    const visit = openPolicyVisit(partCode);
     focusedVisit.current = visit;
     setWriting(null);
     setActionError(null);
@@ -170,7 +179,7 @@ export default function PolicyLiveScreen() {
       visit.close();
       focusedVisit.current = null;
     };
-  }, [load]));
+  }, [load, partCode]));
 
   const active = policies.find((item) => item.active) ?? null;
   const root = active ? rootPolicyForV4(active, policies) : null;
@@ -301,7 +310,7 @@ export default function PolicyLiveScreen() {
           const latest = await assertLatest(visit, expectedActive);
           visit.assertCurrent();
           const current = latest.find((p) => p.policyId === target.policyId);
-          if (!current || !current.ready || current.partCode !== 'COWL_COVER') {
+          if (!current || !current.ready || current.partCode !== partCode) {
             throw new Error('대상 정책의 준비 상태가 달라졌습니다. 목록을 확인해 주세요.');
           }
           if (expectedActive && current.modelVersion !== expectedActive.modelVersion) {
@@ -375,12 +384,28 @@ export default function PolicyLiveScreen() {
         <Pressable accessibilityRole="button" onPress={() => router.back()} style={s.backTouch}>
           <Text style={s.back}>‹ 뒤로</Text>
         </Pressable>
-        <Text style={s.title}>카울커버 자동 판정 정책</Text>
-        <Text style={s.subtitle}>관리자 · COWL_COVER</Text>
+        <Text style={s.title}>{partLabelV4(partCode)} 자동 판정 정책</Text>
+        <Text style={s.subtitle}>관리자 · {partLabelV4(partCode)}</Text>
       </View>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView ref={scrollRef} onLayout={revealInput} style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{if(!loading&&!refreshing&&!writing)void load(false);}}/>}>
+        <View style={s.sectionTabs} accessibilityLabel="정책 부품 선택">
+          {POLICY_PART_CODES_V4.map(code => (
+            <Pressable key={code} testID={'policy-part-' + code} accessibilityRole="button"
+              accessibilityState={{selected:partCode===code, disabled:writing!==null}}
+              disabled={writing!==null}
+              style={[s.sectionTab,partCode===code&&s.sectionTabActive,writing!==null&&s.disabled]}
+              onPress={() => {
+                if (code===partCode || writing!==null || writeLock.current) return;
+                Keyboard.dismiss();
+                focusedVisit.current?.close();
+                onSelectPart(code);
+              }}>
+              <Text style={[s.sectionTabText,partCode===code&&s.sectionTabTextActive]}>{partLabelV4(code)}</Text>
+            </Pressable>
+          ))}
+        </View>
         <View style={s.notice}>
           <Text style={s.noticeText}>
             저장은 새 비활성 버전 생성입니다. 버전 관리에서 별도로 적용해야 새 검사에 반영됩니다.
@@ -407,7 +432,7 @@ export default function PolicyLiveScreen() {
           <>
             <Card title="현재 적용 중인 정책">
               {!active ? (
-                <Text style={s.errorText}>현재 적용 중인 카울커버 정책이 없습니다. 서버에서 적용 상태를 확인해 주세요.</Text>
+                <Text style={s.errorText}>현재 적용 중인 {partLabelV4(partCode)} 정책이 없습니다. 서버에서 적용 상태를 확인해 주세요.</Text>
               ) : (
                 <>
                   <Row label="정책 버전" value={active.policyVersion} />
@@ -545,7 +570,7 @@ export default function PolicyLiveScreen() {
               <Text style={s.muted}>
                 서버 기준 최신 생성순입니다. 현재 적용 정책 외에 준비된 버전을 선택해 원래 기준으로 복귀할 수 있습니다.
               </Text>
-              {policies.length === 0 && <Text style={s.muted}>조회된 COWL_COVER 정책이 없습니다.</Text>}
+              {policies.length === 0 && <Text style={s.muted}>조회된 {partLabelV4(partCode)} 정책이 없습니다.</Text>}
               {policies.map((policy) => {
                 const isOriginal = root?.policyId === policy.policyId ||
                   (root === null && policy.basedOnPolicyId === null);

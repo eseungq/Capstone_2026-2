@@ -1,5 +1,6 @@
 /** API v4 §6.9, TBD-18. Automatic FAIL threshold values are 0..1 fractions, UI accepts percent. */
 import type {AdminPolicyV4} from './adminPolicyServiceV4';
+import {isPolicyPartCodeV4} from './adminPolicyServiceV4';
 
 export interface AutoFailThresholdEditV4 {
   failThreshold:number; failValidatedMin:number; failValidatedMax:number;
@@ -23,8 +24,8 @@ export function parseAutoFailPercentV4(input:string):number {
 export function makeAutoFailThresholdEditV4(
   base:AdminPolicyV4, thresholdPercent:string,minPercent:string,maxPercent:string,
 ):AutoFailThresholdEditV4 {
-  if(base.partCode!=='COWL_COVER'||!base.ready||!base.active)
-    throw new Error('준비된 활성 COWL_COVER 정책에서만 불량 기준을 조정할 수 있습니다.');
+  if(!isPolicyPartCodeV4(base.partCode)||!base.ready||!base.active)
+    throw new Error('준비된 활성 부품 정책에서만 불량 기준을 조정할 수 있습니다.');
   if(base.autoFailEnabled===null)
     throw new Error('현재 서버가 자동 불량 정책 기능을 제공하지 않습니다.');
   if(base.passThreshold==null)
@@ -40,8 +41,8 @@ export function makeAutoFailThresholdEditV4(
   return {failThreshold:threshold,failValidatedMin:min,failValidatedMax:max};
 }
 export function ensureAutoFailToggleV4(base:AdminPolicyV4,enabled:boolean):void {
-  if(base.partCode!=='COWL_COVER'||!base.ready)
-    throw new Error('준비된 COWL_COVER 정책에서만 자동 불량 설정을 변경할 수 있습니다.');
+  if(!isPolicyPartCodeV4(base.partCode)||!base.ready)
+    throw new Error('준비된 부품 정책에서만 자동 불량 설정을 변경할 수 있습니다.');
   if(base.autoFailEnabled===null)
     throw new Error('현재 서버가 자동 불량 설정을 지원하지 않습니다.');
   if(enabled===base.autoFailEnabled)

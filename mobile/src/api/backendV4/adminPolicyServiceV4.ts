@@ -1,5 +1,5 @@
 /**
- * API 계약 v4 §6.9: 실제 COWL_COVER 관리자 정책 조회·조정·적용.
+ * API 계약 v4 §6.9: 실제 부품별 관리자 정책 조회·조정·적용.
  * 요청/응답은 authV4.authorizedRequest의 {data} 해제된 형태.
  * 서버 권한 검사(403)가 최종 권위이며, 라우트 role 파라미터는 신뢰하지 않습니다.
  */
@@ -7,6 +7,11 @@ import type { AuthPublicState } from './authCore';
 import { validateThresholdEditV4 } from './policyThresholdV4';
 
 export const COWL_PART_CODE_V4 = 'COWL_COVER';
+export const POLICY_PART_CODES_V4 = ['DOOR', 'FRAME', 'COWL_COVER'] as const;
+export type PolicyPartCodeV4 = typeof POLICY_PART_CODES_V4[number];
+export function isPolicyPartCodeV4(code: string): code is PolicyPartCodeV4 {
+  return (POLICY_PART_CODES_V4 as readonly string[]).includes(code);
+}
 
 export interface AdminPolicyV4 {
   policyId: string;
@@ -132,10 +137,11 @@ export function decodeAdminPolicyV4(raw: unknown): AdminPolicyV4 {
   };
 }
 
-export function decodeCowlPolicyListV4(raw: unknown): AdminPolicyV4[] {
+export function decodePolicyListV4(raw: unknown, partCode: string): AdminPolicyV4[] {
+  if (!isPolicyPartCodeV4(partCode)) throw new Error('지원하지 않는 정책 부품입니다.');
   if (!Array.isArray(raw)) throw new PolicyAdminContractErrorV4('GET /admin/policies 결과는 배열이어야 합니다.');
   const policies = raw.map(decodeAdminPolicyV4);
-  if (policies.some((p) => p.partCode !== COWL_PART_CODE_V4)) {
+  if (policies.some((p) => p.partCode !== partCode)) {
     throw new PolicyAdminContractErrorV4('요청한 부품이 아닌 정책이 포함됐습니다.');
   }
   const activeModels = new Set<string>();
@@ -147,6 +153,11 @@ export function decodeCowlPolicyListV4(raw: unknown): AdminPolicyV4[] {
     activeModels.add(policy.modelVersion);
   }
   return policies;
+}
+
+/** Compatibility for existing callers that explicitly request cowl policies. */
+export function decodeCowlPolicyListV4(raw: unknown): AdminPolicyV4[] {
+  return decodePolicyListV4(raw, COWL_PART_CODE_V4);
 }
 
 // 정책의 평가 근거는 JSON입니다. 객체 키의 순서는 근거의 의미를 바꾸지 않습니다.
@@ -179,7 +190,7 @@ export function findEquivalentPolicyVersionV4(
   activePolicy: AdminPolicyV4,
   threshold: number,
 ): AdminPolicyV4 | null {
-  if (!Number.isFinite(threshold) || !activePolicy.ready || activePolicy.partCode !== COWL_PART_CODE_V4) return null;
+  if (!Number.isFinite(threshold) || !activePolicy.ready || !isPolicyPartCodeV4(activePolicy.partCode)) return null;
   let firstMatch: AdminPolicyV4 | null = null;
   for (const policy of policies) {
     if (!matchesThresholdEdit(policy, activePolicy, threshold)) continue;
@@ -236,7 +247,8 @@ export function rootPolicyForV4(active: AdminPolicyV4, all: AdminPolicyV4[]): Ad
   return cursor ?? null;
 }
 
-export function createAdminPolicyServiceV4(transport: PolicyAdminTransportV4) {
+export function createAdminPolicyServiceV4(transport: PolicyAdminTransportV4, partCode: string = COWL_PART_CODE_V4) {
+  if (!isPolicyPartCodeV4(partCode)) throw new Error('지원하지 않는 정책 부품입니다.');
   let writing = false;
   const assertAdmin = async () => {
     const session = await transport.restore();
@@ -247,10 +259,10 @@ export function createAdminPolicyServiceV4(transport: PolicyAdminTransportV4) {
   async function list(): Promise<AdminPolicyV4[]> {
     await assertAdmin();
     const raw = await transport.authorizedRequest<unknown>(
-      `/admin/policies?partCode=${encodeURIComponent(COWL_PART_CODE_V4)}`,
+      `/admin/policies?partCode=${encodeURIComponent(partCode)}`,
       { method: 'GET' },
     );
-    return decodeCowlPolicyListV4(raw);
+    return decodePolicyListV4(raw, partCode);
   }
   async function serialize<T>(action: () => Promise<T>): Promise<T> {
     if (writing) throw new Error('정책 쓰기 요청이 진행 중입니다. 중복 제출하지 마세요.');
@@ -261,8 +273,8 @@ export function createAdminPolicyServiceV4(transport: PolicyAdminTransportV4) {
   async function saveNewVersion(base: AdminPolicyV4, inputPercent: string): Promise<AdminPolicyV4> {
     return serialize(async () => {
       await assertAdmin();
-      if (base.partCode !== COWL_PART_CODE_V4 || !base.active || !base.ready) {
-        throw new Error('현재 활성·준비된 COWL_COVER 정책에서만 새 버전을 저장할 수 있습니다.');
+      if (base.partCode !== partCode || !base.active || !base.ready) {
+        throw new Error('현재 활성·준비된 선택한 부품 정책에서만 새 버전을 저장할 수 있습니다.');
       }
       const passThreshold = parsePolicyPercentInputV4(inputPercent, base);
       const raw = await transport.authorizedRequest<unknown>(
@@ -280,14 +292,14 @@ export function createAdminPolicyServiceV4(transport: PolicyAdminTransportV4) {
   async function activate(policy: AdminPolicyV4): Promise<AdminPolicyV4> {
     return serialize(async () => {
       await assertAdmin();
-      if (policy.partCode !== COWL_PART_CODE_V4 || !policy.ready) {
-        throw new Error('준비된 COWL_COVER 정책만 적용할 수 있습니다.');
+      if (policy.partCode !== partCode || !policy.ready) {
+        throw new Error('준비된 선택한 부품 정책만 적용할 수 있습니다.');
       }
       const raw = await transport.authorizedRequest<unknown>(
         `/admin/policies/${encodeURIComponent(policy.policyId)}/activate`, { method: 'POST' },
       );
       const result = decodeAdminPolicyV4(raw);
-      if (result.policyId !== policy.policyId || !result.active || result.partCode !== COWL_PART_CODE_V4) {
+      if (result.policyId !== policy.policyId || !result.active || result.partCode !== partCode) {
         throw new PolicyAdminContractErrorV4('적용 응답의 정책 ID 또는 활성 상태가 다릅니다.');
       }
       return result;

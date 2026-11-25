@@ -75,7 +75,7 @@ test('verified threshold range is inclusive and above passThreshold',()=>{
  assert.throws(()=>makeAutoFailThresholdEditV4(base,'99.66','100','98'),/최솟값/);
 });
 test('inactive or unready or foreign policy cannot set fail threshold',()=>{
- for(const changes of [{active:false},{ready:false},{partCode:'DOOR'}])
+ for(const changes of [{active:false},{ready:false},{partCode:'UNKNOWN'}])
    assert.throws(()=>makeAutoFailThresholdEditV4({...base,...changes},'99.66','98','100'),/준비된 활성/);
 });
 test('toggle on requires registered threshold, rejects no-op',()=>{
@@ -151,3 +151,17 @@ test('equal AUTO_FAIL bounds are fixed trial values, not a validated range',()=>
  assert.equal(autoFailRangeLabelV4(null,null),'미제공');
  assert.equal(autoFailRangeLabelV4(0.98,1),'98.0000% ~ 100.0000%');
 });
+
+for(const partCode of ['DOOR','FRAME']){
+ test(partCode+' supports fail-threshold and toggle with same-part response validation',async()=>{
+   const b={...base,partCode},f={...withFail,partCode},r={...registered,partCode};
+   assert.equal(makeAutoFailThresholdEditV4(b,'99.66','98','100').failThreshold,0.9966);
+   assert.doesNotThrow(()=>ensureAutoFailToggleV4(f,true));
+   const h=transport({answer:r});
+   assert.equal((await createAutoFailPolicyServiceV4(h.value).saveThreshold(b,'99.66','98','100')).partCode,partCode);
+   const wrong=transport({answer:{...r,partCode:'COWL_COVER'}});
+   await assert.rejects(createAutoFailPolicyServiceV4(wrong.value).saveThreshold(b,'99.66','98','100'),/응답/);
+   const enabled={...on,partCode};
+   assert.equal((await createAutoFailPolicyServiceV4(transport({answer:enabled}).value).saveToggle(r,true)).partCode,partCode);
+ });
+}
