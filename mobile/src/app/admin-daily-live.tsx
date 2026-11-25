@@ -135,7 +135,7 @@ export default function AdminDailyLiveScreen(){
    <Stack.Screen options={{headerShown:false}}/>
    <View style={s.header}>
      <Pressable accessibilityRole="button" onPress={()=>router.back()} style={s.backTouch}>
-       <Text style={s.link}>‹ 관리자 설정으로 돌아가기</Text>
+       <Text style={s.link}>‹ 뒤로</Text>
      </Pressable>
      <Text style={s.title}>날짜별 자동 판정 이력</Text>
      <Text style={s.muted}>관리자 · 한국 시간 기준</Text>

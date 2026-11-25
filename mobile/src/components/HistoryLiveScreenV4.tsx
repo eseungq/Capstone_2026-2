@@ -1,4 +1,6 @@
 import Pressable from './TouchPressable';
+import LiveBottomNavV4 from './LiveBottomNavV4';
+import { useVerifiedRoleV4 } from './useVerifiedRoleV4';
 import { partLabelV4 } from './partLabelV4';
 import React, { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -76,8 +78,7 @@ function errorText(error: unknown): string {
 }
 
 export default function HistoryLiveScreenV4() {
-  const { role: roleParam } = useLocalSearchParams<{ role?: string }>();
-  const role = roleParam === 'ADMIN' ? 'ADMIN' : 'WORKER';
+  const {role} = useVerifiedRoleV4();
 
   const [partCode, setPartCode] = useState<PartFilter>('');
   const [stateFilter, setStateFilter] = useState<StateFilter>('ALL');
@@ -153,10 +154,6 @@ export default function HistoryLiveScreenV4() {
     resetForFilter();
     setPartCode(next);
   };
-  const toMonitor = () => router.replace({
-    pathname: '/monitoring',
-    params: { role, mode: 'live' },
-  });
   const toDetail = (row: HistoryRowV4) => router.push({
     pathname: '/inspection-live',
     params: { inspectionId: row.inspectionId },
@@ -328,24 +325,7 @@ export default function HistoryLiveScreenV4() {
         )}
       </ScrollView>
 
-      <View style={styles.bottomNav}>
-        <Pressable style={styles.navItem} onPress={toMonitor} accessibilityRole="button">
-          <Text style={styles.navIcon}>▣</Text>
-          <Text style={styles.navText}>모니터링</Text>
-        </Pressable>
-        <View style={styles.navItem} accessibilityLabel="현재 검사 이력 화면">
-          <Text style={[styles.navIcon, styles.active]}>▤</Text>
-          <Text style={[styles.navText, styles.active]}>이력</Text>
-        </View>
-        <Pressable
-          style={styles.navItem}
-          onPress={() => router.push({ pathname: '/settings', params: { role, mode: 'live' } })}
-          accessibilityRole="button"
-        >
-          <Text style={styles.navIcon}>⚙</Text>
-          <Text style={styles.navText}>설정</Text>
-        </Pressable>
-      </View>
+      {role && <LiveBottomNavV4 role={role} active="history"/>}
     </SafeAreaView>
   );
 }

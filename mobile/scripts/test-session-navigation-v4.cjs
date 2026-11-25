@@ -159,6 +159,7 @@ function settingsFixture() {
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '../api/backendV4/authRuntime': { authV4 },
     '../components/TouchPressable': 'Pressable',
+    '../components/LiveBottomNavV4': 'LiveBottomNavV4',
   };
   const filename = path.join(__dirname, '../src/app/settings.tsx');
   const screen = new Module(filename, module);

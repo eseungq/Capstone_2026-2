@@ -366,7 +366,7 @@ export default function PolicyLiveScreen() {
       <Stack.Screen options={{headerShown: false}} />
       <View style={s.header}>
         <Pressable accessibilityRole="button" onPress={() => router.back()} style={s.backTouch}>
-          <Text style={s.back}>‹ 설정으로 돌아가기</Text>
+          <Text style={s.back}>‹ 뒤로</Text>
         </Pressable>
         <Text style={s.title}>카울커버 자동 판정 정책</Text>
         <Text style={s.subtitle}>관리자 · COWL_COVER</Text>

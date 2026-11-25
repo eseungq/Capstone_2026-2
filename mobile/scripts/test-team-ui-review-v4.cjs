@@ -107,3 +107,17 @@ test('control colors retain text and non-text contrast with neutral card backgro
     for(const color of ['#475569','#64748B','#1E293B'])assert.ok(code.includes(color),file+': '+color);
   }
 });
+
+test('management navigation is ADMIN-only and uses verified roles and a dedicated live route',()=>{
+  const n=parse('components/LiveBottomNavV4.tsx').code;
+  const m=parse('app/manage-live.tsx').code;
+  const settings=parse('app/settings.tsx').code;
+  assert.match(n,/tabs\.filter\(tab=>tab\.key!=='manage'\|\|role==='ADMIN'\)/);
+  assert.match(n,/accessibilityState=\{\{selected:active===tab\.key\}\}/);
+  assert.match(m,/role!=='ADMIN'/);
+  for(const route of ['/judgement-requests-admin-live','/policy-live','/admin-daily-live','/rechecks-live'])assert.ok(m.includes(route));
+  assert.match(settings,/mode === 'live' \? <LiveBottomNavV4/);
+  assert.doesNotMatch(settings,/router\.push\('\/rechecks-live'\)/);
+  assert.match(settings,/performLiveLogout\(origin\)/);
+  assert.match(read('components/useVerifiedRoleV4.ts'),/epoch !== authV4\.sessionEpoch\(\)/);
+});

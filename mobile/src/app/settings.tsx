@@ -1,4 +1,5 @@
 import Pressable from '../components/TouchPressable';
+import LiveBottomNavV4 from '../components/LiveBottomNavV4';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { authV4 } from '../api/backendV4/authRuntime';
 import React, { useCallback, useRef, useState } from 'react';
@@ -23,7 +24,7 @@ const color = {
   background: '#F5F7FB',
   white: '#FFFFFF',
   ink: '#111827',
-  muted: '#64748B',
+  muted: '#475569',
   border: '#E4E7EC',
   blue: '#2054D8',
 };
@@ -224,57 +225,10 @@ export default function SettingsScreen() {
           <Field label="로그인 상태" value={mode === 'live' ? '로그인됨' : '시연 중'} />
         </Card>
 
-        <Card title="사용 가능한 메뉴">
-          <Text style={styles.cardText}>
-            {isAdmin ? '모니터링 · 전체 이력 · 설정' : '모니터링 · 검사 이력 · 판정 대기 · 설정'}
-          </Text>
-        </Card>
-
-        <Card title={isAdmin ? '관리자 전용' : '작업자 업무'}>
-          <Text style={styles.cardText}>
-            {isAdmin
-              ? '자동 통과 기준치 · 준비·적용 상태 관리'
-              : '확인 필요 알림 → 검사 상세 → 통과·불량 판정 제출'}
-          </Text>
-        </Card>
-
-        {mode === 'live' && (
-          <Pressable
-            style={[styles.button, styles.secondary]}
-            onPress={() => router.push('/rechecks-live')}
-            accessibilityRole="button"
-          >
-            <Text style={styles.buttonText}>
-              자동 통과 표본 재확인 · {isAdmin ? '관리자 결과 확인' : '작업자 확인'}
-            </Text>
-          </Pressable>
-        )}
-
-        {isAdmin && mode === 'live' && (
-          <Pressable style={[styles.button, styles.primary]}
-            accessibilityRole="button"
-            onPress={() => router.push('/judgement-requests-admin-live')}>
-            <Text style={[styles.buttonText, { color: color.white }]}>
-              판정 확인 요청 관리
-            </Text>
-          </Pressable>
-        )}
-
-        {isAdmin && (
+        {isAdmin && mode === 'mock' && (
           <Pressable style={[styles.button, styles.primary]} accessibilityRole="button"
-            onPress={() => mode === 'live'
-              ? router.push('/policy-live')
-              : router.push({ pathname: '/policy', params: { role: 'ADMIN' } })}>
-            <Text style={[styles.buttonText, { color: color.white }]}>
-              {mode === 'live' ? '카울커버 자동 판정 정책' : '자동 통과 기준 관리 · Mock'}
-            </Text>
-          </Pressable>
-        )}
-
-        {isAdmin && mode === 'live' && (
-          <Pressable style={[styles.button, styles.primary]} accessibilityRole="button"
-            onPress={() => router.push('/admin-daily-live')}>
-            <Text style={[styles.buttonText, { color: color.white }]}>날짜별 자동 판정 통계</Text>
+            onPress={() => router.push({ pathname: '/policy', params: { role: 'ADMIN' } })}>
+            <Text style={[styles.buttonText, {color:color.white}]}>자동 통과 기준 관리 · Mock</Text>
           </Pressable>
         )}
 
@@ -293,7 +247,7 @@ export default function SettingsScreen() {
         {mode === 'mock' && <Text style={styles.demoNote}>시연에서는 예시 검사와 정책을 사용합니다.</Text>}
       </ScrollView>
 
-      <NavBar role={displayRole} mode={mode} />
+      {mode === 'live' ? <LiveBottomNavV4 role={displayRole} active="settings"/> : <NavBar role={displayRole} mode={mode} />}
     </SafeAreaView>
   );
 }
@@ -304,23 +258,23 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   header: { paddingHorizontal: 20, paddingTop: 9, paddingBottom: 26 },
   title: { color: color.ink, fontSize: 23, fontWeight: '700', lineHeight: 34 },
-  subtitle: { color: color.muted, fontSize: 11, lineHeight: 18, marginTop: 1 },
+  subtitle: { color: color.muted, fontSize: 13, lineHeight: 18, marginTop: 1 },
   scroll: { flex: 1 },
   body: { paddingHorizontal: 20, paddingBottom: 20, gap: 10 },
   card: { padding: 13, gap: 7, borderWidth: 1, borderColor: color.border, borderRadius: 14, backgroundColor: color.white },
   cardTitle: { fontSize: 13, lineHeight: 21, fontWeight: '700', color: color.ink },
   field: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  fieldLabel: { flex: 0.43, color: color.muted, fontSize: 11, lineHeight: 18 },
-  fieldValue: { flex: 0.57, color: color.ink, textAlign: 'right', fontSize: 11, lineHeight: 18, fontWeight: '500' },
-  cardText: { color: color.ink, fontSize: 12, lineHeight: 20, fontWeight: '500' },
-  button: { height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  fieldLabel: { flex: 0.43, color: color.muted, fontSize: 13, lineHeight: 18 },
+  fieldValue: { flex: 0.57, color: color.ink, textAlign: 'right', fontSize: 13, lineHeight: 18, fontWeight: '500' },
+  cardText: { color: color.ink, fontSize: 13, lineHeight: 20, fontWeight: '500' },
+  button: { minHeight: 44, paddingVertical: 10, paddingHorizontal: 10, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   primary: { backgroundColor: color.blue },
   secondary: { backgroundColor: color.white, borderWidth: 1, borderColor: color.border },
   buttonText: { fontSize: 13, lineHeight: 20, fontWeight: '700', color: color.ink },
-  demoNote: { color: color.muted, fontSize: 11, lineHeight: 16 },
+  demoNote: { color: color.muted, fontSize: 13, lineHeight: 16 },
   nav: { height: 58, borderWidth: 1, borderColor: color.border, borderRadius: 15, backgroundColor: color.white, marginHorizontal: 20, marginBottom: 6, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' },
   navItem: { flex: 1, height: 46, alignItems: 'center', justifyContent: 'center', gap: 1 },
   navIcon: { color: color.muted, fontSize: 16, lineHeight: 24, fontWeight: '700' },
-  navText: { color: color.muted, fontSize: 11, lineHeight: 17, fontWeight: '500' },
+  navText: { color: color.muted, fontSize: 13, lineHeight: 17, fontWeight: '500' },
   active: { color: color.blue, fontWeight: '700' },
 });

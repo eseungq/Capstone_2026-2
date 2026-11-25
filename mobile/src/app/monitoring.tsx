@@ -1,4 +1,6 @@
 import Pressable from '../components/TouchPressable';
+import LiveBottomNavV4 from '../components/LiveBottomNavV4';
+import { useVerifiedRoleV4 } from '../components/useVerifiedRoleV4';
 
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -67,8 +69,9 @@ export default function MonitoringScreen() {
   mode?: string;
 }>();
 
-const isAdmin = role === 'ADMIN';
 const isLive = mode === 'live';
+const {role: verifiedRole} = useVerifiedRoleV4(isLive);
+const isAdmin = isLive ? verifiedRole === 'ADMIN' : role === 'ADMIN';
 
   const [activeTab, setActiveTab] = useState<Tab>('monitoring');
   const [liveBannerAlerts, setLiveBannerAlerts] = useState<MonitorAlertV4[]>([]);
@@ -274,6 +277,7 @@ const showInspection = (inspectionNo: string) => {
       </ScrollView>
 
       {/* Figma 하단 내비게이션 */}
+      {isLive ? (verifiedRole && <LiveBottomNavV4 role={verifiedRole} active="monitoring"/>) : (
       <View style={styles.bottomNav}>
         <Pressable
           style={styles.tab}
@@ -361,6 +365,7 @@ onPress={() =>
           </Text>
         </Pressable>
       </View>
+      )}
 
       {/* 실행 중 모니터링 화면에서만 보이는 앱 내부 알림. 시스템 푸시가 아닙니다. */}
       {isLive && activeTab === 'monitoring' && latestLiveAlert && (
