@@ -56,6 +56,10 @@ export default function JudgementRequestsAdminLiveScreen(){
 
   const load=async(pageNum:number,append:boolean,nextStatus=status,nextPart=partCode)=>{
     const n=++generation.current;
+    if(!append){
+      confirmation.current++;
+      setSelected(null);setNote('');setDecision('KEEP');setPage(null);
+    }
     setLoading(true);setError(null);
     try{
       const session=await authV4.restore();
@@ -146,7 +150,7 @@ export default function JudgementRequestsAdminLiveScreen(){
             <Text style={s.muted}>전체 {page.totalElements}건 · {page.page+1}/{Math.max(1,page.totalPages)}페이지</Text>
             {page.items.length===0&&<Text style={s.muted}>선택 조건의 요청이 없습니다.</Text>}
             {page.items.map(item=><Pressable key={item.requestId} style={s.entry} disabled={processing}
-              onPress={()=>{confirmation.current++;setSelected(item);setNote('');setDecision('KEEP');}}>
+              onPress={()=>{if(loading||locked.current)return;confirmation.current++;setSelected(item);setNote('');setDecision('KEEP');}}>
               <Text style={s.strong}>{item.inspectionNo} · {partLabelV4(item.partCode)} · {judgementRequestStatusLabelV4(item.status)}</Text>
               <Text style={s.muted}>{item.originalJudgement} · 시스템 자동 판정 → 요청 {item.claimedJudgement}</Text>
               <Text style={s.link}>내용 검토 ›</Text>

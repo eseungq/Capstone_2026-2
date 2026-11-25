@@ -80,7 +80,11 @@ export function validateDwellFieldsV4(timing: InspectionDwellV4 | null | undefin
       !isIso(timing.firstOpenedAt)) {
     throw new Error('체류 시간 세 필드가 올바르지 않습니다. 일부만 전송하지 않습니다.');
   }
-  return timing;
+  return {
+    screenDwellMs: timing.screenDwellMs,
+    firstOpenedAt: timing.firstOpenedAt,
+    openCount: timing.openCount,
+  };
 }
 export function makeRecheckSubmitBodyV4(
   result: FinalJudgementV4, comment?: string, timing?: InspectionDwellV4 | null,

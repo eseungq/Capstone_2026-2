@@ -194,5 +194,5 @@ export function decodeJudgementQueuePageV4(raw: unknown, requestedPage: number):
     totalElements:raw.totalElements as number,totalPages:raw.totalPages as number};
 }
 export function judgementRequestStatusLabelV4(status: JudgementRequestStatusV4): string {
-  return status==='OPEN'?'확인 대기':status==='KEPT'?'최초 판정 유지':'정정 완료';
+  return status==='OPEN'?'확인 대기':status==='KEPT'?'현재 판정 유지':'정정 완료';
 }

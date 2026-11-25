@@ -163,7 +163,7 @@ export default function InspectionLiveScreen() {
 
   const load = useCallback(async (initial = false) => {
     const visit = visitRef.current;
-    if (!isCurrentVisit(visit)) return;
+    if (!visit || !isCurrentVisit(visit)) return;
     const serial = ++requestSerial.current;
     if (initial) {
       setLoading(true);
@@ -178,13 +178,26 @@ export default function InspectionLiveScreen() {
       setRefreshing(true);
     }
     setError(null);
+    setRole(null);
+    setRoleLoading(true);
     try {
       if (!id) throw new Error('조회할 검사를 다시 선택해 주세요.');
+      const session = await authV4.restore();
+      if (serial !== requestSerial.current || !isCurrentVisit(visit)) return;
+      if (!session.signedIn || (session.role !== 'WORKER' && session.role !== 'ADMIN')) {
+        throw new Error('검사 상세를 보려면 작업자 또는 관리자 계정으로 로그인해 주세요.');
+      }
+      visit.loginId = session.loginId;
+      setRole(session.role);
       const response = await inspectionReader.detail(id);
       if (serial !== requestSerial.current || !isCurrentVisit(visit)) return;
       const next = response.value;
       if (next.inspectionId !== id) throw new Error('선택한 검사 정보를 확인할 수 없습니다. 다시 조회해 주세요.');
       setDetail(next);
+      if (session.role === 'WORKER' && session.loginId && !visit.dwell) {
+        visit.dwell = inspectionDwellForSessionV4(session.loginId, visit.epoch);
+        visit.dwell.focus(id, AppState.currentState === 'active' || AppState.currentState == null);
+      }
       // 서버가 실패했던 이미지 URL을 그대로 재발급해도 성공으로 표시하지 않습니다.
       const urls = [next.originalImageUrl, next.gradcamImageUrl].filter(
         (url): url is string => typeof url === 'string',
@@ -200,6 +213,7 @@ export default function InspectionLiveScreen() {
       if (serial === requestSerial.current && isCurrentVisit(visit)) {
         setLoading(false);
         setRefreshing(false);
+        setRoleLoading(false);
       }
     }
   }, [id, isCurrentVisit]);
@@ -227,26 +241,7 @@ export default function InspectionLiveScreen() {
     setError(null);
     setLoading(true);
     setSubmitting(null);
-    void authV4.restore().then(session => {
-      if (!isCurrentVisit(visit)) return;
-      if (!session.signedIn || (session.role !== 'WORKER' && session.role !== 'ADMIN')) {
-        throw new Error('검사 상세를 보려면 작업자 또는 관리자 계정으로 로그인해 주세요.');
-      }
-      visit.loginId = session.loginId;
-      setRole(session.role);
-      if (session.role === 'WORKER' && session.loginId && id) {
-        visit.dwell = inspectionDwellForSessionV4(session.loginId, visit.epoch);
-        visit.dwell.focus(id, AppState.currentState === 'active' || AppState.currentState == null);
-      }
-      void load(true);
-    }).catch(cause => {
-      if (isCurrentVisit(visit)) {
-        setError(errorMessage(cause));
-        setLoading(false);
-      }
-    }).finally(() => {
-      if (isCurrentVisit(visit)) setRoleLoading(false);
-    });
+    void load(true);
     const subscription = AppState.addEventListener('change', state => {
       if (isCurrentVisit(visit)) visit.dwell?.setForeground(id, state === 'active');
     });
