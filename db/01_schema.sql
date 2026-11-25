@@ -1,16 +1,18 @@
--- 최종 스키마 전체 (V1 → V9 적용 결과를 한 파일로 합친 것) · 김남균 DB · 2026-10-28 (11/20 V7~V9 반영)
+-- 최종 스키마 전체 (V1 → V10 적용 결과를 한 파일로 합친 것) · 김남균 DB · 2026-10-28 (11/20 V7~V9, 11/24 V10 반영)
 --
 -- 11/11 갱신: V6 수동 판정 반영 — source MANUAL, review_reason AI_UNAVAILABLE, 완료 규칙 통합(chk_insp_completed_v6),
 --   chk_insp_manual·chk_insp_reason_ai_unavailable 추가
 -- 11/20 갱신: V7 검사항목 코드 UNIFIED(데이터만 변경, 구조 같음), V8 auto_pass_recheck, V9 recheck_rule·
 --   inspection.recheck_rule_id·재확인 결정 규칙·관리자 확인함·화면 체류 시간(worker_confirmation 포함)
--- 용도: 비교·검토용 원본. Flyway에 넣지 않는다 (실제 DB는 V1~V9 마이그레이션이 만든다).
+-- 11/24 갱신: V10 표본 재확인 CHECK 보강 — chk_insp_recheck_rule·chk_recheck_ack NULL 구멍 수정,
+--   chk_recheck_draw(뽑힘 = 추출 값 < 비율)·chk_recheck_order(시각 순서) 추가
+-- 용도: 비교·검토용 원본. Flyway에 넣지 않는다 (실제 DB는 V1~V10 마이그레이션이 만든다).
 --   이 파일과 마이그레이션 결과가 다르면 마이그레이션이 기준이다.
 -- 포함: 테이블·컬럼·키·인덱스·제약 + inspection_no_seq 초기 행 (V4에 있는 것)
 -- 제외: V2 부품·검사항목 시드, V7 코드 변경(UPDATE), seed-dev 시드(V3_1 계정, V4_1~V7_1 모델·정책·보정기)
 -- 컬럼 순서: 마이그레이션 적용 후 실제 순서와 같게 맞춤 (V4의 AFTER 위치 반영)
 -- 11/05 갱신: 백엔드 적용 V5(10/28 이승규 수정본) 반영 — gradcam_status NO_ACTIVATION 추가, FAILED면 predicted_quality NULL
--- 상태: 이 파일 자체는 MySQL 실행 미확인 (V5~V9 마이그레이션은 백엔드 MySQL에서 적용 확인).
+-- 상태: 이 파일 자체는 MySQL 실행 미확인 (V5~V10 마이그레이션은 백엔드 MySQL에서 적용 확인).
 --       SQLite 대체 실행으로 마이그레이션과 컬럼·제약 일치만 확인
 -- 대상: MySQL 8.0.19 이상 (백엔드 docker compose 기준 8.4)
 
@@ -308,10 +310,9 @@ CREATE TABLE inspection (
     CONSTRAINT chk_insp_reason_ai_unavailable CHECK (review_reason IS NULL
         OR review_reason <> 'AI_UNAVAILABLE' OR source = 'MANUAL'),
 
-    -- ---- V9 표본 재확인 규칙 ----
-    -- 주의: recommended_action이 NULL이면 결과가 NULL이라 통과함. V10에서 IS NOT NULL 보강 예정(11/20 이승규 확인),
-    --       그 전까지 무결성 점검 I18로 확인 (백엔드는 AUTO_PASS 판정 흐름에서만 값을 넣어 현재 위반 행 없음)
-    CONSTRAINT chk_insp_recheck_rule CHECK (recheck_rule_id IS NULL OR recommended_action = 'AUTO_PASS')
+    -- ---- V9 표본 재확인 규칙 (V10에서 NULL 구멍 보강) ----
+    CONSTRAINT chk_insp_recheck_rule CHECK (recheck_rule_id IS NULL
+        OR (recommended_action IS NOT NULL AND recommended_action = 'AUTO_PASS'))
 );
 
 -- 패치 좌표 기록. 패치 검사 범위 제외로 신규 기록 중단, 과거 기록만 보존
@@ -389,15 +390,23 @@ CREATE TABLE auto_pass_recheck (
            (rule_id IS NULL AND ratio IS NULL AND draw_value IS NULL)
         OR (rule_id IS NOT NULL AND ratio IS NOT NULL AND draw_value IS NOT NULL
             AND draw_value >= 0 AND draw_value < 1)),
-    -- 확인함은 재확인 FAIL에만, 확인자·시각은 짝
+    -- 확인함은 재확인 FAIL에만, 확인자·시각은 짝 (V10에서 result NULL 구멍 보강)
     CONSTRAINT chk_recheck_ack CHECK (
            (acknowledged_by IS NULL AND acknowledged_at IS NULL AND acknowledge_note IS NULL)
-        OR (acknowledged_by IS NOT NULL AND acknowledged_at IS NOT NULL AND result = 'FAIL')),
+        OR (acknowledged_by IS NOT NULL AND acknowledged_at IS NOT NULL
+            AND result IS NOT NULL AND result = 'FAIL')),
     -- 체류 시간은 재확인 결과와 함께만
     CONSTRAINT chk_recheck_timing CHECK (
            (screen_dwell_ms IS NULL AND first_opened_at IS NULL AND open_count IS NULL)
         OR (screen_dwell_ms IS NOT NULL AND first_opened_at IS NOT NULL AND open_count IS NOT NULL
-            AND screen_dwell_ms >= 0 AND open_count >= 1 AND result IS NOT NULL))
+            AND screen_dwell_ms >= 0 AND open_count >= 1 AND result IS NOT NULL)),
+    -- V10: 규칙이 있는 결정 행은 뽑힘 = 추출 값 < 구간 비율 (백엔드 RecheckRules와 같음, V8 행은 제외)
+    CONSTRAINT chk_recheck_draw CHECK (rule_id IS NULL
+        OR sampled = (sampling_rate > 0 AND draw_value < sampling_rate)),
+    -- V10: 재확인은 추출 결정 뒤, 확인함은 재확인 뒤 (모두 서버 시각)
+    CONSTRAINT chk_recheck_order CHECK (
+            (rechecked_at IS NULL OR rechecked_at >= sampled_at)
+        AND (acknowledged_at IS NULL OR (rechecked_at IS NOT NULL AND acknowledged_at >= rechecked_at)))
 );
 -- 재확인 목록: 뽑힌 건의 대기·완료별 뽑힌 순서
 CREATE INDEX idx_recheck_result_sampled ON auto_pass_recheck (sampled, result, sampled_at);
