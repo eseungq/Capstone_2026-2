@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
-  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
+  ActivityIndicator, Alert, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
   Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -72,6 +72,27 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
   const detailRequestId = useRef(0);
   const mountedRef = useRef(true);
   const submitLock = useRef(false);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const commentRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+  // KeyboardAvoidingView resizes the viewport, but it does not scroll a
+  // focused input at the end of a long inspection list into that viewport.
+  const revealComment = useCallback(() => {
+    const field = commentRef.current;
+    const content = scrollRef.current?.getInnerViewRef();
+    if (!field?.isFocused() || !content) return;
+    field.measureLayout(content, (_x, y) => {
+      if (commentRef.current === field && field.isFocused()) {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: false });
+      }
+    });
+  }, []);
+  // Re-measure after iOS finishes its keyboard animation as well as on focus
+  // and viewport layout; don't alter the selection, comment or confirmation.
+  useFocusEffect(useCallback(() => {
+    if (Platform.OS !== 'ios') return;
+    const subscription = Keyboard.addListener('keyboardDidShow', revealComment);
+    return () => subscription.remove();
+  }, [revealComment]));
 
   useEffect(() => {
     mountedRef.current = true;
@@ -239,7 +260,8 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
         </Text>
       </View>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={{flex:1}} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <ScrollView ref={scrollRef} style={{flex:1}} contentContainerStyle={s.body}
+        onLayout={revealComment} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {authLoading ? <ActivityIndicator /> : role !== 'WORKER' ? (
           <View style={s.card}><Text style={s.error}>작업자 계정으로 로그인하면 일괄 판정을 사용할 수 있습니다.</Text></View>
         ) : (
@@ -307,7 +329,7 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
                 </View>
               ))}
               <Text style={s.strong}>공통 판정 사유 (선택, 최대 200자)</Text>
-              <TextInput value={comment} editable={!submitting} onChangeText={value=>{confirmation.invalidate();setComment(value);}} style={s.input}
+              <TextInput ref={commentRef} onFocus={revealComment} value={comment} editable={!submitting} onChangeText={value=>{confirmation.invalidate();setComment(value);}} style={s.input}
                 placeholder="예: 고정핀 들뜸" placeholderTextColor="#94A3B8"
                 maxLength={200} multiline />
               <Text style={s.muted}>제출 후에는 정상 처리·기존 FAIL·충돌·서버 오류가 검사별로 구분됩니다.</Text>

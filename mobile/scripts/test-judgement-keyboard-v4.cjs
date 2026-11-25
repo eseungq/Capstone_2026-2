@@ -56,3 +56,34 @@ test('other live input screens keep their text fields in a keyboard-adjusted scr
     assert.ok(inputs>0,screen);
   }
 });
+
+test('batch memo is revealed in its main scroll viewport on focus and keyboard layout changes', () => {
+  const filename = path.join(__dirname, '../src/app/batch-fail-live.tsx');
+  const code = readFileSync(filename, 'utf8');
+  const source = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const prop = (node, name) => node.attributes.properties.find(p => ts.isJsxAttribute(p) && p.name.getText(source) === name)?.initializer?.getText(source);
+  let count = 0;
+  function inspect(node, ancestors = []) {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(source) === 'TextInput' && prop(node, 'value') === '{comment}') {
+      count++;
+      assert.equal(prop(node, 'ref'), '{commentRef}');
+      assert.equal(prop(node, 'onFocus'), '{revealComment}');
+      const scroll = ancestors.find(parent => parent.openingElement.tagName.getText(source) === 'ScrollView');
+      assert.ok(scroll);
+      assert.equal(prop(scroll.openingElement, 'ref'), '{scrollRef}');
+      assert.equal(prop(scroll.openingElement, 'onLayout'), '{revealComment}');
+      assert.equal(prop(scroll.openingElement, 'keyboardShouldPersistTaps'), '"handled"');
+      assert.equal(prop(scroll.openingElement, 'keyboardDismissMode'), '"on-drag"');
+      assert.ok(ancestors.some(parent => parent.openingElement.tagName.getText(source) === 'KeyboardAvoidingView'));
+    }
+    if (ts.isJsxElement(node)) ancestors = [...ancestors, node];
+    ts.forEachChild(node, child => inspect(child, ancestors));
+  }
+  inspect(source);
+  assert.equal(count, 1);
+  assert.match(code, /Keyboard\.addListener\('keyboardDidShow', revealComment\)/);
+  assert.match(code, /field\.measureLayout\(content,/);
+  assert.match(code, /field\.isFocused\(\)/);
+  assert.match(code, /scrollRef\.current\?\.scrollTo\(/);
+  assert.match(code, /subscription\.remove\(\)/);
+});
