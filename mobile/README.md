@@ -2,7 +2,7 @@
 
 담당: 홍승인
 
-현재 기준: PR #68의 모바일 최종 통합 후보. main 병합 여부는 GitHub에서 확인합니다.
+현재 기준: 2026-11-25 PR #68 main 병합 완료 (`1b78388`). 이후 변경 여부는 GitHub에서 확인합니다.
 
 - 실제 계정 로그인, 부품별 모니터링·상세·원본/Grad-CAM 확대, 작업자 판정·재확인·일괄 FAIL, 관리자 판정 확인 요청 처리를 제공합니다.
 - 관리자는 관리 탭에서 도어·프레임·카울커버의 자동 판정 정책과 날짜별 이력을 조회합니다. 정책 저장은 새 비활성 버전 생성이며 적용은 별도입니다.
@@ -35,11 +35,10 @@
 
 ```powershell
 cd mobile
-npm run test:door-demo
-npm run test:admin-policy
-npm run test:monitor-alerts
-npm run test:monitor-thumbnails
+npm run test:integration-all
 npx tsc --noEmit
 ```
 
-이 기능은 팀 협업 규칙에 따라 별도 모바일 PR에서 리뷰하고, 실서버 정책 API 검증과 별도로 취급합니다.
+2026-11-25 병합본 기준 GitHub 타입 검사 성공, 전체 회귀 **285/285 통과**. Windows 재검사에서 LF에 의존하는 소스 검사 1건이 CRLF 체크아웃에 민감함을 확인했습니다. 검사 시 Git 원본 줄바꿈(LF)을 사용합니다. 이는 앱 실행 오류와 구분합니다.
+
+이 결과는 실서버 쓰기·최종 iPhone 실사용 검증을 대신하지 않습니다. 기존 CodeRabbit Minor 13건은 후속 개선으로 남아 있으며 전부 해결됐다는 뜻이 아닙니다. 이후 변경은 파트별 브랜치와 PR로 진행합니다.
