@@ -1,4 +1,5 @@
 import { qualityLabelV4 } from '../components/partLabelV4';
+import { reviewListReasonV4, reviewReasonCopyV4 } from '../components/reviewReasonCopyV4';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
@@ -299,7 +300,7 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
                 <View key={item.inspectionId} style={s.line}>
                   <View style={s.rowText}>
                     <Text style={s.strong}>{item.inspectionNo ?? '검사번호 미제공'} · {item.partCode}</Text>
-                    <Text style={s.muted}>AI 예측: {qualityLabelV4(item.predictedQuality)} · 판정 대기</Text>
+                    <Text style={s.muted}>{reviewListReasonV4(item.displayState,item.reviewReason)}</Text>
                   </View>
                   <Pressable accessibilityRole="button" style={s.outline}
                     disabled={previewLoading || submitting} onPress={()=>{void openDetail(item);}}>
@@ -397,7 +398,11 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
                 <>
                   <Text style={s.strong}>{preview.inspectionNo} · {preview.partCode}</Text>
                   <Text style={s.muted}>상태: {preview.displayStateLabel}</Text>
-                  <Text style={s.muted}>AI 예측: {preview.prediction ?? '미제공'} · 보정 불량 확률 {percent(preview.calibratedDefectProbability)}</Text>
+                  <Text style={s.muted}>AI 예측: {qualityLabelV4(preview.prediction)} · AI 불량 확률 {percent(preview.calibratedDefectProbability)}</Text>
+                  {preview.displayState==='REVIEW_PENDING'&&<>
+                    <Text style={s.strong}>{reviewReasonCopyV4(preview.reviewReasonCode).title}</Text>
+                    <Text style={s.muted}>{reviewReasonCopyV4(preview.reviewReasonCode).description}</Text>
+                  </>}
                   <Text style={s.muted}>현재 판정: {preview.finalJudgement ?? '미판정'}</Text>
                   <Text style={s.strong}>원본 사진</Text>
                   {preview.originalImageUrl ? (

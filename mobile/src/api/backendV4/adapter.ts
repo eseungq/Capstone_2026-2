@@ -239,6 +239,7 @@ export function mapInspectionDetailV4(detail: InspectionDetailV4): InspectionVie
     calibratedDefectProbability: detail.ai?.calibratedDefectProbability ?? null,
     modelVersion: detail.ai?.modelVersion ?? null,
     policyVersion: detail.policy?.policyVersion ?? null,
+    passThresholdApplied: detail.policy?.passThreshold ?? null,
     reviewReasonCode: detail.policy?.reviewReason ?? null,
     reviewReasonText: detail.policy?.reviewReason ? reviewReasonLabels[detail.policy.reviewReason] : null,
     errorCode: detail.error?.code ?? null,

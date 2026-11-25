@@ -199,9 +199,11 @@ test('read-only refresh gestures preserve explicit recovery and detail image ref
   assert.match(code,/판단 근거 이미지는 결함 위치를 확정하는 좌표나 마스크가 아닙니다/);
 });
 
-test('team feedback keeps request history in a vertical layout and removes review reason and empty Grad-CAM card',()=>{
+test('team feedback keeps request history in a vertical layout and restores readable review reason without an empty Grad-CAM card',()=>{
   const {code}=parse('app/inspection-live.tsx');
   assert.match(code,/key=\{request.requestId\} style=\{styles.requestHistory\}/);
+  assert.match(code,/testID="inspection-review-reason"/);
+  assert.match(code,/adminDetail\?reviewCopy\.adminDescription:reviewCopy\.description/);
   assert.doesNotMatch(code,/label="확인 필요 사유"/);
   assert.match(code,/\{visibleDetail\.gradcamImageUrl && <ImagePanel embedded/);
   assert.match(code,/params: \{ inspectionId: id, kind: 'gradcam' \}/);
@@ -213,5 +215,5 @@ test('claim colors differ by judgement, and monitoring AI filter is a checkbox',
   assert.match(q,/choicePass:\{backgroundColor:'#2054D8'/);
   assert.match(q,/choiceFail:\{backgroundColor:'#B42318'/);
   assert.match(m,/testID="monitor-ai-defect-checkbox"\s*accessibilityRole="checkbox"\s*accessibilityState=\{\{ checked: aiDefectOnly \}\}/);
-  assert.match(m,/<Text style=\{styles.priorityHint\}>판정 대기<\/Text>/);
+  assert.match(m,/<Text style=\{styles.priorityHint\}>\{reviewListReasonV4\(item.displayState,item.reviewReason\)\}<\/Text>/);
 });

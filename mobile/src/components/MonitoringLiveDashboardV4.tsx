@@ -1,5 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
-import { partLabelV4, qualityLabelV4 } from './partLabelV4';
+import { partLabelV4 } from './partLabelV4';
+import { reviewListReasonV4 } from './reviewReasonCopyV4';
 import { createRecheckServiceV4 } from '../api/backendV4/recheckServiceV4';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -19,9 +20,6 @@ import { monitoringThumbnailNeedsReloadV4, resolveMonitoringThumbnailUrlV4 } fro
 const INITIAL_VISIBLE_QUEUE_COUNT = 3;
 const recheckReader = createRecheckServiceV4(authV4);
 const reviewQueueReaderV4 = createInspectionReadServiceV4({ mode: 'api', transport: authV4 });
-function probabilityLabelV4(value: number | null | undefined): string {
-  return value == null ? '미제공' : `${(value * 100).toFixed(2)}%`;
-}
 type MonitoredPart = (typeof MONITORED_PARTS)[number];
 
 function statusLabel(displayState: string): string {
@@ -306,7 +304,7 @@ export default function MonitoringLiveDashboardV4({
         </View>
         {queueSort === 'PRIORITY' && (
           <Text style={styles.description}>
-            정상 예측 중 자동 통과 기준을 초과한 판정 대기 검사를 먼저, 나머지는 뒤에 표시합니다. 각 그룹은 오래된 순입니다.
+            정상으로 예측했지만 확신이 부족한 검사를 먼저 표시합니다. 각 그룹은 오래된 순입니다.
           </Text>
         )}
         {aiDefectOnly && (
@@ -340,28 +338,17 @@ export default function MonitoringLiveDashboardV4({
             key={item.inspectionId}
             style={({ pressed }) => [styles.inspectionRow, pressed && styles.pressed]}
             accessibilityRole="button"
-            accessibilityLabel={`${item.inspectionNo ?? '검사번호 미제공'}, ${statusLabel(item.displayState)}, 상세 보기`}
+            accessibilityLabel={`${item.inspectionNo ?? '검사번호 미제공'}, ${statusLabel(item.displayState)}, ${reviewListReasonV4(item.displayState,item.reviewReason)??'실패 사유는 상세에서 확인'}, 상세 보기`}
             onPress={() => openInspection(item.inspectionId)}
           >
             <InspectionThumbnail inspectionId={item.inspectionId} url={item.thumbnailUrl} />
             <View style={styles.rowInfo}>
               <Text style={styles.itemTitle}>{item.inspectionNo ?? '검사번호 미제공'}</Text>
               <Text style={styles.itemStatus}>{statusLabel(item.displayState)}</Text>
-              <Text style={styles.description}>
-                {item.reviewReason === 'AI_UNAVAILABLE'
-                  ? 'AI 분석 없이 작업자 판정'
-                  : item.displayState === 'FAILED'
-                    ? '실패 사유는 상세에서 확인'
-                    : 'AI 예측: ' + qualityLabelV4(item.predictedQuality)}
-              </Text>
-              {item.reviewReason === 'ABOVE_THRESHOLD' && (
-                <Text style={styles.priorityHint}>판정 대기</Text>
-              )}
-              {item.displayState === 'REVIEW_PENDING' && (
-                <Text style={styles.description}>
-                  보정 불량 확률: {probabilityLabelV4(item.calibratedDefectProbability)}
-                  {' · '}적용된 통과 기준: {probabilityLabelV4(item.passThresholdApplied)}
-                </Text>
+              {item.displayState === 'REVIEW_PENDING' ? (
+                <Text style={styles.priorityHint}>{reviewListReasonV4(item.displayState,item.reviewReason)}</Text>
+              ) : (
+                <Text style={styles.description}>실패 사유는 상세에서 확인</Text>
               )}
               <Text style={styles.detailLink}>상세 보기 ›</Text>
             </View>

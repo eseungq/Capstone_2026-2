@@ -33,6 +33,7 @@ import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
 import { partLabelV4, qualityLabelV4, stratumLabelV4 } from '../components/partLabelV4';
 import { useRevealFocusedInputV4 } from '../components/useRevealFocusedInputV4';
 import { findNextReviewAlertV4, reviewAlertQueueV4 } from '../components/reviewAlertQueueV4';
+import { reviewReasonCopyV4, hasReviewReasonDetailV4 } from '../components/reviewReasonCopyV4';
 
 type DetailVisit = {
   id: string;
@@ -300,6 +301,8 @@ export default function InspectionLiveScreen() {
 
   // 새 검사로 이동하는 첫 렌더에서도 이전 검사의 데이터를 숨깁니다.
   const visibleDetail = detail?.inspectionId === id ? detail : null;
+  const reviewCopy=reviewReasonCopyV4(visibleDetail?.reviewReasonCode);
+  const adminDetail=!roleLoading&&role==='ADMIN';
   const isManualInspection = visibleDetail?.source === 'MANUAL' ||
     visibleDetail?.reviewReasonCode === 'AI_UNAVAILABLE';
 
@@ -774,14 +777,22 @@ export default function InspectionLiveScreen() {
             )}
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>{isManualInspection ? '수동 판정 · 최종 판정' : 'AI 분석 · 정책 · 최종 판정'}</Text>
+              <Text style={styles.cardTitle}>{isManualInspection ? '수동 판정 · 최종 판정' : 'AI 분석 · 최종 판정'}</Text>
+              {hasReviewReasonDetailV4(visibleDetail.displayState,visibleDetail.reviewReasonCode) && (
+                <View testID="inspection-review-reason" style={styles.reviewReasonBox}>
+                  <Text style={styles.muted}>{visibleDetail.displayState==='REVIEW_DONE'?'판정 대기 당시 사유':'판정 대기 사유'}</Text>
+                  <Text style={styles.reviewReasonTitle}>{reviewCopy.title}</Text>
+                  <Text style={styles.muted}>{adminDetail?reviewCopy.adminDescription:reviewCopy.description}</Text>
+                  {adminDetail && <Field label="구체적인 원인" value={reviewCopy.adminCause}/>}
+                </View>
+              )}
               {isManualInspection ? (
                 <Field label="판정 방식" value="AI 분석 없이 작업자 판정" />
               ) : (
                 <>
                   <Field label="AI 예측" value={qualityLabelV4(visibleDetail.prediction)} />
                   <Field
-                    label="보정 불량 확률"
+                    label={adminDetail?'보정 불량 확률':'AI 불량 확률'}
                     value={visibleDetail.calibratedDefectProbability === null
                       ? '미준비 / 미제공'
                       : `${(visibleDetail.calibratedDefectProbability * 100).toFixed(2)}%`}
@@ -809,7 +820,12 @@ export default function InspectionLiveScreen() {
                 <Field label="최초 판정자" value={visibleDetail.confirmedBy??'미제공'} />
                 <Field label="최초 판정 시각" value={formatTime(visibleDetail.confirmedAt)} />
                 <Field label="AI 모델" value={visibleDetail.modelVersion??'미제공'} />
-                <Field label="정책 버전" value={visibleDetail.policyVersion??'미제공'} />
+                {adminDetail&&<>
+                  <Field label="정책 버전" value={visibleDetail.policyVersion??'미제공'} />
+                  <Field label="적용된 자동 통과 기준치" value={visibleDetail.passThresholdApplied==null?'미제공':`${(visibleDetail.passThresholdApplied*100).toFixed(2)}%`}/>
+                  {hasReviewReasonDetailV4(visibleDetail.displayState,visibleDetail.reviewReasonCode)&&
+                    <Field label="서버 사유 코드" value={visibleDetail.reviewReasonCode??'미제공'}/>}
+                </>}
               </View>}
               {visibleDetail.errorCode && <Field label="오류 코드" value={visibleDetail.errorCode} />}
               {visibleDetail.errorMessage && <Text style={styles.errorText}>{visibleDetail.errorMessage}</Text>}
@@ -1083,6 +1099,8 @@ const styles = StyleSheet.create({
   stateBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '100%' },
   stateBadgeText: { fontSize: 13, lineHeight: 19, fontWeight: '700' },
   reviewBadge: { backgroundColor: '#FFF3E5' }, reviewBadgeText: { color: '#92400E' },
+  reviewReasonBox: { backgroundColor: '#FFF8EF', borderRadius: 10, padding: 12, gap: 6, minWidth: 0 },
+  reviewReasonTitle: { color: '#92400E', fontSize: 15, fontWeight: '700', flexShrink: 1 },
   failBadge: { backgroundColor: '#FFF0ED' }, failBadgeText: { color: '#B42318' },
   passBadge: { backgroundColor: '#EAFBF2' }, passBadgeText: { color: '#067647' },
   neutralBadge: { backgroundColor: '#E9EFFC' }, neutralBadgeText: { color: '#334155' },

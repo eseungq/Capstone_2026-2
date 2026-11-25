@@ -2,6 +2,7 @@ import Pressable from './TouchPressable';
 import LiveBottomNavV4 from './LiveBottomNavV4';
 import { useVerifiedRoleV4 } from './useVerifiedRoleV4';
 import { partLabelV4, qualityLabelV4 } from './partLabelV4';
+import { reviewListReasonV4 } from './reviewReasonCopyV4';
 import React, { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
@@ -281,7 +282,7 @@ export default function HistoryLiveScreenV4() {
               style={[styles.recordRow, index !== 0 && styles.recordDivider]}
               onPress={() => toDetail(item)}
               accessibilityRole="button"
-              accessibilityLabel={`${item.inspectionNo ?? '검사번호 미제공'}, ${stateLabels[item.displayState]}, ${partLabelV4(item.partCode)}, 검사 상세 열기`}
+              accessibilityLabel={`${item.inspectionNo ?? '검사번호 미제공'}, ${stateLabels[item.displayState]}, ${partLabelV4(item.partCode)}${item.displayState==='REVIEW_PENDING'?', '+reviewListReasonV4(item.displayState,item.reviewReason):''}, 검사 상세 열기`}
             >
               <View style={styles.recordTop}>
                 <View style={[styles.stateBadge, { backgroundColor: badgeTone[item.displayState].bg }]}>
@@ -296,7 +297,9 @@ export default function HistoryLiveScreenV4() {
               </View>
               <Text style={styles.itemState}>{partLabelV4(item.partCode)}</Text>
               <Text style={styles.caption}>
-                {item.source === 'MANUAL' || item.reviewReason === 'AI_UNAVAILABLE'
+                {item.displayState === 'REVIEW_PENDING'
+                  ? reviewListReasonV4(item.displayState,item.reviewReason)
+                  : item.source === 'MANUAL' || item.reviewReason === 'AI_UNAVAILABLE'
                   ? '수동 판정 · AI 분석 없음'
                   : item.displayState === 'FAILED'
                     ? 'AI 분석 실패'

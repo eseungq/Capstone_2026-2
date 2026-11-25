@@ -113,6 +113,7 @@ export interface InspectionViewV4 {
   calibratedDefectProbability: number | null;
   modelVersion: string | null;
   policyVersion: string | null;
+  passThresholdApplied?: number | null; // 접수 당시 detail.policy.passThreshold, 표시용
   reviewReasonCode: ReviewReasonV4 | null;
   reviewReasonText: string | null;
   errorCode: string | null;
