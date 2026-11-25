@@ -253,3 +253,29 @@ test('policy save feedback stays visible and successful writes only switch to ve
   assert.match(ui, /disabled=\{!canWrite \|\| !validInput\}/);
   assert.match(ui, /disabled=\{!canWrite\|\|!failEditValid\}/);
 });
+
+test('inspection detail keeps identity in the header and preserves the receipt time and manual label', () => {
+  const code=fs.readFileSync(path.join(__dirname, '../src/app/inspection-live.tsx'),'utf8');
+  const source=ts.createSourceFile('inspection-live.tsx',code,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+  assert.equal(source.parseDiagnostics.length,0);
+  const ui=code.slice(code.lastIndexOf('return (\n    <SafeAreaView'));
+  assert.match(ui,/visibleDetail\.partCode \+ ' · ' \+ visibleDetail\.inspectionNo/);
+  assert.match(ui,/visibleDetail\.displayStateLabel/);
+  assert.doesNotMatch(ui,/<Field label="부품 · 검사번호"/);
+  assert.doesNotMatch(ui,/<Field label="상태" value=\{visibleDetail\.displayStateLabel\}/);
+  assert.match(ui,/formatTime\(visibleDetail\.receivedAt\)/);
+  assert.match(ui,/visibleDetail\.source === 'MANUAL' && <Text style=\{styles\.receiptValue\}>수동 판정/);
+});
+
+test('inspection photo layout uses side-by-side panels only for two available URLs and keeps missing reasons', () => {
+  const code=fs.readFileSync(path.join(__dirname,'../src/app/inspection-live.tsx'),'utf8');
+  assert.match(code,/visibleDetail\.originalImageUrl && visibleDetail\.gradcamImageUrl \? styles\.imageRow : styles\.imageStack/);
+  assert.equal((code.match(/compact=\{!!visibleDetail\.originalImageUrl && !!visibleDetail\.gradcamImageUrl\}/g)||[]).length,2);
+  assert.match(code,/!url && styles\.missingImageCard/);
+  assert.match(code,/<Text style=\{styles\.muted\}>\{missingText\}<\/Text>/);
+  assert.match(code,/missingText=\{gradcamMissing\}/);
+  assert.match(code,/resizeMode="contain"/);
+  assert.match(code,/onError=\{\(\) => onLoadError\(url\)\}/);
+  assert.match(code,/params: \{ inspectionId: id, kind: 'gradcam' \}/);
+  assert.match(code,/params: \{ inspectionId: id, kind: 'original' \}/);
+});

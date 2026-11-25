@@ -89,7 +89,7 @@ function ImagePanel({
   onLoadError: (url: string) => void; onOpen: () => void; compact?: boolean;
 }) {
   return (
-    <View style={[styles.card, compact && styles.imageCard]}>
+    <View style={[styles.card, compact && styles.imageCard, !url && styles.missingImageCard]}>
       <Text style={styles.cardTitle}>{title}</Text>
       {url ? (
         <Pressable accessibilityRole="button" accessibilityLabel={title + ' 크게 보기'}
@@ -610,12 +610,10 @@ export default function InspectionLiveScreen() {
 
         {visibleDetail && (
           <>
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>검사 상태</Text>
-              <Field label="부품 · 검사번호" value={visibleDetail.partCode + ' · ' + visibleDetail.inspectionNo} />
-              <Field label="상태" value={visibleDetail.displayStateLabel} />
-              <Field label="접수 시각" value={formatTime(visibleDetail.receivedAt)} />
-              {visibleDetail.source === 'MANUAL' && <Field label="검사 유형" value="수동 판정" />}
+            <View style={styles.receiptSummary}>
+              <Text style={styles.muted}>접수 시각</Text>
+              <Text style={styles.receiptValue}>{formatTime(visibleDetail.receivedAt)}</Text>
+              {visibleDetail.source === 'MANUAL' && <Text style={styles.receiptValue}>수동 판정</Text>}
             </View>
 
             {isManualInspection && (
@@ -679,9 +677,10 @@ export default function InspectionLiveScreen() {
                 })}
               />
             ) : (
-              <View style={styles.imageRow}>
+              <View style={visibleDetail.originalImageUrl && visibleDetail.gradcamImageUrl ? styles.imageRow : styles.imageStack}>
                 <ImagePanel key={`original-${imageRetryRevision}`} title="원본 사진" url={visibleDetail.originalImageUrl}
-                  missingText="원본 이미지가 제공되지 않았습니다." compact
+                  missingText="원본 이미지가 제공되지 않았습니다."
+                  compact={!!visibleDetail.originalImageUrl && !!visibleDetail.gradcamImageUrl}
                   onLoadError={handleImageError}
                   onOpen={() => router.push({
                     pathname: '/inspection-image-live',
@@ -689,7 +688,8 @@ export default function InspectionLiveScreen() {
                   })}
                 />
                 <ImagePanel key={`gradcam-${imageRetryRevision}`} title="AI 판단 근거" url={visibleDetail.gradcamImageUrl}
-                  missingText={gradcamMissing} compact
+                  missingText={gradcamMissing}
+                  compact={!!visibleDetail.originalImageUrl && !!visibleDetail.gradcamImageUrl}
                   onLoadError={handleImageError}
                   onOpen={() => router.push({
                     pathname: '/inspection-image-live',
@@ -1001,6 +1001,10 @@ const styles = StyleSheet.create({
   value: { color: '#111827', fontSize: 14, fontWeight: '500' },
   muted: { color: '#64748B', fontSize: 13, lineHeight: 18 },
   inspectionImage: { height: 265, width: '100%', backgroundColor: '#EEF2F8', borderRadius: 10 },
+  receiptSummary: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: 4, paddingVertical: 2 },
+  receiptValue: { color: '#334155', fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  imageStack: { gap: 8 },
+  missingImageCard: { padding: 12, gap: 4 },
   imageRow: { flexDirection: 'row', gap: 8, alignItems: 'stretch' },
   imageCard: { flex: 1, minWidth: 0, padding: 10 },
   compactImage: { height: 137 },
