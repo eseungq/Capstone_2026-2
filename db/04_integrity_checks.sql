@@ -1,5 +1,5 @@
 -- 테이블 간 무결성 점검 (CHECK로 막을 수 없는 규칙). 정상이면 모든 결과가 0건.
--- V1~V9 스키마 명칭 기준 (11/11 수동 판정 I13·I14, 11/20 표본 재확인 I15~I21, 11/21 I19·I20 보강·I22 추가). 개발 DB에서 수시로 실행해 백엔드 저장 로직을 점검한다.
+-- V1~V12 스키마 명칭 기준 (11/11 수동 판정 I13·I14, 11/20 표본 재확인 I15~I21, 11/21 I19·I20 보강·I22 추가, 11/24 일괄 FAIL·판정 확인 요청 I23~I29). 개발 DB에서 수시로 실행해 백엔드 저장 로직을 점검한다.
 
 -- I1. REVIEW 확정 건인데 작업자 확인 기록이 없음
 SELECT 'I1' AS rule_name, i.id, i.inspection_no FROM inspection i
@@ -148,8 +148,56 @@ JOIN inspection i ON i.id = r.inspection_id
 WHERE (r.acknowledged_by IS NOT NULL OR r.acknowledged_at IS NOT NULL OR r.acknowledge_note IS NOT NULL)
   AND (r.result IS NULL OR r.result <> 'FAIL');
 
+-- ===================== 일괄 FAIL·판정 확인 요청 (V11·V12, 11/24) =====================
+-- V11(worker_confirmation.batch_id)·V12(judgement_request)가 적용된 DB에서만 실행된다 (그 전에는 테이블·컬럼이 없어 오류)
+
+-- I23. 일괄로 저장된 작업자 확인(batch_id 있음)인데 판정이 FAIL이 아님 (일괄은 FAIL만, 계약 6.7.1)
+SELECT 'I23' AS rule_name, i.id, i.inspection_no FROM worker_confirmation w
+JOIN inspection i ON i.id = w.inspection_id
+WHERE w.batch_id IS NOT NULL AND w.final_judgement <> 'FAIL';
+
+-- I24. 판정 확인 요청의 대상 검사가 시스템 판정(judged_by = SYSTEM, 최종 판정 있음)이 아님 (계약 6.12)
+SELECT 'I24' AS rule_name, i.id, i.inspection_no FROM judgement_request q
+JOIN inspection i ON i.id = q.inspection_id
+WHERE COALESCE(i.judged_by, '') <> 'SYSTEM' OR i.final_judgement IS NULL;
+
+-- I25. 요청자가 WORKER가 아님
+SELECT 'I25' AS rule_name, i.id, i.inspection_no FROM judgement_request q
+JOIN inspection i ON i.id = q.inspection_id
+JOIN users u ON u.id = q.requested_by
+WHERE u.role <> 'WORKER';
+
+-- I26. 처리자가 ADMIN이 아님
+SELECT 'I26' AS rule_name, i.id, i.inspection_no FROM judgement_request q
+JOIN inspection i ON i.id = q.inspection_id
+JOIN users u ON u.id = q.resolved_by
+WHERE u.role <> 'ADMIN';
+
+-- I27. 요청에 남긴 최초 판정(original_judgement)이 검사의 최초 판정과 다름 (정정해도 검사의 판정은 바뀌지 않음)
+SELECT 'I27' AS rule_name, i.id, i.inspection_no FROM judgement_request q
+JOIN inspection i ON i.id = q.inspection_id
+WHERE i.final_judgement IS NULL OR q.original_judgement <> i.final_judgement;
+
+-- I28. 요청 당시 현재 판정(current_judgement)이 맞지 않음
+--      = 이 요청 전에 처리된 마지막 CORRECTED 요청의 claimed_judgement, 없으면 최초 판정
+SELECT 'I28' AS rule_name, i.id, i.inspection_no FROM judgement_request q
+JOIN inspection i ON i.id = q.inspection_id
+WHERE q.current_judgement <> COALESCE(
+        (SELECT p.claimed_judgement FROM judgement_request p
+         WHERE p.inspection_id = q.inspection_id AND p.id <> q.id AND p.status = 'CORRECTED'
+           AND p.resolved_at <= q.requested_at
+         ORDER BY p.resolved_at DESC LIMIT 1),
+        q.original_judgement);
+
+-- I29. 요청 시각이 검사 판정(완료) 전
+SELECT 'I29' AS rule_name, i.id, i.inspection_no FROM judgement_request q
+JOIN inspection i ON i.id = q.inspection_id
+WHERE i.completed_at IS NULL OR q.requested_at < i.completed_at;
+
 -- ===================== 참고 (0건이 아니어도 오류는 아님) =====================
 -- X1. 판정 당시 규칙이 있는데 1시간이 지나도 추출 결정 행이 없는 AUTO_PASS (RecheckSweeper 재처리 대상·누락 확인용)
 SELECT 'X1' AS rule_name, i.id, i.inspection_no, i.completed_at FROM inspection i
 LEFT JOIN auto_pass_recheck r ON r.inspection_id = i.id
-WHERE i.recheck_rule_id IS NOT NULL AND r.id IS NULL AND i.completed_at < NOW() - INTERVAL 1 HOUR;
+--     DB 시각은 서울 시각으로 저장하므로(계약 2장) 기준 시각도 서울로 맞춤. NOW()는 MySQL 서버 시간대를 따라 UTC 서버면 9시간 어긋남
+WHERE i.recheck_rule_id IS NOT NULL AND r.id IS NULL
+  AND i.completed_at < UTC_TIMESTAMP(6) + INTERVAL 9 HOUR - INTERVAL 1 HOUR;
