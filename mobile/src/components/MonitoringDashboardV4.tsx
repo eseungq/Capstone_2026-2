@@ -1,3 +1,4 @@
+import { qualityLabelV4 } from './partLabelV4';
 import Pressable from './TouchPressable';
 /**
  * 73단계: 모니터링 요약, DOOR, REVIEW/FAILED 목록, 신규 이벤트가 동일한
@@ -78,10 +79,10 @@ export default function MonitoringDashboardV4() {
         <Text style={s.description}>모델 지원: {vm.door ? (vm.door.modelAvailable ? '확인됨' : '미지원') : '조회 전'} · 정책: {vm.door ? (vm.door.policyActive ? '적용 중' : '미적용') : '조회 전'}</Text>
         <Text style={s.description}>최근 접수: {dateLabel(vm.door?.lastReceivedAt ?? null)}</Text>
         <View style={s.miniRow}>
-          <View style={s.mini}><Text style={s.blueCount}>{vm.hasSuccessfulRead ? `${vm.reviewCount}건` : '—'}</Text><Text style={s.muted}>작업자 REVIEW 대기</Text></View>
+          <View style={s.mini}><Text style={s.blueCount}>{vm.hasSuccessfulRead ? `${vm.reviewCount}건` : '—'}</Text><Text style={s.muted}>판정 대기</Text></View>
           <View style={s.mini}><Text style={s.redCount}>{vm.hasSuccessfulRead ? `${vm.failedCount}건` : '—'}</Text><Text style={s.muted}>AI 분석 FAILED</Text></View>
         </View>
-        <Text style={s.smallNote}>REVIEW는 최종 FAIL이 아니며, FAILED는 제품 불량 판정이 아닙니다.</Text>
+        <Text style={s.smallNote}>판정 대기는 최종 FAIL이 아니며, 분석 실패는 제품 불량 판정이 아닙니다.</Text>
       </View>
 
       <Text style={s.sectionTitle}>최근 접수 · 가상 데이터</Text>
@@ -102,10 +103,10 @@ export default function MonitoringDashboardV4() {
           vm.queue.slice(0, 20).map((item) => (
             <View key={item.inspectionId} style={s.listRow}>
               <View style={s.badgeRow}>
-                <Text style={[s.pill, item.displayState === 'FAILED' ? s.failedPill : s.reviewPill]}>{item.displayState === 'FAILED' ? 'FAILED' : 'REVIEW'}</Text>
+                <Text style={[s.pill, item.displayState === 'FAILED' ? s.failedPill : s.reviewPill]}>{item.displayState === 'FAILED' ? '분석 실패' : '판정 대기'}</Text>
                 <Text style={s.value}>{item.inspectionNo ?? '검사번호 미제공'} · {item.partCode}</Text>
               </View>
-              <Text style={s.description}>{item.displayState === 'FAILED' ? `AI 분석 오류 · ${item.errorCode ?? '상세 미제공'}` : `AI 예측: ${item.predictedQuality ?? '미제공'} · 작업자 확인 대기`}</Text>
+              <Text style={s.description}>{item.displayState === 'FAILED' ? `AI 분석 오류 · ${item.errorCode ?? '상세 미제공'}` : `AI 예측: ${qualityLabelV4(item.predictedQuality)} · 작업자 확인 대기`}</Text>
               <Text style={s.description}>접수: {dateLabel(item.receivedAt)}</Text>
             </View>
           ))}
@@ -117,7 +118,7 @@ export default function MonitoringDashboardV4() {
         {events.length ? events.slice(0, 8).map((event) => <Text key={`${event.inspectionId}:${event.kind}`} style={s.event}>{event.kind} · {event.inspectionNo ?? '검사번호 미제공'}</Text>) :
           <Text style={s.description}>새 알림 없음 · 최초 조회의 기존 대기 항목은 제외</Text>}
         <View style={s.buttonRow}>
-          <Pressable accessibilityRole="button" style={s.button} onPress={addReview}><Text style={s.buttonText}>가상 REVIEW 추가</Text></Pressable>
+          <Pressable accessibilityRole="button" style={s.button} onPress={addReview}><Text style={s.buttonText}>가상 판정 대기 추가</Text></Pressable>
           <Pressable accessibilityRole="button" style={s.button} onPress={addFailed}><Text style={s.buttonText}>가상 FAILED 추가</Text></Pressable>
         </View>
         <Pressable accessibilityRole="button" style={s.outline} onPress={failOnce}><Text style={s.outlineText}>다음 조회에서 가상 오류 1회</Text></Pressable>

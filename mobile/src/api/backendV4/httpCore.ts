@@ -26,6 +26,7 @@ export interface ApiV4Request {
   signal?: AbortSignal;
   mode?: BodyMode;
   fetchImpl?: ApiFetch;
+  timeoutMs?: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -53,6 +54,8 @@ export function parseApiV4Error(
   );
 }
 
+export const API_REQUEST_TIMEOUT_MS_V4 = 20_000;
+
 /** mode='empty': POST /retry 같은 정상 202 빈 본문 처리. */
 export async function requestApiV4<T>(
   baseUrl: string,
@@ -69,36 +72,59 @@ export async function requestApiV4<T>(
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
 
-  const fetcher = options.fetchImpl ?? fetch;
-  let response: Response;
-  try {
-    response = await fetcher(`${baseUrl.replace(/\/+$/, '')}${options.path}`, {
-      method,
-      headers,
-      ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
-      signal: options.signal,
-    });
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') throw err;
-    throw new ApiV4RequestError(0, 'NETWORK_ERROR', '서버에 연결할 수 없습니다. 네트워크를 확인해 주세요.', null);
-  }
-
-  const traceHeader = response.headers?.get('X-Trace-Id') ?? null;
-  let parsed: unknown;
-  try {
-    const raw = await response.text();
-    parsed = raw.length > 0 ? JSON.parse(raw) : undefined;
-  } catch {
-    throw new ApiV4RequestError(response.status, 'INVALID_JSON', '서버 응답을 JSON으로 읽지 못했습니다.', traceHeader);
-  }
-  if (!response.ok) throw parseApiV4Error(response.status, parsed, traceHeader);
-  if ((options.mode ?? 'data') === 'empty') return undefined as T;
-  try {
-    return unwrapApiV4Data<T>(parsed);
-  } catch (err) {
-    if (err instanceof ApiV4RequestError) {
-      throw new ApiV4RequestError(response.status, err.code, err.message, traceHeader);
+  const timeoutMs = options.timeoutMs ?? API_REQUEST_TIMEOUT_MS_V4;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('API timeout must be positive.');
+  const controller = new AbortController();
+  const abortError = () => Object.assign(new Error('요청이 취소됐습니다.'), { name: 'AbortError' });
+  if (options.signal?.aborted) throw abortError();
+  let cancel: (cause: Error) => void = () => {};
+  const cancellation = new Promise<never>((_, reject) => { cancel = reject; });
+  const abort = () => { cancel(abortError()); controller.abort(); };
+  options.signal?.addEventListener('abort', abort);
+  const timer = setTimeout(() => {
+    cancel(new ApiV4RequestError(0, 'REQUEST_TIMEOUT', method === 'GET'
+      ? '서버 응답이 지연됩니다. 연결을 확인하고 다시 조회해 주세요.'
+      : '서버 응답이 지연되어 저장 여부를 확인하지 못했습니다. 다시 제출하기 전에 최신 기록을 확인해 주세요.', null));
+    controller.abort();
+  }, timeoutMs);
+  async function perform(): Promise<T> {
+    const fetcher = options.fetchImpl ?? fetch;
+    let response: Response;
+    try {
+      response = await fetcher(`${baseUrl.replace(/\/+$/, '')}${options.path}`, {
+        method,
+        headers,
+        ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') throw err;
+      throw new ApiV4RequestError(0, 'NETWORK_ERROR', '서버에 연결할 수 없습니다. 네트워크를 확인해 주세요.', null);
     }
-    throw err;
+
+    const traceHeader = response.headers?.get('X-Trace-Id') ?? null;
+    let parsed: unknown;
+    try {
+      const raw = await response.text();
+      parsed = raw.length > 0 ? JSON.parse(raw) : undefined;
+    } catch {
+      throw new ApiV4RequestError(response.status, 'INVALID_JSON', '서버 응답을 JSON으로 읽지 못했습니다.', traceHeader);
+    }
+    if (!response.ok) throw parseApiV4Error(response.status, parsed, traceHeader);
+    if ((options.mode ?? 'data') === 'empty') return undefined as T;
+    try {
+      return unwrapApiV4Data<T>(parsed);
+    } catch (err) {
+      if (err instanceof ApiV4RequestError) {
+        throw new ApiV4RequestError(response.status, err.code, err.message, traceHeader);
+      }
+      throw err;
+    }
+  }
+  try {
+    return await Promise.race([cancellation, perform()]);
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener('abort', abort);
   }
 }

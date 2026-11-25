@@ -1,7 +1,12 @@
 import Pressable from '../components/TouchPressable';
+import LiveBottomNavV4 from '../components/LiveBottomNavV4';
+import { useVerifiedRoleV4 } from '../components/useVerifiedRoleV4';
 
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { authV4 } from '../api/backendV4/authRuntime';
+import { reviewAlertQueueV4 } from '../components/reviewAlertQueueV4';
+import InspectionAlertBannerV4 from '../components/InspectionAlertBannerV4';
 import {
   Image,
   
@@ -30,7 +35,7 @@ const recentInspections = [
   },
   {
     no: 'INS-006',
-    label: 'REVIEW',
+    label: '판정 대기',
     color: '#A74B12',
     image: doorImage,
   },
@@ -45,12 +50,12 @@ const recentInspections = [
 const mockAlerts = [
   {
     no: 'INS-006',
-    state: 'REVIEW',
+    state: '판정 대기',
     description: 'AI 예측: 불량 쪽 · Mock / 작업자 확인 대기',
   },
   {
     no: 'INS-005',
-    state: 'REVIEW',
+    state: '판정 대기',
     description: 'AI 예측: 정상 쪽 · Mock / 정책 미충족 · 확인 대기',
   },
   {
@@ -67,35 +72,28 @@ export default function MonitoringScreen() {
   mode?: string;
 }>();
 
-const isAdmin = role === 'ADMIN';
 const isLive = mode === 'live';
+const {role: verifiedRole} = useVerifiedRoleV4(isLive);
+const isAdmin = isLive ? verifiedRole === 'ADMIN' : role === 'ADMIN';
 
   const [activeTab, setActiveTab] = useState<Tab>('monitoring');
-  const [liveBannerAlerts, setLiveBannerAlerts] = useState<MonitorAlertV4[] | null>(null);
-
-  // 실제 5초 폴링에서 새로 발견된 REVIEW/FAILED만 표시합니다.
-  // 최초 서버 조회의 기존 대기 건은 controller에서 제외합니다.
-  const handleNewLiveAlerts = useCallback((alerts: MonitorAlertV4[]) => {
-    if (alerts.length) setLiveBannerAlerts([...alerts]);
-  }, []);
-
-  const latestLiveAlert = liveBannerAlerts
-    ? [...liveBannerAlerts].sort(
-      (a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt),
-    )[0] ?? null
-    : null;
-  const failedLiveAlert = latestLiveAlert?.kind === 'ANALYSIS_FAILED';
-  const openLiveAlert = () => {
-    if (!latestLiveAlert) return;
-    const inspectionId = latestLiveAlert.inspectionId;
-    setLiveBannerAlerts(null);
-    router.push({
-      pathname: '/inspection-live',
-      params: { inspectionId },
-    });
+  const epoch=authV4.sessionEpoch();
+  const [liveBannerAlerts,setLiveBannerAlerts]=useState<MonitorAlertV4[]>(()=>reviewAlertQueueV4.snapshot(epoch));
+  useEffect(()=>{
+    setLiveBannerAlerts(reviewAlertQueueV4.snapshot(epoch));
+    return reviewAlertQueueV4.subscribe(()=>setLiveBannerAlerts(reviewAlertQueueV4.snapshot(epoch)));
+  },[epoch]);
+  const handleNewLiveAlerts=useCallback((alerts:MonitorAlertV4[])=>{
+    if(verifiedRole==='WORKER'&&authV4.sessionEpoch()===epoch)reviewAlertQueueV4.add(epoch,alerts);
+  },[verifiedRole,epoch]);
+  const latestLiveAlert=liveBannerAlerts[0]??null;
+  const openLiveAlert=()=>{
+    if(!latestLiveAlert||verifiedRole!=='WORKER'||authV4.sessionEpoch()!==epoch)return;
+    if(!reviewAlertQueueV4.snapshot(epoch).some(a=>a.inspectionId===latestLiveAlert.inspectionId&&a.kind===latestLiveAlert.kind))return;
+    const alertFlow=reviewAlertQueueV4.begin(epoch,latestLiveAlert);
+    router.push({pathname:'/inspection-live',params:{inspectionId:latestLiveAlert.inspectionId,...(alertFlow?{alertFlow}:{})}});
   };
 
-  
 const showInspection = (inspectionNo: string) => {
   router.push({
     pathname: '/inspection/[id]',
@@ -114,27 +112,21 @@ const showInspection = (inspectionNo: string) => {
         ? '검사 이력'
         : '설정';
 
-  // 실제 조회와 Mock 시연을 구분해 화면 상단 모드를 일치시킵니다.
-  const modeLabel = isLive ? 'SERVER' : 'Mock';
   const pageSubtitle =
     activeTab === 'monitoring'
-      ? isAdmin
-        ? `전체 라인·검사·오류 조회 · ${modeLabel}`
-        : `최근 이미지 · 확인 필요 알림 · ${modeLabel}`
+      ? isAdmin ? '전체 공정 · 검사 현황' : '최근 검사 · 확인 필요 알림'
       : activeTab === 'history'
-        ? `검사 기록 조회 · ${modeLabel}`
-        : isAdmin
-          ? `시스템 관리자 · ${modeLabel}`
-          : `현장 작업자 · ${modeLabel}`;
+        ? '검사 기록 조회'
+        : isAdmin ? '시스템 관리자' : '현장 작업자';
 
   return (
     <SafeAreaView style={styles.screen}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* 화면 제목 */}
-      <View style={styles.header}>
+      <View style={[styles.header, isLive && styles.liveHeader]}>
         <Text style={styles.title}>{pageTitle}</Text>
-        <Text style={styles.subtitle}>{pageSubtitle}</Text>
+        <Text style={[styles.subtitle, isLive && styles.liveSubtitle]}>{pageSubtitle}{!isLive && ' · 시연'}</Text>
       </View>
 
       <ScrollView
@@ -146,7 +138,7 @@ const showInspection = (inspectionNo: string) => {
           <>
             {/* 73단계: 공정 요약 · 최근 접수 · 대기열 · 새 알림은 하나의 폴링 데이터 출처 공유 */}
             {isLive ? (
-  <MonitoringLiveDashboardV4 onNewAlerts={handleNewLiveAlerts} />
+  <MonitoringLiveDashboardV4 onNewAlerts={verifiedRole==='WORKER'?handleNewLiveAlerts:undefined} />
 ) : (
   <MonitoringDashboardV4 />
 )}
@@ -284,6 +276,7 @@ const showInspection = (inspectionNo: string) => {
       </ScrollView>
 
       {/* Figma 하단 내비게이션 */}
+      {isLive ? (verifiedRole && <LiveBottomNavV4 role={verifiedRole} active="monitoring"/>) : (
       <View style={styles.bottomNav}>
         <Pressable
           style={styles.tab}
@@ -371,72 +364,21 @@ onPress={() =>
           </Text>
         </Pressable>
       </View>
+      )}
 
-      {/* 실행 중 모니터링 화면에서만 보이는 앱 내부 알림. 시스템 푸시가 아닙니다. */}
-      {isLive && activeTab === 'monitoring' && latestLiveAlert && (
-        <View
-          style={[styles.liveBanner, failedLiveAlert && styles.liveBannerFailed]}
-          accessibilityLiveRegion="polite"
-        >
-          <View style={styles.liveBannerHeader}>
-            <Text style={[styles.liveBannerTitle, failedLiveAlert && styles.liveBannerFailedText]}>
-              {failedLiveAlert ? '새 AI 분석 실패' : '새 작업자 확인 필요'}
-              {liveBannerAlerts && liveBannerAlerts.length > 1 ? ` · 외 ${liveBannerAlerts.length - 1}건` : ''}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="새 검사 알림 닫기"
-              onPress={() => setLiveBannerAlerts(null)}
-              style={styles.liveBannerDismiss}
-            >
-              <Text style={styles.liveBannerDismissText}>닫기</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.liveBannerDescription}>
-            {latestLiveAlert.partCode} · {latestLiveAlert.inspectionNo ?? '검사번호 확인 필요'}
-            {' · '}{failedLiveAlert ? 'FAILED' : 'REVIEW_PENDING'}
-          </Text>
-          <Text style={styles.liveBannerNote}>모니터링 중 발견 · 앱 내부 알림 (푸시 아님)</Text>
-          <Pressable accessibilityRole="button" onPress={openLiveAlert} style={styles.liveBannerOpen}>
-            <Text style={styles.liveBannerOpenText}>새 검사 상세 보기 ›</Text>
-          </Pressable>
-        </View>
+      {/* 작업자 전용 앱 내부 알림. */}
+      {isLive && verifiedRole==='WORKER' && activeTab==='monitoring' && latestLiveAlert && (
+        <InspectionAlertBannerV4 kind={latestLiveAlert.kind==='ANALYSIS_FAILED'?'failed':'review'}
+          inspectionNo={latestLiveAlert.inspectionNo} partCode={latestLiveAlert.partCode} count={liveBannerAlerts.length} bottom={83}
+          onClose={()=>reviewAlertQueueV4.dismiss(epoch,latestLiveAlert)} onOpen={openLiveAlert}/>
       )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  liveBanner: {
-    position: 'absolute',
-    bottom: 83,
-    left: 18,
-    right: 18,
-    zIndex: 20,
-    elevation: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderLeftWidth: 5,
-    borderColor: '#CBD5E1',
-    borderLeftColor: '#2054D8',
-    borderRadius: 14,
-    padding: 14,
-    gap: 6,
-    shadowColor: '#000000',
-    shadowOpacity: 0.14,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  liveBannerFailed: { borderLeftColor: '#B42318' },
-  liveBannerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  liveBannerTitle: { flex: 1, color: '#2054D8', fontSize: 15, fontWeight: '700' },
-  liveBannerFailedText: { color: '#B42318' },
-  liveBannerDismiss: { paddingHorizontal: 8, paddingVertical: 4 },
-  liveBannerDismissText: { color: '#64748B', fontSize: 12, fontWeight: '600' },
-  liveBannerDescription: { color: '#111827', fontSize: 13, fontWeight: '600' },
-  liveBannerNote: { color: '#64748B', fontSize: 11 },
-  liveBannerOpen: { backgroundColor: '#2054D8', borderRadius: 9, padding: 10, alignItems: 'center' },
-  liveBannerOpenText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  liveHeader: { paddingBottom: 16 },
+  liveSubtitle: { fontSize: 13, lineHeight: 19 },
   screen: {
     flex: 1,
     backgroundColor: '#F5F7FB',
@@ -444,8 +386,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingTop: 15,
-    paddingBottom: 31,
-  },
+    paddingBottom: 31, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#CBD5E1' },
   title: {
     color: '#111827',
     fontSize: 23,

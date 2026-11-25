@@ -7,11 +7,12 @@ export function makeLoginBody(loginId: string, password: string) {
   return { loginId: loginId.trim(), password };
 }
 
-export type BackendRole = 'WORKER' | 'ADMIN' | 'DEVICE';
+type MobileRole = 'WORKER' | 'ADMIN';
+export type BackendRole = MobileRole | 'DEVICE';
 export interface AuthSessionV4 {
   accessToken: string;
   refreshToken: string;
-  role: BackendRole | null; // 실제 응답 위치 미확정: 추측해서 ADMIN/WORKER로 설정하지 않음
+  role: BackendRole | null;
   loginId: string | null;
 }
 export interface AuthVault {
@@ -37,6 +38,17 @@ type TokenReply = {
 
 export class AuthContractPendingError extends Error {
   constructor(message: string) { super(message); this.name = 'AuthContractPendingError'; }
+}
+
+export class UnsupportedMobileRoleError extends Error {
+  constructor() {
+    super('모바일 앱은 작업자 또는 관리자 계정으로 이용할 수 있습니다.');
+    this.name = 'UnsupportedMobileRoleError';
+  }
+}
+
+function isMobileRole(role: BackendRole | null): role is MobileRole {
+  return role === 'WORKER' || role === 'ADMIN';
 }
 
 function isObject(value: unknown): value is TokenReply {
@@ -68,14 +80,12 @@ export function parseTokenReply(
   }
   
   const user = isObject(data.user) ? data.user : null;
+  const returnedRole = user?.role === undefined ? data.role : user.role;
 
   return {
     accessToken: data.accessToken,
     refreshToken,
-    role: (user ? asRole(user.role) : null)
-      ?? asRole(data.role)
-      ?? previous?.role
-      ?? null,
+    role: returnedRole === undefined ? previous?.role ?? null : asRole(returnedRole),
     loginId:
       user && typeof user.loginId === 'string'
         ? user.loginId
@@ -90,6 +100,7 @@ export interface AuthV4Config {
   baseUrl: string; // 서버 연결 시 외부 설정. 소스 코드에 IP/비밀정보 입력 금지
   vault: AuthVault; // iOS/Android 운영 테스트에서는 makeSecureAuthVault() 사용
   fetchImpl?: ApiFetch;
+  timeoutMs?: number;
   /** 실제 /auth/refresh 요청 본문 확인 후에만 지정. 예: (token) => ({ refreshToken: token }) — 미확정 예시 */
   refreshBody?: (refreshToken: string) => unknown;
   /** 실제 /auth/logout 요청 본문 확인 후에만 지정. 없으면 서버 로그아웃을 시도하지 않음. */
@@ -102,42 +113,142 @@ function publicState(s: AuthSessionV4 | null): AuthPublicState {
 
 export function createAuthV4(config: AuthV4Config) {
   let refreshInFlight: Promise<AuthSessionV4> | null = null;
-  let epoch = 0; // 로그아웃 중 기존 비동기 갱신이 토큰을 되살리지 못하도록 차단
+  let epoch = 0;
+  let changingSession = false;
+  let vaultTail = Promise.resolve();
+  const listeners = new Set<() => void>();
 
-  const api = <T>(path: string, method: 'GET' | 'POST', body: unknown, token: string | null, mode: BodyMode = 'data') =>
-    requestApiV4<T>(config.baseUrl, { path, method, body, token, mode, fetchImpl: config.fetchImpl });
+  // Serialize storage operations so a delayed write cannot undo a later clear.
+  function withVault<T>(operation: () => Promise<T>): Promise<T> {
+    const result = vaultTail.then(operation);
+    vaultTail = result.then(() => {}, () => {});
+    return result;
+  }
 
-  async function login(loginId: string, password: string): Promise<AuthPublicState> {
-    const startedEpoch = ++epoch;
-    const data = await api<unknown>('/auth/login', 'POST', makeLoginBody(loginId, password), null);
-    const parsed = parseTokenReply(data, null, loginId.trim());
-    if (startedEpoch !== epoch) throw new Error('다른 인증 작업이 진행되어 이전 로그인 응답을 폐기했습니다.');
-    await config.vault.write(parsed);
-    return publicState(parsed);
+  function beginChange() {
+    changingSession = true;
+    refreshInFlight = null;
+    return ++epoch;
+  }
+
+  function finishChange(generation: number) {
+    if (generation !== epoch) return;
+    changingSession = false;
+    listeners.forEach(listener => listener());
+  }
+
+  function requireCurrent(generation: number) {
+    if (generation !== epoch || changingSession) {
+      throw new ApiV4RequestError(401, 'SESSION_CHANGED', '로그인 상태가 변경됐습니다. 현재 계정에서 다시 시도해 주세요.', null);
+    }
+  }
+
+  const api = <T>(path: string, method: 'GET' | 'POST', body: unknown, token: string | null, mode: BodyMode = 'data', signal?: AbortSignal) =>
+    requestApiV4<T>(config.baseUrl, { path, method, body, token, mode, signal, fetchImpl: config.fetchImpl, timeoutMs: config.timeoutMs });
+
+  // Revoke exactly this token pair, regardless of which account is now on the device.
+  async function revokeServerSession(session: AuthSessionV4): Promise<boolean> {
+    if (!config.logoutBody) return false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      await api<void>('/auth/logout', 'POST', config.logoutBody(session.refreshToken), session.accessToken, 'empty', controller.signal);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  // Older builds could have persisted a device or unidentified account.
+  function readMobileSession(): Promise<AuthSessionV4 | null> {
+    return withVault(async () => {
+      const session = await config.vault.read();
+      if (!session || isMobileRole(session.role)) return session;
+      await config.vault.clear();
+      return null;
+    });
+  }
+
+  async function login(loginId: string, password: string): Promise<AuthPublicState & { role: MobileRole }> {
+    const generation = beginChange();
+    try {
+      const data = await api<unknown>('/auth/login', 'POST', makeLoginBody(loginId, password), null);
+      const parsed = parseTokenReply(data, null, loginId.trim());
+      const role = parsed.role;
+      if (!isMobileRole(role)) {
+        void revokeServerSession(parsed);
+        if (generation !== epoch) throw new Error('이전 로그인 요청이 취소됐습니다.');
+        throw new UnsupportedMobileRoleError();
+      }
+      await withVault(async () => {
+        if (generation !== epoch) throw new Error('이전 로그인 요청이 취소됐습니다.');
+        let previous: AuthSessionV4 | null = null;
+        try {
+          previous = await config.vault.read();
+        } catch {
+          // The new server-authenticated session may replace an unreadable old
+          // value. If this login is cancelled after writing, the unknown prior
+          // state must be cleared, never guessed or restored.
+        }
+        if (generation !== epoch) throw new Error('이전 로그인 요청이 취소됐습니다.');
+        await config.vault.write(parsed);
+        // A later login can supersede this request while SecureStore is writing.
+        // Restore the prior value before releasing the storage queue to readers
+        // or to the newer login's write, even when that newer login failed.
+        if (generation !== epoch) {
+          if (previous) await config.vault.write(previous);
+          else await config.vault.clear();
+          throw new Error('이전 로그인 요청이 취소됐습니다.');
+        }
+      });
+      if (generation !== epoch) throw new Error('이전 로그인 요청이 취소됐습니다.');
+      return { signedIn: true, role, loginId: parsed.loginId };
+    } finally {
+      finishChange(generation);
+    }
   }
 
   async function restore(): Promise<AuthPublicState> {
-    return publicState(await config.vault.read());
+    const generation = epoch;
+    if (changingSession) return publicState(null);
+    const session = await readMobileSession();
+    return publicState(generation === epoch && !changingSession ? session : null);
   }
 
   async function refreshAccessToken(): Promise<AuthSessionV4> {
+    const generation = epoch;
+    requireCurrent(generation);
     if (refreshInFlight) return refreshInFlight;
-    const startedEpoch = epoch;
     const work = (async () => {
-      const before = await config.vault.read();
+      const before = await readMobileSession();
+      requireCurrent(generation);
       if (!before) throw new ApiV4RequestError(401, 'NOT_LOGGED_IN', '로그인이 필요합니다.', null);
-      if (!config.refreshBody) {
-        throw new AuthContractPendingError('백엔드 /auth/refresh 요청 본문을 확인한 후 refreshBody를 지정해 주세요.');
-      }
+      if (!config.refreshBody) throw new AuthContractPendingError('인증 갱신 설정이 필요합니다.');
       try {
         const data = await api<unknown>('/auth/refresh', 'POST', config.refreshBody(before.refreshToken), null);
         const next = parseTokenReply(data, before);
-        if (startedEpoch !== epoch) throw new Error('로그아웃 이후 도착한 토큰 갱신 결과를 폐기했습니다.');
-        await config.vault.write(next);
+        if (!isMobileRole(next.role)) {
+          void revokeServerSession(next);
+          throw new UnsupportedMobileRoleError();
+        }
+        if (next.loginId !== before.loginId || next.role !== before.role) {
+          throw new ApiV4RequestError(401, 'SESSION_IDENTITY_CHANGED', '로그인 계정 또는 권한이 변경됐습니다. 다시 로그인해 주세요.', null);
+        }
+        await withVault(async () => {
+          requireCurrent(generation);
+          await config.vault.write(next);
+        });
+        requireCurrent(generation);
         return next;
       } catch (err) {
-        if (err instanceof ApiV4RequestError && err.httpStatus === 401 && startedEpoch === epoch) {
-          await config.vault.clear();
+        const expiredOrLocked = err instanceof ApiV4RequestError &&
+          (err.httpStatus === 401 || (err.httpStatus === 423 && err.code === 'AUTH_ACCOUNT_LOCKED'));
+        if ((expiredOrLocked || err instanceof UnsupportedMobileRoleError) && generation === epoch) {
+          const expired = beginChange();
+          try { await withVault(() => config.vault.clear()); }
+          finally { finishChange(expired); }
         }
         throw err;
       }
@@ -151,41 +262,56 @@ export function createAuthV4(config: AuthV4Config) {
     path: string,
     opts: { method?: 'GET' | 'POST'; body?: unknown; mode?: BodyMode } = {},
   ): Promise<T> {
-    const current = await config.vault.read();
+    const generation = epoch;
+    requireCurrent(generation);
+    const current = await readMobileSession();
+    requireCurrent(generation);
     if (!current) throw new ApiV4RequestError(401, 'NOT_LOGGED_IN', '로그인이 필요합니다.', null);
-    const method = opts.method ?? 'GET';
-    const mode = opts.mode ?? 'data';
+    const send = (token: string) => api<T>(path, opts.method ?? 'GET', opts.body, token, opts.mode ?? 'data');
+    let response: T;
     try {
-      return await api<T>(path, method, opts.body, current.accessToken, mode);
+      response = await send(current.accessToken);
     } catch (err) {
+      requireCurrent(generation);
       if (!(err instanceof ApiV4RequestError) || err.httpStatus !== 401) throw err;
-      // 동일한 세션의 동시 요청에 401이 발생하면 이미 갱신된 토큰을 재사용
-      const stored = await config.vault.read();
-      if (!stored) throw err;
+      const stored = await readMobileSession();
+      requireCurrent(generation);
+      if (!stored || stored.loginId !== current.loginId || stored.role !== current.role) throw err;
       const after = stored.accessToken !== current.accessToken ? stored : await refreshAccessToken();
-      // 1회만 재시도하며 401 재귀 갱신은 금지
-      return api<T>(path, method, opts.body, after.accessToken, mode);
+      requireCurrent(generation);
+      if (after.loginId !== current.loginId || after.role !== current.role) {
+        throw new ApiV4RequestError(401, 'SESSION_IDENTITY_CHANGED', '로그인 계정 또는 권한이 변경됐습니다. 다시 로그인해 주세요.', null);
+      }
+      response = await send(after.accessToken);
     }
+    requireCurrent(generation);
+    return response;
   }
 
   async function logout(): Promise<{ remoteRevoked: boolean }> {
-    ++epoch;
-    const active = await config.vault.read();
-    let remoteRevoked = false;
+    const generation = beginChange();
+    let active: AuthSessionV4 | null;
     try {
-      if (active && config.logoutBody) {
-        await api<void>('/auth/logout', 'POST', config.logoutBody(active.refreshToken), active.accessToken, 'empty');
-        remoteRevoked = true;
-      }
-    } catch {
-      // 네트워크 실패여도 기기 토큰은 즉시 삭제. 서버 토큰 폐기를 성공했다고 표시하지 않음.
+      active = await withVault(async () => {
+        // Forget the device session before waiting for the network.
+        let session: AuthSessionV4 | null = null;
+        try { session = await config.vault.read(); }
+        catch { /* A missing or unreadable token still permits local sign-out. */ }
+        await config.vault.clear();
+        return session;
+      });
     } finally {
-      await config.vault.clear();
+      finishChange(generation);
     }
-    return { remoteRevoked };
+    return { remoteRevoked: active ? await revokeServerSession(active) : false };
   }
 
-  return { login, restore, refreshAccessToken, authorizedRequest, logout };
+  function subscribeSessionChange(listener: () => void) {
+    listeners.add(listener);
+    return () => { listeners.delete(listener); };
+  }
+
+  return { login, restore, refreshAccessToken, authorizedRequest, logout, sessionEpoch: () => epoch, subscribeSessionChange };
 }
 
 /** 테스트에서만 사용: 실제 JWT 보관에는 사용하지 마세요. */

@@ -1,7 +1,9 @@
+import {decodeJudgementCorrectionV4,decodeJudgementRequestListV4} from './judgementRequestCoreV4';
 import type {
   ApiV4DataEnvelope, DisplayStateV4, GradcamStatusV4,
   InspectionDetailV4, InspectionViewV4, ProcessingStatusV4, ReviewReasonV4,
 } from './types';
+import { decodeRecheckBlockV4 } from './recheckCoreV4';
 
 export class ContractV4Error extends Error {
   constructor(message: string) {
@@ -19,7 +21,7 @@ const nullableText = (v: unknown): v is string | null | undefined => v == null |
 const probability = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
 
 const processingStatuses = ['RECEIVED', 'ANALYZING', 'COMPLETED', 'FAILED'] as const;
-const displayStates = ['ANALYZING', 'AUTO_PASS', 'REVIEW_PENDING', 'REVIEW_DONE', 'FAILED'] as const;
+const displayStates = ['ANALYZING', 'AUTO_PASS', 'AUTO_FAIL', 'REVIEW_PENDING', 'REVIEW_DONE', 'FAILED'] as const;
 const reviewReasons = ['DEFECT_PREDICTED', 'NO_ACTIVE_POLICY', 'CALIBRATION_UNAVAILABLE', 'ABOVE_THRESHOLD', 'AI_UNAVAILABLE'] as const;
 const inspectionSources = ['DEVICE', 'ADMIN', 'RETRY', 'MANUAL'] as const;
 const inspectionUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -37,6 +39,7 @@ export const reviewReasonLabels: Record<ReviewReasonV4, string> = {
 export const stateLabels: Record<DisplayStateV4, string> = {
   ANALYZING: '분석 중',
   AUTO_PASS: '자동 통과',
+  AUTO_FAIL: '자동 불량',
   REVIEW_PENDING: '작업자 확인 대기',
   REVIEW_DONE: '작업자 판정 완료',
   FAILED: 'AI 분석 실패',
@@ -110,7 +113,7 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
   if (p != null && (!obj(p) || typeof p.automationPolicyReady !== 'boolean' ||
       !nullableText(p.policyVersion) ||
       (p.passThreshold != null && !probability(p.passThreshold)) ||
-      !oneOf(p.recommendedAction, ['AUTO_PASS', 'REVIEW', null] as const) ||
+      !oneOf(p.recommendedAction, ['AUTO_PASS', 'AUTO_FAIL', 'REVIEW', null] as const) ||
       !oneOf(p.reviewReason, [...reviewReasons, null] as const))) {
     throw new ContractV4Error('policy 블록 값이 유효하지 않습니다.');
   }
@@ -121,6 +124,18 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
     !oneOf(j.judgedBy, ['WORKER', 'SYSTEM', null] as const) ||
     !nullableText(j.confirmedBy) || !nullableText(j.confirmedAt))) {
     throw new ContractV4Error('judgement 블록 값이 유효하지 않습니다.');
+  }
+
+  // 재확인 FAIL이어도 원래 시스템 PASS는 유지되어야 합니다.
+  let recheck: InspectionDetailV4['recheck'] = null;
+  try {
+    recheck = decodeRecheckBlockV4(d.recheck);
+  } catch (cause) {
+    throw new ContractV4Error(cause instanceof Error ? cause.message : 'recheck 블록 형식 오류');
+  }
+  if (recheck && (d.displayState !== 'AUTO_PASS' ||
+      !obj(j) || j.finalJudgement !== 'PASS' || j.judgedBy !== 'SYSTEM')) {
+    throw new ContractV4Error('재확인은 AUTO_PASS · PASS · SYSTEM 검사에만 표시할 수 있습니다.');
   }
 
   const i = d.images;
@@ -163,6 +178,9 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
   if (displayState === 'AUTO_PASS' && (status !== 'COMPLETED' || action !== 'AUTO_PASS' || final !== 'PASS' || by !== 'SYSTEM')) {
     throw new ContractV4Error('AUTO_PASS의 시스템 PASS 판정 조합이 잘못됐습니다.');
   }
+  if (displayState === 'AUTO_FAIL' && (status !== 'COMPLETED' || action !== 'AUTO_FAIL' || final !== 'FAIL' || by !== 'SYSTEM' || !obj(a) || a.predictedQuality !== 'DEFECT' || a.calibratedDefectProbability == null || !obj(p) || p.reviewReason != null)) {
+    throw new ContractV4Error('AUTO_FAIL의 시스템 FAIL 판정 조합이 잘못됐습니다.');
+  }
   if (displayState === 'REVIEW_PENDING' && (status !== 'COMPLETED' || action !== 'REVIEW' || final != null)) {
     throw new ContractV4Error('REVIEW_PENDING 판정 조합이 잘못됐습니다.');
   }
@@ -179,7 +197,7 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
        !['REVIEW_PENDING', 'REVIEW_DONE'].includes(displayState))) {
     throw new ContractV4Error('MANUAL 검사의 상태·AI 미사용·정책 사유가 계약과 다릅니다.');
   }
-  if (status === 'COMPLETED' && !['AUTO_PASS', 'REVIEW_PENDING', 'REVIEW_DONE'].includes(displayState)) {
+  if (status === 'COMPLETED' && !['AUTO_PASS', 'AUTO_FAIL', 'REVIEW_PENDING', 'REVIEW_DONE'].includes(displayState)) {
     throw new ContractV4Error('COMPLETED 상태에 유효한 displayState가 없습니다.');
   }
 
@@ -199,8 +217,11 @@ export function decodeInspectionDetailV4(payload: unknown): InspectionDetailV4 {
     ai: a == null ? null : a as unknown as InspectionDetailV4['ai'],
     policy: p == null ? null : p as unknown as InspectionDetailV4['policy'],
     judgement: j == null ? null : j as unknown as InspectionDetailV4['judgement'],
+    recheck,
     images,
     error: e == null ? null : e as unknown as InspectionDetailV4['error'],
+    judgementRequests: decodeJudgementRequestListV4(d.judgementRequests),
+    correction: decodeJudgementCorrectionV4(d.correction),
   };
   return detail;
 }
@@ -218,12 +239,14 @@ export function mapInspectionDetailV4(detail: InspectionDetailV4): InspectionVie
     calibratedDefectProbability: detail.ai?.calibratedDefectProbability ?? null,
     modelVersion: detail.ai?.modelVersion ?? null,
     policyVersion: detail.policy?.policyVersion ?? null,
+    passThresholdApplied: detail.policy?.passThreshold ?? null,
     reviewReasonCode: detail.policy?.reviewReason ?? null,
     reviewReasonText: detail.policy?.reviewReason ? reviewReasonLabels[detail.policy.reviewReason] : null,
     errorCode: detail.error?.code ?? null,
     errorMessage: detail.error?.message ?? null,
     finalJudgement: detail.judgement?.finalJudgement ?? null,
     judgedBy: detail.judgement?.judgedBy ?? null,
+    recheck: detail.recheck ?? null,
     confirmedBy: detail.judgement?.confirmedBy ?? null,
     confirmedAt: detail.judgement?.confirmedAt ?? null,
     originalImageUrl: detail.images?.original?.url ?? null,
@@ -237,6 +260,9 @@ export function mapInspectionDetailV4(detail: InspectionDetailV4): InspectionVie
     canOfferConfirm: detail.displayState === 'REVIEW_PENDING',
     canOfferRetry: detail.displayState === 'FAILED' && detail.error?.retryable === true && !detail.followUp,
     canOfferManual: detail.displayState === 'FAILED' && detail.error?.retryable === true && !detail.followUp,
+    judgementRequests: detail.judgementRequests ?? [],
+    correction: detail.correction ?? null,
+    correctedJudgement: detail.correction?.correctedJudgement ?? null,
     isServerAutoPass: detail.displayState === 'AUTO_PASS',
   };
 }

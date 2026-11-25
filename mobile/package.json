@@ -43,7 +43,18 @@
     "test:door-demo": "node --test ./scripts/test-door-demo-v4.cjs",
     "test:admin-policy": "node --test ./scripts/test-admin-policy-v4.cjs",
     "test:monitor-alerts": "node --test ./scripts/test-monitor-alerts-v4.cjs",
-    "test:monitor-thumbnails": "node --test ./scripts/test-monitor-thumbnails-v4.cjs"
+    "test:monitor-thumbnails": "node --test ./scripts/test-monitor-thumbnails-v4.cjs",
+    "test:recheck-trial": "node --test ./scripts/test-recheck-trial-v4.cjs",
+    "test:integration": "node --test ./scripts/test-door-demo-v4.cjs ./scripts/test-admin-policy-v4.cjs ./scripts/test-monitor-alerts-v4.cjs ./scripts/test-monitor-thumbnails-v4.cjs ./scripts/test-recheck-trial-v4.cjs ./scripts/test-recheck-summary-v4.cjs",
+    "test:recheck-summary": "node --test ./scripts/test-recheck-summary-v4.cjs",
+    "test:auto-fail-alerts": "node --test ./scripts/test-auto-fail-alerts-v4.cjs",
+    "test:queue-priority": "node --test ./scripts/test-queue-priority-v4.cjs",
+    "test:batch-fail": "node --test ./scripts/test-batch-fail-v4.cjs",
+    "test:judgement-requests": "node --test ./scripts/test-judgement-requests-v4.cjs",
+    "test:auto-fail-policy": "node --test ./scripts/test-auto-fail-policy-v4.cjs",
+    "test:admin-daily-history": "node --test ./scripts/test-admin-daily-history-v4.cjs",
+    "test:integration-all": "node --test \"./scripts/test-*.cjs\"",
+    "test:logout": "node --test ./scripts/test-logout-v4.cjs"
   },
   "private": true
 }
