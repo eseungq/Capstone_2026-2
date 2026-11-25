@@ -121,3 +121,28 @@ test('management navigation is ADMIN-only and uses verified roles and a dedicate
   assert.match(settings,/performLiveLogout\(origin\)/);
   assert.match(read('components/useVerifiedRoleV4.ts'),/epoch !== authV4\.sessionEpoch\(\)/);
 });
+
+test('worker recheck entry uses a verified session and a server count, never a fabricated zero',()=>{
+  const {code}=parse('components/MonitoringLiveDashboardV4.tsx');
+  assert.match(code,/session\.role!=='WORKER'\)return/);
+  assert.match(code,/recheckReader\.list\(\{status:'PENDING',page:0,size:1\}\)/);
+  assert.match(code,/if\(stillCurrent\(\)\)setRecheckCount\(result\.totalElements\)/);
+  assert.match(code,/recheckCount===null\?\(recheckError\?'조회 실패/);
+  assert.match(code,/isAuthenticatedWorker && <Pressable testID="monitor-recheck-entry"/);
+  assert.match(code,/router\.push\('\/rechecks-live'\)/);
+  assert.match(code,/vm\.part\?\.pendingReviewCount !== 0/);
+  assert.match(code,/queueItems\.some\(item => item\.displayState === 'REVIEW_PENDING'\)/);
+});
+test('monitor counts route to exact history filters, which remain accessible in a compact disclosure',()=>{
+  const {code:m}=parse('components/MonitoringLiveDashboardV4.tsx');
+  const {code:h}=parse('components/HistoryLiveScreenV4.tsx');
+  assert.match(m,/params:\{mode:'live',role:verifiedRole,partCode,displayState\}/);
+  assert.match(m,/openFilteredHistory\('REVIEW_PENDING'\)/);
+  assert.match(m,/openFilteredHistory\('FAILED'\)/);
+  assert.match(h,/parts\.find\(option=>option\.value===params\.partCode\)/);
+  assert.match(h,/states\.find\(option=>option\.value===params\.displayState\)/);
+  assert.match(h,/useState\(false\);\s*const \[period/);
+  assert.match(h,/accessibilityState=\{\{expanded:filtersExpanded\}\}/);
+  assert.match(h,/\{filtersExpanded&&<>/);
+  assert.match(h,/<RefreshControl/);
+});

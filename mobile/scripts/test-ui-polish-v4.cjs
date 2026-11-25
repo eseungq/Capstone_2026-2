@@ -206,7 +206,8 @@ test('worker monitoring puts the pending queue before recent inspections without
   const queue = code.slice(code.indexOf('const queueCard ='), code.indexOf('return (\n    <View style={styles.container}>'));
   assert.ok(queue.indexOf('queueItems.slice(0, visibleQueueCount).map') >= 0);
   assert.ok(queue.indexOf('queueItems.slice(0, visibleQueueCount).map') < queue.indexOf("pathname: '/batch-fail-live'"));
-  assert.match(queue, /\{isAuthenticatedWorker && \(/);
+  assert.match(queue, /\{canOpenBatch && \(/);
+  assert.match(code, /const canOpenBatch = isAuthenticatedWorker/);
   assert.match(queue, /params: \{partCode, sort: queueSort, aiDefectOnly: String\(aiDefectOnly\)\}/);
 });
 
@@ -314,7 +315,7 @@ test('history part filter offers only current part codes plus all without a keyb
   assert.equal(source.parseDiagnostics.length,0);
   const options=code.slice(code.indexOf('const parts:'),code.indexOf('const stateLabels:'));
   assert.deepEqual([...options.matchAll(/value: '([^']*)', label: /g)].map(match=>match[1]),['','DOOR','FRAME','COWL_COVER']);
-  assert.match(code,/useState<PartFilter>\(''\)/);
+  assert.match(code,/useState<PartFilter>\(\(\)=>parts\.find\(option=>option\.value===params\.partCode\)\?\.value\?\?''\)/);
   const ui=code.slice(code.indexOf('>부품 선택</Text>'),code.indexOf('<View style={styles.resultsCard}>'));
   assert.match(ui,/parts\.map\(\(option\) =>/);
   assert.match(ui,/styles\.chip, partCode === option\.value && styles\.chipActive/);

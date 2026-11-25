@@ -1,6 +1,7 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { partLabelV4 } from './partLabelV4';
-import React, { useEffect, useMemo, useState } from 'react';
+import { createRecheckServiceV4 } from '../api/backendV4/recheckServiceV4';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { API_BASE_URL, authV4 } from '../api/backendV4/authRuntime';
@@ -16,6 +17,7 @@ import { buildMonitoringViewModelV4 } from '../api/backendV4/monitoringViewModel
 import { monitoringThumbnailNeedsReloadV4, resolveMonitoringThumbnailUrlV4 } from '../api/backendV4/monitoringThumbnailUrlV4';
 
 const INITIAL_VISIBLE_QUEUE_COUNT = 3;
+const recheckReader = createRecheckServiceV4(authV4);
 const reviewQueueReaderV4 = createInspectionReadServiceV4({ mode: 'api', transport: authV4 });
 function probabilityLabelV4(value: number | null | undefined): string {
   return value == null ? '미제공' : `${(value * 100).toFixed(2)}%`;
@@ -176,14 +178,31 @@ export default function MonitoringLiveDashboardV4({
   }, [controller, onNewAlerts]);
 
   const [partCode, setPartCode] = useState<MonitoredPart>('DOOR');
-  const [isAuthenticatedWorker, setIsAuthenticatedWorker] = useState(false);
-  useEffect(() => {
-    let mounted = true;
-    void authV4.restore().then(session => {
-      if (mounted) setIsAuthenticatedWorker(session.signedIn && session.role === 'WORKER');
-    }).catch(() => { if (mounted) setIsAuthenticatedWorker(false); });
-    return () => { mounted = false; };
-  }, []);
+  const [verifiedRole, setVerifiedRole] = useState<'WORKER'|'ADMIN'|null>(null);
+  const isAuthenticatedWorker = verifiedRole === 'WORKER';
+  const [recheckCount,setRecheckCount] = useState<number|null>(null);
+  const [recheckError,setRecheckError] = useState(false);
+  useFocusEffect(useCallback(() => {
+    let current = true;
+    const epoch = authV4.sessionEpoch();
+    const stillCurrent = () => current && authV4.sessionEpoch()===epoch;
+    setVerifiedRole(null);
+    setRecheckCount(null);
+    setRecheckError(false);
+    void (async()=>{
+      try{
+        const session=await authV4.restore();
+        if(!stillCurrent() || !session.signedIn || (session.role!=='WORKER'&&session.role!=='ADMIN'))return;
+        setVerifiedRole(session.role);
+        if(session.role!=='WORKER')return;
+        const result=await recheckReader.list({status:'PENDING',page:0,size:1});
+        if(stillCurrent())setRecheckCount(result.totalElements);
+      }catch{
+        if(stillCurrent())setRecheckError(true);
+      }
+    })();
+    return ()=>{current=false;};
+  }, []));
   const [visibleQueueCount, setVisibleQueueCount] = useState(INITIAL_VISIBLE_QUEUE_COUNT);
   const [queueSort, setQueueSort] = useState<ReviewQueueSortV4>('RECEIVED');
   const [aiDefectOnly, setAiDefectOnly] = useState(false);
@@ -207,6 +226,14 @@ export default function MonitoringLiveDashboardV4({
   const queueLoading = filteredMode && (!matchingBrowse || browse.status === 'loading');
   const queueError = filteredMode && matchingBrowse ? browse.error : null;
   const recent = vm.part?.recent[0] ?? null;
+  const canOpenBatch = isAuthenticatedWorker && queueReady && !queueLoading && !queueError &&
+    !vm.isStale && vm.part?.pendingReviewCount !== 0 &&
+    queueItems.some(item => item.displayState === 'REVIEW_PENDING');
+  const openFilteredHistory=(displayState:'REVIEW_PENDING'|'FAILED')=>{
+    if(!verifiedRole)return;
+    router.push({pathname:'/history',params:{mode:'live',role:verifiedRole,partCode,displayState}});
+  };
+  const lastRefresh=vm.lastSuccessAtMs===null?'미조회':new Date(vm.lastSuccessAtMs).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Seoul'});
 
   const connectionLabel = !vm.hasSuccessfulRead
     ? snapshot.status === 'error' ? '연결 실패' : '조회 중'
@@ -367,10 +394,11 @@ export default function MonitoringLiveDashboardV4({
             <Text style={styles.collapseText}>처음 3건만 보기</Text>
           </Pressable>
         )}
-        <Text style={styles.description}>
-          기본 목록은 5초마다 갱신됩니다. 정렬·필터 목록은 선택 시 서버에서 조회하며 새로고침할 수 있습니다.
-        </Text>
-        {isAuthenticatedWorker && (
+        <Text style={styles.description}>{filteredMode?'선택한 필터 · 새로고침 시 갱신':`마지막 갱신 ${lastRefresh} (서울)`}</Text>
+        {queueReady && !queueLoading && !queueError && queueItems.length>0 && <Text style={styles.description}>
+          현재 목록 {Math.min(visibleQueueCount,queueItems.length)}/{queueItems.length}건{filteredMode&&browse.nextCursor!==null?' · 다음 페이지 있음':''}
+        </Text>}
+        {canOpenBatch && (
           <Pressable accessibilityRole="button" style={styles.batchFailEntry}
             onPress={() => router.push({
               pathname: '/batch-fail-live',
@@ -428,21 +456,34 @@ export default function MonitoringLiveDashboardV4({
           </Text>
         ) : (
           <>
-            <Text style={styles.description}>부품: {vm.part.partName}</Text>
             <View style={styles.metricRow}>
-              <View style={styles.metric}>
+              <Pressable testID="monitor-review-history" accessibilityRole="button"
+                accessibilityLabel={`확인 대기 ${vm.part.pendingReviewCount}건, 이력 보기`}
+                disabled={!verifiedRole} onPress={()=>openFilteredHistory('REVIEW_PENDING')} style={styles.metric}>
                 <Text style={styles.metricLabel}>작업자 확인 필요</Text>
-                <Text style={styles.metricValue}>{vm.part.pendingReviewCount}건</Text>
-              </View>
-              <View style={styles.metric}>
+                <Text style={styles.metricValue}>{vm.part.pendingReviewCount}건 ›</Text>
+              </Pressable>
+              <Pressable testID="monitor-failed-history" accessibilityRole="button"
+                accessibilityLabel={`분석 실패 ${vm.part.failedCount}건, 이력 보기`}
+                disabled={!verifiedRole} onPress={()=>openFilteredHistory('FAILED')} style={styles.metric}>
                 <Text style={styles.metricLabel}>AI 분석 실패</Text>
-                <Text style={styles.metricValue}>{vm.part.failedCount}건</Text>
-              </View>
+                <Text style={styles.metricValue}>{vm.part.failedCount}건 ›</Text>
+              </Pressable>
             </View>
+            {vm.isStale&&<Text style={styles.warning}>마지막 조회 기준 건수입니다.</Text>}
           </>
         )}
       </View>
 
+      {isAuthenticatedWorker && <Pressable testID="monitor-recheck-entry" style={styles.card}
+        accessibilityRole="button" accessibilityLabel="자동 통과 표본 재확인 목록"
+        onPress={()=>router.push('/rechecks-live')}>
+        <View style={styles.headingRow}>
+          <Text style={styles.title}>표본 재확인</Text>
+          <Text style={styles.detailLink}>{recheckCount===null?(recheckError?'조회 실패 ›':'조회 중… ›'):`${recheckCount}건 ›`}</Text>
+        </View>
+        <Text style={styles.description}>전체 부품 재확인 대기 · 목록에서 최신 상태 확인</Text>
+      </Pressable>}
       {isAuthenticatedWorker ? [queueCard, recentCard] : [recentCard, queueCard]}
     </View>
   );

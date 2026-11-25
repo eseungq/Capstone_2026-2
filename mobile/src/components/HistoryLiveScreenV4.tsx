@@ -6,6 +6,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -79,9 +80,10 @@ function errorText(error: unknown): string {
 
 export default function HistoryLiveScreenV4() {
   const {role} = useVerifiedRoleV4();
-
-  const [partCode, setPartCode] = useState<PartFilter>('');
-  const [stateFilter, setStateFilter] = useState<StateFilter>('ALL');
+  const params=useLocalSearchParams<{partCode?:string;displayState?:string}>();
+  const [partCode, setPartCode] = useState<PartFilter>(()=>parts.find(option=>option.value===params.partCode)?.value??'');
+  const [stateFilter, setStateFilter] = useState<StateFilter>(()=>states.find(option=>option.value===params.displayState)?.value??'ALL');
+  const [filtersExpanded,setFiltersExpanded]=useState(false);
   const [period, setPeriod] = useState<PeriodFilter>(0);
   const [page, setPage] = useState(0);
   const [data, setData] = useState<HistoryPageV4 | null>(null);
@@ -166,8 +168,19 @@ export default function HistoryLiveScreenV4() {
         <Text style={styles.subtitle}>상태 · 기간 · 부품별 검사 기록 조회</Text>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.body}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{if(!loading&&!refreshing)void load(false);}}/>}>
         <View style={styles.card}>
+          <Pressable testID="history-filter-toggle" style={styles.filterSummary} accessibilityRole="button"
+            accessibilityState={{expanded:filtersExpanded}} accessibilityLabel="검사 이력 검색 조건"
+            onPress={()=>setFiltersExpanded(value=>!value)}>
+            <View style={styles.resultInfo}>
+              <Text style={styles.cardTitle}>검색 조건</Text>
+              <Text style={styles.caption}>{states.find(option=>option.value===stateFilter)?.label} · {periods.find(option=>option.value===period)?.label} · {parts.find(option=>option.value===partCode)?.label}</Text>
+            </View>
+            <Text style={styles.refreshText}>{filtersExpanded?'접기 −':'변경 +'}</Text>
+          </Pressable>
+          {filtersExpanded&&<>
           <Text style={styles.filterTitle}>검사 상태</Text>
           <View style={styles.chipRow}>
             {states.map((option) => (
@@ -219,6 +232,7 @@ export default function HistoryLiveScreenV4() {
               </Pressable>
             ))}
           </View>
+          </>}
         </View>
 
         <View style={styles.resultsCard}>
@@ -347,6 +361,7 @@ const styles = StyleSheet.create({
   recordArrow: { marginLeft: 'auto', color: '#475569', fontSize: 20, fontWeight: '600' },
   recordOutcome: { color: '#067647', fontSize: 13, fontWeight: '600' },
   cardTitle: { fontSize: 16, color: '#111827', fontWeight: '700' },
+  filterSummary: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 },
   filterTitle: { fontSize: 13, fontWeight: '700', color: '#111827', marginTop: 4 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 11, minHeight: 44, borderRadius: 24, borderWidth: 1, borderColor: '#64748B', backgroundColor: '#EEF2F8' },
