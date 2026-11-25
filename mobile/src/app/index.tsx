@@ -62,23 +62,6 @@ export default function LoginScreen() {
     }
   };
 
-  // 서버 로그인 없이 화면 권한 표시만 확인하기 위한 독립 Mock WORKER 진입.
-  // 실제 인증 세션이나 백엔드의 권한을 변경하지 않습니다.
-  const handleWorkerPreview = () => {
-    router.replace({
-      pathname: '/monitoring',
-      params: { role: 'WORKER', mode: 'mock' },
-    });
-  };
-
-  // 관리자 화면 시연용 이동
-  const handleAdminPreview = () => {
-    router.replace({
-      pathname: '/monitoring',
-      params: { role: 'ADMIN', mode: 'mock' },
-    });
-  };
-
   return (
     <SafeAreaView style={styles.screen}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -187,34 +170,6 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* 시연 상태 */}
-          <View style={styles.notice}>
-            <Text style={styles.noticeText}>
-              시연은 예시 데이터를 사용합니다. 실제 검사 업무는 계정으로 로그인해 주세요.
-            </Text>
-          </View>
-
-          {/* Mock WORKER와 ADMIN 역할별 진입: 실서버 인증이 아닙니다. */}
-          <Pressable
-            accessibilityRole="button"
-            style={styles.previewButton}
-            disabled={signingIn}
-            onPress={handleWorkerPreview}
-          >
-            <Text style={styles.previewText}>
-              현장 작업자 시연으로 이동 · Mock
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.previewButton}
-            disabled={signingIn}
-            onPress={handleAdminPreview}
-          >
-            <Text style={styles.previewText}>
-              시스템 관리자 시연으로 이동 · Mock
-            </Text>
-          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -330,27 +285,4 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
-  notice: {
-    backgroundColor: '#EBF1FF',
-    borderRadius: 10,
-    padding: 10,
-  },
-
-  noticeText: {
-    fontSize: 10,
-    color: '#2054D8',
-  },
-
-  previewButton: {
-    height: 40,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  previewText: {
-    color: '#2054D8',
-    fontSize: 12,
-  },
 });
