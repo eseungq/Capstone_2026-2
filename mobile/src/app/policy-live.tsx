@@ -1,5 +1,6 @@
 import Pressable from '../components/TouchPressable';
 import React, { useCallback, useRef, useState } from 'react';
+import { useRevealFocusedInputV4 } from '../components/useRevealFocusedInputV4';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import {
   ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View,
@@ -89,6 +90,12 @@ export default function PolicyLiveScreen() {
   const [section, setSection] = useState<PolicySection>('pass');
   const [showPolicyDetails, setShowPolicyDetails] = useState(false);
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const passRef=useRef<React.ComponentRef<typeof TextInput>>(null);
+  const failRef=useRef<React.ComponentRef<typeof TextInput>>(null);
+  const failMinRef=useRef<React.ComponentRef<typeof TextInput>>(null);
+  const failMaxRef=useRef<React.ComponentRef<typeof TextInput>>(null);
+  const getFocusedField=useCallback(()=>[passRef.current,failRef.current,failMinRef.current,failMaxRef.current].find(field=>field?.isFocused()),[]);
+  const revealInput=useRevealFocusedInputV4(scrollRef,getFocusedField);
   const selectSection = (next: PolicySection) => {
     Keyboard.dismiss();
     setSection(next);
@@ -372,7 +379,7 @@ export default function PolicyLiveScreen() {
         <Text style={s.subtitle}>관리자 · COWL_COVER</Text>
       </View>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView ref={scrollRef} style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <ScrollView ref={scrollRef} onLayout={revealInput} style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <View style={s.notice}>
           <Text style={s.noticeText}>
             저장은 새 비활성 버전 생성입니다. 버전 관리에서 별도로 적용해야 새 검사에 반영됩니다.
@@ -458,7 +465,7 @@ export default function PolicyLiveScreen() {
                 현재 정책의 허용 범위 안에서 백분율(%)을 입력하세요.
               </Text>
               <Text style={s.formLabel}>새 기준치 입력 (%)</Text>
-              <TextInput style={s.input} value={percentInput}
+              <TextInput ref={passRef} onFocus={revealInput} testID="policy-pass-input" style={s.input} value={percentInput}
                 onChangeText={(v) => { editedInput.current = true; setPercentInput(v); }}
                 placeholder="예: 1.00" keyboardType="decimal-pad" maxLength={9}
                 editable={canWrite && activeHasBounds} selectTextOnFocus
@@ -466,15 +473,13 @@ export default function PolicyLiveScreen() {
               <Text style={validInput?s.hint:invalidPassInput?s.errorText:s.muted}>{validationText}</Text>
               <Button title={writing === 'save' ? '새 버전 저장 중…' : '새 정책 버전 저장'}
                 onPress={confirmSave} disabled={!canWrite || !validInput} />
-              <Text style={s.muted}>저장 직후 새 정책은 비활성이며, 이전 활성 정책은 그대로 유지됩니다.</Text>
             </Card>
             )}
 
             {section === 'fail' && (
             <Card title="자동 불량 정책 · 별도 검증·적용">
               <Text style={s.muted}>
-                자동 불량 기본값은 꺼짐입니다. 기준 등록/켜기/끄기는 각각 새 비활성 정책 버전을 만듭니다.
-                활성화는 버전 관리에서 별도로 선택해야 하며, 시험 승인 전에는 적용하지 마세요.
+                자동 불량은 기본적으로 꺼져 있으며, 팀에서 승인한 시험 범위에서만 적용하세요.
               </Text>
               {!active ? <Text style={s.errorText}>활성 정책을 확인한 뒤 사용할 수 있습니다.</Text> : <>
                 <Row label="현재 자동 불량" value={active.autoFailEnabled===null?'정보 없음':active.autoFailEnabled?'켜짐':'꺼짐'} />
@@ -486,18 +491,18 @@ export default function PolicyLiveScreen() {
                 )}
                 {active.autoFailEnabled!==null && <>
                   <Text style={s.formLabel}>불량 기준 입력 (%)</Text>
-                  <TextInput style={s.input} value={failPercent} placeholder="불량 기준 (%)"
+                  <TextInput ref={failRef} onFocus={revealInput} testID="policy-fail-input" style={s.input} value={failPercent} placeholder="불량 기준 (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
                     accessibilityLabel="자동 불량 기준 백분율" />
                   <Text style={s.muted}>최솟값과 최댓값이 같으면 시험용 고정 기준입니다.</Text>
                   <Text style={s.formLabel}>불량 기준 최솟값 (%)</Text>
-                  <TextInput style={s.input} value={failMinPercent} placeholder="최솟값 (%)"
+                  <TextInput ref={failMinRef} onFocus={revealInput} testID="policy-fail-min-input" style={s.input} value={failMinPercent} placeholder="최솟값 (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailMinPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
                     accessibilityLabel="불량 기준 최솟값" />
                   <Text style={s.formLabel}>불량 기준 최댓값 (%)</Text>
-                  <TextInput style={s.input} value={failMaxPercent} placeholder="최댓값 (%)"
+                  <TextInput ref={failMaxRef} onFocus={revealInput} testID="policy-fail-max-input" style={s.input} value={failMaxPercent} placeholder="최댓값 (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailMaxPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
                     accessibilityLabel="불량 기준 최댓값" />
@@ -630,5 +635,5 @@ const s = StyleSheet.create({
   errorText: { color: C.red, fontSize: 13, lineHeight: 19 },
   successCard: { borderRadius: 12, padding: 12, backgroundColor: C.greenPale },
   successText: { color: C.green, fontSize: 13, lineHeight: 20 },
-  footer: { color: C.muted, fontSize: 12, lineHeight: 18, paddingHorizontal: 3 },
+  footer: { color: C.muted, fontSize: 13, lineHeight: 19, paddingHorizontal: 3 },
 });

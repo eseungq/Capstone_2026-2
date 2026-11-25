@@ -258,7 +258,7 @@ test('inspection detail keeps identity in the header and preserves the receipt t
   const source=ts.createSourceFile('inspection-live.tsx',code,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
   assert.equal(source.parseDiagnostics.length,0);
   const ui=code.slice(code.lastIndexOf('return (\n    <SafeAreaView'));
-  assert.match(ui,/visibleDetail\.partCode \+ ' · ' \+ visibleDetail\.inspectionNo/);
+  assert.match(ui,/partLabelV4\(visibleDetail\.partCode\) \+ ' · ' \+ visibleDetail\.inspectionNo/);
   assert.match(ui,/visibleDetail\.displayStateLabel/);
   assert.doesNotMatch(ui,/<Field label="부품 · 검사번호"/);
   assert.doesNotMatch(ui,/<Field label="상태" value=\{visibleDetail\.displayStateLabel\}/);

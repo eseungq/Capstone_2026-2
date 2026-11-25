@@ -29,6 +29,8 @@ import { inspectionDwellForSessionV4 } from '../api/backendV4/inspectionDwellV4'
 import { createRecheckServiceV4 } from '../api/backendV4/recheckServiceV4';
 
 import { actorLabelV4 } from '../api/backendV4/actorLabelV4';
+import { partLabelV4 } from '../components/partLabelV4';
+import { useRevealFocusedInputV4 } from '../components/useRevealFocusedInputV4';
 
 type DetailVisit = {
   id: string;
@@ -127,6 +129,13 @@ export default function InspectionLiveScreen() {
   const [role, setRole] = useState<BackendRole | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
   const [comment, setComment] = useState('');
+  const [showTrace,setShowTrace]=useState(false);
+  const scrollRef=useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const reviewMemoRef=useRef<React.ComponentRef<typeof TextInput>>(null);
+  const recheckMemoRef=useRef<React.ComponentRef<typeof TextInput>>(null);
+  const acknowledgeMemoRef=useRef<React.ComponentRef<typeof TextInput>>(null);
+  const getFocusedField=useCallback(()=>[reviewMemoRef.current,recheckMemoRef.current,acknowledgeMemoRef.current].find(field=>field?.isFocused()),[]);
+  const revealInput=useRevealFocusedInputV4(scrollRef,getFocusedField);
   const [submitting, setSubmitting] = useState<'confirm' | 'retry' | 'manual' | 'recheck' | 'acknowledge' | null>(null);
   const [recheckComment, setRecheckComment] = useState('');
   const [acknowledgeNote, setAcknowledgeNote] = useState('');
@@ -196,6 +205,7 @@ export default function InspectionLiveScreen() {
     const visit: DetailVisit = { id, epoch: authV4.sessionEpoch(), loginId: null, dwell: null };
     if (previousVisit.current?.id !== id || previousVisit.current.epoch !== visit.epoch) {
       setComment('');
+      setShowTrace(false);
       setRecheckComment('');
       setAcknowledgeNote('');
       setActionError(null);
@@ -587,11 +597,11 @@ export default function InspectionLiveScreen() {
             </Text>
           </View>}
         </View>
-        <Text style={styles.muted}>{visibleDetail ? visibleDetail.partCode + ' · ' + visibleDetail.inspectionNo : '검사 결과 조회'}</Text>
+        <Text style={styles.muted}>{visibleDetail ? partLabelV4(visibleDetail.partCode) + ' · ' + visibleDetail.inspectionNo : '검사 결과 조회'}</Text>
       </View>
 
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={{flex:1}} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <ScrollView ref={scrollRef} onLayout={revealInput} style={{flex:1}} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {refreshing && !loading && (
           <Text style={styles.muted}>서버에서 최신 상세 정보를 확인하는 중…</Text>
         )}
@@ -739,8 +749,19 @@ export default function InspectionLiveScreen() {
                   <Text style={styles.muted}>정정 근거: {visibleDetail.correction.note}</Text>
                 </>
               )}
-              <Field label="최초 판정 주체" value={actorLabelV4(visibleDetail.judgedBy)} />
-              <Field label="최초 판정 시각" value={formatTime(visibleDetail.confirmedAt)} />
+              <Pressable testID="inspection-trace-toggle" accessibilityRole="button" accessibilityState={{expanded:showTrace}}
+                style={styles.traceToggle} onPress={()=>setShowTrace(value=>!value)}>
+                <Text style={styles.secondaryButtonText}>{showTrace?'상세 정보 접기':'상세 정보 보기'}</Text>
+                <Text style={styles.secondaryButtonText}>{showTrace?'−':'+'}</Text>
+              </Pressable>
+              {showTrace&&<View style={styles.traceDetails}>
+                <Field label="부품 코드" value={visibleDetail.partCode}/>
+                <Field label="최초 판정 주체" value={actorLabelV4(visibleDetail.judgedBy)} />
+                <Field label="최초 판정자" value={visibleDetail.confirmedBy??'미제공'} />
+                <Field label="최초 판정 시각" value={formatTime(visibleDetail.confirmedAt)} />
+                <Field label="AI 모델" value={visibleDetail.modelVersion??'미제공'} />
+                <Field label="정책 버전" value={visibleDetail.policyVersion??'미제공'} />
+              </View>}
               {visibleDetail.errorCode && <Field label="오류 코드" value={visibleDetail.errorCode} />}
               {visibleDetail.errorMessage && <Text style={styles.errorText}>{visibleDetail.errorMessage}</Text>}
             </View>
@@ -789,7 +810,7 @@ export default function InspectionLiveScreen() {
                     <TextInput style={styles.commentInput} maxLength={200} multiline
                       placeholder="재확인 결과에 대한 설명을 남겨주세요."
                       placeholderTextColor="#475569"
-                      testID="inspection-recheck-memo" accessibilityLabel="재확인 메모"
+                      ref={recheckMemoRef} onFocus={revealInput} testID="inspection-recheck-memo" accessibilityLabel="재확인 메모"
                       value={recheckComment} onChangeText={setRecheckComment} editable={!submitting} />
                     <View style={styles.buttonRow}>
                       <Pressable accessibilityRole="button"
@@ -819,7 +840,7 @@ export default function InspectionLiveScreen() {
                     <TextInput style={styles.commentInput} maxLength={200} multiline
                       placeholder="예: 라인 담당자에게 전달"
                       placeholderTextColor="#475569"
-                      testID="inspection-acknowledge-memo" accessibilityLabel="관리자 확인 메모"
+                      ref={acknowledgeMemoRef} onFocus={revealInput} testID="inspection-acknowledge-memo" accessibilityLabel="관리자 확인 메모"
                       value={acknowledgeNote} onChangeText={setAcknowledgeNote} editable={!submitting} />
                     <Pressable accessibilityRole="button" disabled={submitting !== null}
                       style={({ pressed }) => [styles.button, pressed && styles.buttonPressed,
@@ -883,7 +904,7 @@ export default function InspectionLiveScreen() {
                     style={styles.commentInput}
                     placeholder="판정 근거를 입력하세요."
                     placeholderTextColor="#475569"
-                    testID="inspection-review-memo"
+                    ref={reviewMemoRef} onFocus={revealInput} testID="inspection-review-memo"
                     accessibilityLabel="판정 메모"
                     value={comment}
                     onChangeText={setComment}
@@ -1006,7 +1027,7 @@ export default function InspectionLiveScreen() {
             </Pressable>
           </View>
           {submitting === 'confirm' && <Text style={styles.muted}>서버에 판정 저장 중…</Text>}
-          {actionError && <Text style={styles.errorText}>판정 요청 오류: {actionError}</Text>}
+          {actionError && <Text style={styles.errorText}>판정 요청 실패 · 본문 오류를 확인하세요.</Text>}
         </View>
       )}
       </KeyboardAvoidingView>
@@ -1022,6 +1043,8 @@ const styles = StyleSheet.create({
   backTouchPressed: { backgroundColor: '#E9EFFC' },
   title: { color: '#111827', fontSize: 23, fontWeight: '700' },
   titleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  traceToggle: { minHeight: 44, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  traceDetails: { gap: 9, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#CBD5E1', paddingTop: 10 },
   stateBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '100%' },
   stateBadgeText: { fontSize: 13, lineHeight: 19, fontWeight: '700' },
   reviewBadge: { backgroundColor: '#FFF3E5' }, reviewBadgeText: { color: '#92400E' },

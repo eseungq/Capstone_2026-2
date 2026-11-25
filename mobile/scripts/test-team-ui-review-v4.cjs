@@ -158,3 +158,32 @@ test('daily date selection is inclusive on screen but sends the next exclusive d
   assert.match(calendar,/plusDaysV4\(month,index-offset\)/);
   assert.match(calendar,/onPress=\{\(\)=>onSelect\(day\)\}/);
 });
+
+test('policy and inspection input focus is measured inside the existing keyboard-adjusted scroll area',()=>{
+  for(const [file,ids] of [
+    ['app/inspection-live.tsx',['inspection-review-memo','inspection-recheck-memo','inspection-acknowledge-memo']],
+    ['app/policy-live.tsx',['policy-pass-input','policy-fail-input','policy-fail-min-input','policy-fail-max-input']],
+  ]){
+    const {code,source}=parse(file);
+    assert.match(code,/useRevealFocusedInputV4\(scrollRef,getFocusedField\)/);
+    assert.match(code,/onLayout=\{revealInput\}/);
+    for(const id of ids){
+      const input=elementsByTestID(source,id);
+      assert.equal(input.length,1);
+      assert.ok(input[0].ancestors.includes('KeyboardAvoidingView'));
+      assert.ok(input[0].ancestors.includes('ScrollView'));
+      assert.match(input[0].opening.getText(source),/onFocus=\{revealInput\}/);
+    }
+  }
+  const hook=read('components/useRevealFocusedInputV4.ts');
+  assert.match(hook,/Keyboard\.addListener\('keyboardDidShow',reveal\)/);
+  assert.match(hook,/field\.measureLayout\(content,/);
+  assert.match(hook,/subscription\?\.remove\(\)/);
+});
+test('inspection trace information is disclosed on demand, not deleted',()=>{
+  const {code}=parse('app/inspection-live.tsx');
+  assert.match(code,/accessibilityState=\{\{expanded:showTrace\}\}/);
+  const trace=code.slice(code.indexOf('{showTrace&&'),code.indexOf('{visibleDetail.errorCode &&',code.indexOf('{showTrace&&'))<0?undefined:code.indexOf('{visibleDetail.errorCode &&',code.indexOf('{showTrace&&')));
+  for(const field of ['partCode','judgedBy','confirmedBy','confirmedAt','modelVersion','policyVersion'])assert.ok(trace.includes('visibleDetail.'+field),field);
+  assert.match(code,/setShowTrace\(false\)/);
+});
