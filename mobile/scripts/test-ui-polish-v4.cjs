@@ -197,3 +197,17 @@ for (const rule of rules) test('UI size rules: ' + rule.path, () => {
   for (const name of rule.buttons) assert.ok(size(name, 'minHeight') >= 44, name);
   for (const [name, font] of Object.entries(rule.fonts)) assert.ok(size(name, 'fontSize') >= font, name);
 });
+
+test('worker monitoring puts the pending queue before recent inspections without changing admin order', () => {
+  const code = fs.readFileSync(path.join(__dirname, '../src/components/MonitoringLiveDashboardV4.tsx'), 'utf8');
+  const source = ts.createSourceFile('MonitoringLiveDashboardV4.tsx', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  assert.equal(source.parseDiagnostics.length, 0);
+  assert.match(code, /isAuthenticatedWorker \? \[queueCard, recentCard\] : \[recentCard, queueCard\]/);
+  assert.match(code, /key="recent"/);
+  assert.match(code, /key="queue"/);
+  const queue = code.slice(code.indexOf('const queueCard ='), code.indexOf('return (\n    <View style={styles.container}>'));
+  assert.ok(queue.indexOf('queueItems.slice(0, visibleQueueCount).map') >= 0);
+  assert.ok(queue.indexOf('queueItems.slice(0, visibleQueueCount).map') < queue.indexOf("pathname: '/batch-fail-live'"));
+  assert.match(queue, /\{isAuthenticatedWorker && \(/);
+  assert.match(queue, /params: \{partCode, sort: queueSort, aiDefectOnly: String\(aiDefectOnly\)\}/);
+});

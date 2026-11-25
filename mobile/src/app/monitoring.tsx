@@ -122,9 +122,9 @@ const showInspection = (inspectionNo: string) => {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* 화면 제목 */}
-      <View style={styles.header}>
+      <View style={[styles.header, isLive && styles.liveHeader]}>
         <Text style={styles.title}>{pageTitle}</Text>
-        <Text style={styles.subtitle}>{pageSubtitle}{!isLive && ' · 시연'}</Text>
+        <Text style={[styles.subtitle, isLive && styles.liveSubtitle]}>{pageSubtitle}{!isLive && ' · 시연'}</Text>
       </View>
 
       <ScrollView
@@ -397,6 +397,8 @@ onPress={() =>
 }
 
 const styles = StyleSheet.create({
+  liveHeader: { paddingBottom: 16 },
+  liveSubtitle: { fontSize: 13, lineHeight: 19 },
   liveBanner: {
     position: 'absolute',
     bottom: 83,
