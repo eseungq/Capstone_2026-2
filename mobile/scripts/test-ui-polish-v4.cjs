@@ -123,7 +123,6 @@ const rules = [
     "path": "components/HistoryLiveScreenV4.tsx",
     "buttons": [
       "chip",
-      "applyButton",
       "refreshButton",
       "retryButton",
       "pageButton"
@@ -132,7 +131,6 @@ const rules = [
       "subtitle": 13,
       "filterTitle": 13,
       "chipText": 12,
-      "applyButtonText": 13,
       "caption": 13,
       "refreshText": 13,
       "itemTitle": 14,
@@ -308,4 +306,36 @@ test('daily threshold detail is placed under the selected policy row and retains
   assert.match(code,/reads\.loadDetail\(part,row\.date,row\.policyId,band\)/);
   assert.match(rows,/band=\{detail\.passBand\}/);
   assert.match(rows,/band=\{detail\.failBand\}/);
+});
+
+test('history part filter offers only current part codes plus all without a keyboard or apply button', () => {
+  const code=fs.readFileSync(path.join(__dirname,'../src/components/HistoryLiveScreenV4.tsx'),'utf8');
+  const source=ts.createSourceFile('HistoryLiveScreenV4.tsx',code,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+  assert.equal(source.parseDiagnostics.length,0);
+  const options=code.slice(code.indexOf('const parts:'),code.indexOf('const stateLabels:'));
+  assert.deepEqual([...options.matchAll(/value: '([^']*)', label: /g)].map(match=>match[1]),['','DOOR','FRAME','COWL_COVER']);
+  assert.match(code,/useState<PartFilter>\(''\)/);
+  const ui=code.slice(code.indexOf('>부품 선택</Text>'),code.indexOf('<View style={styles.resultsCard}>'));
+  assert.match(ui,/parts\.map\(\(option\) =>/);
+  assert.match(ui,/styles\.chip, partCode === option\.value && styles\.chipActive/);
+  assert.match(ui,/onPress=\{\(\) => selectPart\(option\.value\)\}/);
+  assert.match(ui,/accessibilityState=\{\{ selected: partCode === option\.value \}\}/);
+  assert.doesNotMatch(code,/TextInput|KeyboardAvoidingView|partDraft|applyPart/);
+});
+test('history filter changes preserve other query options and reject stale reads while resetting the page',()=>{
+  const code=fs.readFileSync(path.join(__dirname,'../src/components/HistoryLiveScreenV4.tsx'),'utf8');
+  const reset=code.slice(code.indexOf('const resetForFilter ='),code.indexOf('const setStatus ='));
+  for(const statement of ['requestSerial.current += 1;','setPage(0);','setData(null);','setError(null);','setLoading(true);','setRefreshing(false);'])assert.ok(reset.includes(statement),statement);
+  const select=code.slice(code.indexOf('const selectPart ='),code.indexOf('const toMonitor ='));
+  assert.match(select,/if \(next === partCode\) return;/);
+  assert.match(select,/resetForFilter\(\);\s*setPartCode\(next\);/);
+  assert.doesNotMatch(select,/setStateFilter|setPeriod|load\(/);
+  const status=code.slice(code.indexOf('const setStatus ='),code.indexOf('const selectPart ='));
+  assert.equal((status.match(/resetForFilter\(\);/g)||[]).length,2);
+  assert.match(code,/\.\.\.\(partCode \? \{ partCode \} : \{\}\)/);
+  assert.match(code,/\.\.\.\(stateFilter !== 'ALL' \? \{ displayState: stateFilter \} : \{\}\)/);
+  assert.match(code,/\.\.\.\(from \? \{ from \} : \{\}\)/);
+  assert.match(code,/\}, \[page, partCode, stateFilter, period\]\)/);
+  assert.match(code,/if \(requestSerial\.current !== serial\) return;/);
+  assert.match(code,/void load\(true\);/);
 });

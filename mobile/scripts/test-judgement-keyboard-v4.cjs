@@ -40,7 +40,7 @@ for (const [screen, submitText] of [
 
 test('other live input screens keep their text fields in a keyboard-adjusted scroll area', () => {
   for (const screen of ['app/inspection-live.tsx','app/batch-fail-live.tsx','app/policy-live.tsx',
-    'app/admin-daily-live.tsx','components/HistoryLiveScreenV4.tsx']) {
+    'app/admin-daily-live.tsx']) {
     const filename=path.join(__dirname,'../src',screen);
     const source=ts.createSourceFile(filename,readFileSync(filename,'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
     let inputs=0;

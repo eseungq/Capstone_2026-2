@@ -3,13 +3,9 @@ import React, { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +21,7 @@ const PAGE_SIZE = 20;
 
 type StateFilter = DisplayStateV4 | 'ALL';
 type PeriodFilter = 0 | 7 | 30;
+type PartFilter = '' | 'DOOR' | 'FRAME' | 'COWL_COVER';
 
 const states: { value: StateFilter; label: string }[] = [
   { value: 'ALL', label: '전체' },
@@ -39,6 +36,12 @@ const periods: { value: PeriodFilter; label: string }[] = [
   { value: 0, label: '전체 기간' },
   { value: 7, label: '최근 7일' },
   { value: 30, label: '최근 30일' },
+];
+const parts: { value: PartFilter; label: string }[] = [
+  { value: '', label: '전체 부품' },
+  { value: 'DOOR', label: 'DOOR' },
+  { value: 'FRAME', label: 'FRAME' },
+  { value: 'COWL_COVER', label: 'COWL_COVER' },
 ];
 const stateLabels: Record<DisplayStateV4, string> = {
   ANALYZING: '분석 중',
@@ -75,8 +78,7 @@ export default function HistoryLiveScreenV4() {
   const { role: roleParam } = useLocalSearchParams<{ role?: string }>();
   const role = roleParam === 'ADMIN' ? 'ADMIN' : 'WORKER';
 
-  const [partDraft, setPartDraft] = useState('');
-  const [partCode, setPartCode] = useState('');
+  const [partCode, setPartCode] = useState<PartFilter>('');
   const [stateFilter, setStateFilter] = useState<StateFilter>('ALL');
   const [period, setPeriod] = useState<PeriodFilter>(0);
   const [page, setPage] = useState(0);
@@ -125,27 +127,30 @@ export default function HistoryLiveScreenV4() {
     return () => { requestSerial.current += 1; };
   }, [load]));
 
-  const setStatus = (next: StateFilter) => {
-    if (next === stateFilter) return;
-    setStateFilter(next);
+  // Invalidate an in-flight read immediately when the user changes filters.
+  // The existing focus effect loads the new query; no client-side filtering.
+  const resetForFilter = () => {
+    requestSerial.current += 1;
     setPage(0);
     setData(null);
+    setError(null);
+    setLoading(true);
+    setRefreshing(false);
+  };
+  const setStatus = (next: StateFilter) => {
+    if (next === stateFilter) return;
+    resetForFilter();
+    setStateFilter(next);
   };
   const setRange = (next: PeriodFilter) => {
     if (next === period) return;
+    resetForFilter();
     setPeriod(next);
-    setPage(0);
-    setData(null);
   };
-  const applyPart = () => {
-    const next = partDraft.trim().toUpperCase();
-    if (next === partCode) {
-      void load(false);
-      return;
-    }
+  const selectPart = (next: PartFilter) => {
+    if (next === partCode) return;
+    resetForFilter();
     setPartCode(next);
-    setPage(0);
-    setData(null);
   };
   const toMonitor = () => router.replace({
     pathname: '/monitoring',
@@ -163,8 +168,7 @@ export default function HistoryLiveScreenV4() {
         <Text style={styles.subtitle}>상태 · 기간 · 부품별 검사 기록 조회</Text>
       </View>
 
-      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.body}>
         <View style={styles.card}>
           <Text style={styles.filterTitle}>검사 상태</Text>
           <View style={styles.chipRow}>
@@ -174,6 +178,7 @@ export default function HistoryLiveScreenV4() {
                 style={[styles.chip, stateFilter === option.value && styles.chipActive]}
                 onPress={() => setStatus(option.value)}
                 accessibilityRole="button"
+                accessibilityState={{ selected: stateFilter === option.value }}
               >
                 <Text style={[styles.chipText, stateFilter === option.value && styles.chipTextActive]}>
                   {option.label}
@@ -190,6 +195,7 @@ export default function HistoryLiveScreenV4() {
                 style={[styles.chip, period === option.value && styles.chipActive]}
                 onPress={() => setRange(option.value)}
                 accessibilityRole="button"
+                accessibilityState={{ selected: period === option.value }}
               >
                 <Text style={[styles.chipText, period === option.value && styles.chipTextActive]}>
                   {option.label}
@@ -198,22 +204,21 @@ export default function HistoryLiveScreenV4() {
             ))}
           </View>
 
-          <Text style={styles.filterTitle}>부품 코드</Text>
-          <View style={styles.partRow}>
-            <TextInput
-              style={styles.partInput}
-              value={partDraft}
-              onChangeText={setPartDraft}
-              placeholder="전체 부품 (예: DOOR)"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              returnKeyType="search"
-              onSubmitEditing={applyPart}
-            />
-            <Pressable style={styles.applyButton} onPress={applyPart} accessibilityRole="button">
-              <Text style={styles.applyButtonText}>적용</Text>
-            </Pressable>
+          <Text style={styles.filterTitle}>부품 선택</Text>
+          <View style={styles.chipRow}>
+            {parts.map((option) => (
+              <Pressable
+                key={option.value || 'ALL_PARTS'}
+                style={[styles.chip, partCode === option.value && styles.chipActive]}
+                onPress={() => selectPart(option.value)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: partCode === option.value }}
+              >
+                <Text style={[styles.chipText, partCode === option.value && styles.chipTextActive]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
           </View>
         </View>
 
@@ -319,7 +324,6 @@ export default function HistoryLiveScreenV4() {
           <Text style={styles.caption}>서버가 다음 페이지 여부를 제공하지 않아 임의로 다음 페이지를 추정하지 않습니다.</Text>
         )}
       </ScrollView>
-      </KeyboardAvoidingView>
 
       <View style={styles.bottomNav}>
         <Pressable style={styles.navItem} onPress={toMonitor} accessibilityRole="button">
@@ -366,10 +370,6 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: '#2054D8', borderColor: '#2054D8' },
   chipText: { fontSize: 12, color: '#334155', fontWeight: '600' },
   chipTextActive: { color: '#FFFFFF' },
-  partRow: { flexDirection: 'row', gap: 8 },
-  partInput: { minWidth: 0, flex: 1, minHeight: 44, borderWidth: 1, borderColor: '#D5DCE8', borderRadius: 9, paddingHorizontal: 12, color: '#111827' },
-  applyButton: { minHeight: 44, backgroundColor: '#2054D8', paddingHorizontal: 18, justifyContent: 'center', borderRadius: 9 },
-  applyButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   caption: { fontSize: 13, lineHeight: 18, color: '#64748B' },
   resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   resultInfo: { flex: 1, gap: 3 },
