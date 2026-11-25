@@ -279,8 +279,9 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
                     </Text>
                   </Pressable>
                 ))}
-                <Pressable accessibilityRole="checkbox"
-                  accessibilityState={{checked:filters.aiDefectOnly}} disabled={submitting}
+                <Pressable accessibilityRole="checkbox" testID="batch-ai-defect-filter"
+                  aria-checked={filters.aiDefectOnly}
+                  accessibilityState={{checked:filters.aiDefectOnly,disabled:submitting}} disabled={submitting}
                   style={[s.outline, filters.aiDefectOnly && s.activeChoice]}
                   onPress={()=>changeFilters({...filters, aiDefectOnly:!filters.aiDefectOnly})}>
                   <Text style={[s.outlineText, filters.aiDefectOnly && s.activeChoiceText]}>AI 불량 의심만</Text>
@@ -329,8 +330,8 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
                 </View>
               ))}
               <Text style={s.strong}>공통 판정 사유 (선택, 최대 200자)</Text>
-              <TextInput ref={commentRef} onFocus={revealComment} value={comment} editable={!submitting} onChangeText={value=>{confirmation.invalidate();setComment(value);}} style={s.input}
-                placeholder="예: 고정핀 들뜸" placeholderTextColor="#94A3B8"
+              <TextInput ref={commentRef} onFocus={revealComment} testID="batch-common-memo" accessibilityLabel="공통 판정 사유" value={comment} editable={!submitting} onChangeText={value=>{confirmation.invalidate();setComment(value);}} style={s.input}
+                placeholder="예: 고정핀 들뜸" placeholderTextColor="#475569"
                 maxLength={200} multiline />
               <Text style={s.muted}>제출 후에는 정상 처리·기존 FAIL·충돌·서버 오류가 검사별로 구분됩니다.</Text>
               <Pressable accessibilityRole="button" disabled={selected.length===0 || submitting}
@@ -463,15 +464,15 @@ const s = StyleSheet.create({
   card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:14,gap:11},
   cardTitle:{color:'#111827',fontSize:16,fontWeight:'700'},
   strong:{color:'#111827',fontSize: 14,fontWeight:'700',flexShrink:1},
-  muted:{color:'#64748B',fontSize: 13,lineHeight: 18},
+  muted:{color:'#475569',fontSize: 13,lineHeight: 18},
   error:{color:'#B42318',fontSize: 13,lineHeight:18},
   line:{ minHeight: 44,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,paddingVertical:8,
     borderTopColor:'#E4E7EC',borderTopWidth:1},
   rowText:{flex:1,gap:5},
-  outline:{ justifyContent: 'center', minHeight: 44,borderColor:'#CBD5E1',borderWidth:1,borderRadius:8,paddingHorizontal:10,paddingVertical:9,
+  outline:{ justifyContent: 'center', minHeight: 44,borderColor:'#64748B',borderWidth:1,borderRadius:8,paddingHorizontal:10,paddingVertical:9,
     alignSelf:'flex-start',backgroundColor:'#FFFFFF'},
   choices:{flexDirection:'row',flexWrap:'wrap',gap:6},
-  activeChoice:{backgroundColor:'#2054D8',borderColor:'#2054D8'},
+  activeChoice:{backgroundColor:'#1E293B',borderColor:'#1E293B'},
   activeChoiceText:{color:'#FFFFFF'},
   outlineText:{color:'#2054D8',fontSize: 13,fontWeight:'700'},
   photo:{width:'100%',height:250,backgroundColor:'#EEF2F8',borderRadius:8},
@@ -480,7 +481,7 @@ const s = StyleSheet.create({
   danger:{ justifyContent: 'center', minHeight: 44,backgroundColor:'#B42318',borderRadius:10,padding:13,alignItems:'center'},
   disabled:{opacity:0.45},
   remove:{color:'#B42318',fontSize: 13,fontWeight:'700'},
-  input:{backgroundColor:'#F8FAFC',borderColor:'#CBD5E1',borderWidth:1,borderRadius:9,
+  input:{backgroundColor:'#F8FAFC',borderColor:'#64748B',borderWidth:1,borderRadius:9,
     padding:11,color:'#111827',minHeight:62,textAlignVertical:'top',fontSize: 14},
   result:{borderTopWidth:1,borderTopColor:'#E4E7EC',paddingVertical:10,gap:5},
 });

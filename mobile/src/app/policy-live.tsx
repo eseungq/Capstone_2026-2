@@ -34,7 +34,7 @@ const POLICY_SECTIONS: {value: PolicySection; label: string}[] = [
 ];
 
 const C = {
-  bg: '#F5F7FB', white: '#FFFFFF', ink: '#111827', muted: '#64748B',
+  bg: '#F5F7FB', white: '#FFFFFF', ink: '#111827', muted: '#475569',
   blue: '#2054D8', pale: '#EBF1FF', border: '#E4E7EC',
   green: '#067647', greenPale: '#EAFBF2', red: '#B42318', redPale: '#FFF0ED',
 };
@@ -171,6 +171,7 @@ export default function PolicyLiveScreen() {
   const activeHasBounds = active?.ready === true &&
     active.validatedMin != null && active.validatedMax != null;
   let validInput = false;
+  let invalidPassInput = false;
   let validationText = '활성 정책과 서버 검증 범위를 확인한 후 조정할 수 있습니다.';
   if (active && activeHasBounds) {
     try {
@@ -186,12 +187,14 @@ export default function PolicyLiveScreen() {
       }
     } catch (cause) {
       validationText = errorText(cause);
+      invalidPassInput = true;
     }
   }
   // 목록 재조회가 실패했다면 오래된 정책 정보로 POST하지 않습니다.
   const canWrite = access === 'admin' && !loading && !refreshing && writing === null && error === null;
 
   let failEditValid = false;
+  let invalidFailInput = false;
   let failEditHint = '현재 정책의 불량 기준과 허용 범위를 확인해 주세요.';
   if (active && active.autoFailEnabled !== null) {
     try {
@@ -206,7 +209,7 @@ export default function PolicyLiveScreen() {
           ? '검증 범위 없음(고정값) · 시험값 고정용입니다. 저장 시 비활성 버전이 생성됩니다.'
           : '불량 기준이 입력한 허용 범위 안에 있습니다. 저장 시 비활성 버전이 생성됩니다.';
       }
-    } catch(cause) {failEditHint=errorText(cause);}
+    } catch(cause) {failEditHint=errorText(cause);invalidFailInput=true;}
   }
   const evidencePresent = !!active?.metrics && !!active.metrics.autoFail &&
     typeof active.metrics.autoFail === 'object';
@@ -432,7 +435,7 @@ export default function PolicyLiveScreen() {
 
             <View style={s.sectionTabs}>
               {POLICY_SECTIONS.map(item=>(
-                <Pressable key={item.value} style={[s.sectionTab,section===item.value&&s.sectionTabActive,writing!==null&&s.disabled]}
+                <Pressable key={item.value} testID={'policy-section-' + item.value} style={[s.sectionTab,section===item.value&&s.sectionTabActive,writing!==null&&s.disabled]}
                   accessibilityRole="button" accessibilityState={{selected:section===item.value,disabled:writing!==null}}
                   disabled={writing!==null} onPress={()=>selectSection(item.value)}>
                   <Text style={[s.sectionTabText,section===item.value&&s.sectionTabTextActive]}>{item.label}</Text>
@@ -460,7 +463,7 @@ export default function PolicyLiveScreen() {
                 placeholder="예: 1.00" keyboardType="decimal-pad" maxLength={9}
                 editable={canWrite && activeHasBounds} selectTextOnFocus
                 accessibilityLabel="새 자동 통과 기준 백분율" />
-              <Text style={[s.hint, !validInput && s.errorText]}>{validationText}</Text>
+              <Text style={validInput?s.hint:invalidPassInput?s.errorText:s.muted}>{validationText}</Text>
               <Button title={writing === 'save' ? '새 버전 저장 중…' : '새 정책 버전 저장'}
                 onPress={confirmSave} disabled={!canWrite || !validInput} />
               <Text style={s.muted}>저장 직후 새 정책은 비활성이며, 이전 활성 정책은 그대로 유지됩니다.</Text>
@@ -498,7 +501,7 @@ export default function PolicyLiveScreen() {
                     onChangeText={x=>{editedFailInput.current=true;setFailMaxPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
                     accessibilityLabel="불량 기준 최댓값" />
-                  <Text style={[s.hint,!failEditValid&&s.errorText]}>{failEditHint}</Text>
+                  <Text style={failEditValid?s.hint:invalidFailInput?s.errorText:s.muted}>{failEditHint}</Text>
                   <Button title="불량 기준 새 비활성 버전 저장" onPress={confirmSaveFail}
                     disabled={!canWrite||!failEditValid}/>
                   {!evidencePresent && <Text style={s.errorText}>검증 자료 없음: 팀 승인 시험 범위에서만 사용하세요. 품질 정확도를 보장하지 않습니다.</Text>}
@@ -588,8 +591,8 @@ const s = StyleSheet.create({
   failEnabled: { color: C.red },
   detailsToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, paddingHorizontal: 4 },
   sectionTabs: { flexDirection: 'row', gap: 6 },
-  sectionTab: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.white },
-  sectionTabActive: { backgroundColor: C.blue, borderColor: C.blue },
+  sectionTab: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: '#64748B', backgroundColor: C.white },
+  sectionTabActive: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
   sectionTabText: { color: C.ink, fontSize: 13, fontWeight: '700', textAlign: 'center' },
   sectionTabTextActive: { color: C.white },
   formLabel: { color: C.ink, fontSize: 13, lineHeight: 18, fontWeight: '600' },
@@ -607,7 +610,7 @@ const s = StyleSheet.create({
   value: { color: C.ink, fontSize: 13, lineHeight: 18, textAlign: 'right', flex: 0.54, fontWeight: '600' },
   muted: { color: C.muted, fontSize: 13, lineHeight: 19 },
   evidenceCheck: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, padding: 12 },
-  input: { borderWidth: 1, borderColor: '#D5DCE8', borderRadius: 10, minHeight: 46,
+  input: { borderWidth: 1, borderColor: '#64748B', borderRadius: 10, minHeight: 46,
     backgroundColor: '#F8FAFC', color: C.ink, paddingHorizontal: 14, fontSize: 16 },
   hint: { fontSize: 13, lineHeight: 19, color: C.green },
   button: { borderRadius: 10, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },

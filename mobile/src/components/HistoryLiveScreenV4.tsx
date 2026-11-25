@@ -1,4 +1,5 @@
 import Pressable from './TouchPressable';
+import { partLabelV4 } from './partLabelV4';
 import React, { useCallback, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
@@ -39,9 +40,9 @@ const periods: { value: PeriodFilter; label: string }[] = [
 ];
 const parts: { value: PartFilter; label: string }[] = [
   { value: '', label: '전체 부품' },
-  { value: 'DOOR', label: 'DOOR' },
-  { value: 'FRAME', label: 'FRAME' },
-  { value: 'COWL_COVER', label: 'COWL_COVER' },
+  { value: 'DOOR', label: '도어' },
+  { value: 'FRAME', label: '프레임' },
+  { value: 'COWL_COVER', label: '카울커버' },
 ];
 const stateLabels: Record<DisplayStateV4, string> = {
   ANALYZING: '분석 중',
@@ -209,6 +210,7 @@ export default function HistoryLiveScreenV4() {
             {parts.map((option) => (
               <Pressable
                 key={option.value || 'ALL_PARTS'}
+                testID={'history-part-' + (option.value || 'ALL')}
                 style={[styles.chip, partCode === option.value && styles.chipActive]}
                 onPress={() => selectPart(option.value)}
                 accessibilityRole="button"
@@ -268,7 +270,7 @@ export default function HistoryLiveScreenV4() {
               style={[styles.recordRow, index !== 0 && styles.recordDivider]}
               onPress={() => toDetail(item)}
               accessibilityRole="button"
-              accessibilityLabel={(item.inspectionNo ?? '검사번호 미제공') + ' 검사 상세 열기'}
+              accessibilityLabel={`${item.inspectionNo ?? '검사번호 미제공'}, ${stateLabels[item.displayState]}, ${partLabelV4(item.partCode)}, 검사 상세 열기`}
             >
               <View style={styles.recordTop}>
                 <View style={[styles.stateBadge, { backgroundColor: badgeTone[item.displayState].bg }]}>
@@ -276,11 +278,12 @@ export default function HistoryLiveScreenV4() {
                     {stateLabels[item.displayState]}
                   </Text>
                 </View>
-                <Text style={styles.itemTitle} numberOfLines={1}>
-                  {item.inspectionNo ?? '검사번호 미제공'} · {item.partCode}
+                <Text style={styles.itemTitle}>
+                  {item.inspectionNo ?? '검사번호 미제공'}
                 </Text>
                 <Text style={styles.recordArrow}>›</Text>
               </View>
+              <Text style={styles.itemState}>{partLabelV4(item.partCode)}</Text>
               <Text style={styles.caption}>
                 {item.source === 'MANUAL' || item.reviewReason === 'AI_UNAVAILABLE'
                   ? '수동 판정 · AI 분석 없음'
@@ -351,26 +354,26 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F5F7FB' },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
   title: { fontSize: 23, fontWeight: '700', color: '#111827' },
-  subtitle: { fontSize: 13, color: '#64748B', marginTop: 5 },
+  subtitle: { fontSize: 13, color: '#475569', marginTop: 5 },
   scroll: { flex: 1 },
   body: { paddingHorizontal: 20, paddingBottom: 35, gap: 12 },
   card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 14, padding: 14, gap: 10 },
   resultsCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 14, padding: 14, gap: 10 },
   recordRow: { paddingVertical: 12, gap: 7, borderRadius: 7 },
   recordDivider: { borderTopWidth: 1, borderTopColor: '#E4E7EC' },
-  recordTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  recordTop: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   stateBadge: { borderRadius: 999, minWidth: 70, paddingVertical: 6, paddingHorizontal: 8, alignItems: 'center' },
-  stateBadgeText: { fontSize: 11, fontWeight: '700' },
-  recordArrow: { marginLeft: 'auto', color: '#64748B', fontSize: 20, fontWeight: '600' },
-  recordOutcome: { color: '#067647', fontSize: 12, fontWeight: '600' },
+  stateBadgeText: { fontSize: 13, fontWeight: '700' },
+  recordArrow: { marginLeft: 'auto', color: '#475569', fontSize: 20, fontWeight: '600' },
+  recordOutcome: { color: '#067647', fontSize: 13, fontWeight: '600' },
   cardTitle: { fontSize: 16, color: '#111827', fontWeight: '700' },
   filterTitle: { fontSize: 13, fontWeight: '700', color: '#111827', marginTop: 4 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 11, minHeight: 44, borderRadius: 24, borderWidth: 1, borderColor: '#E9EEF6', backgroundColor: '#EEF2F8' },
-  chipActive: { backgroundColor: '#2054D8', borderColor: '#2054D8' },
-  chipText: { fontSize: 12, color: '#334155', fontWeight: '600' },
+  chip: { justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 11, minHeight: 44, borderRadius: 24, borderWidth: 1, borderColor: '#64748B', backgroundColor: '#EEF2F8' },
+  chipActive: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
+  chipText: { fontSize: 13, color: '#334155', fontWeight: '600' },
   chipTextActive: { color: '#FFFFFF' },
-  caption: { fontSize: 13, lineHeight: 18, color: '#64748B' },
+  caption: { fontSize: 13, lineHeight: 18, color: '#475569' },
   resultHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   resultInfo: { flex: 1, gap: 3 },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: '#111827' },
@@ -385,17 +388,17 @@ const styles = StyleSheet.create({
   retryText: { color: '#B42318', fontSize: 12, fontWeight: '700' },
   itemCard: { backgroundColor: '#FFFFFF', borderRadius: 13, borderWidth: 1, borderColor: '#E4E7EC', padding: 14, gap: 5 },
   itemTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 6 },
-  itemTitle: { fontSize: 14, fontWeight: '700', color: '#111827', flexShrink: 1 },
+  itemTitle: { fontSize: 14, fontWeight: '700', color: '#111827', flexGrow: 1, flexShrink: 1, minWidth: 0 },
   detailLink: { fontSize: 13, fontWeight: '700', color: '#2054D8' },
   itemState: { fontSize: 13, fontWeight: '600', color: '#334155' },
   pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 4 },
   pageButton: { justifyContent: 'center', minHeight: 44, borderWidth: 1, borderColor: '#2054D8', borderRadius: 9, paddingHorizontal: 18, paddingVertical: 10 },
   pageButtonText: { color: '#2054D8', fontSize: 13, fontWeight: '700' },
   pageNumber: { color: '#475569', fontSize: 12 },
-  footer: { color: '#64748B', fontSize: 11, textAlign: 'center', paddingTop: 5 },
+  footer: { color: '#475569', fontSize: 11, textAlign: 'center', paddingTop: 5 },
   bottomNav: { height: 58, flexDirection: 'row', marginHorizontal: 20, marginBottom: 6, backgroundColor: '#FFFFFF', borderRadius: 15, borderWidth: 1, borderColor: '#E4E7EC' },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  navIcon: { fontSize: 17, color: '#64748B' },
-  navText: { fontSize: 11, color: '#64748B' },
+  navIcon: { fontSize: 17, color: '#475569' },
+  navText: { fontSize: 11, color: '#475569' },
   active: { color: '#2054D8', fontWeight: '700' },
 });

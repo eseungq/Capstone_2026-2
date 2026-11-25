@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { partLabelV4 } from './partLabelV4';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -215,7 +216,7 @@ export default function MonitoringLiveDashboardV4({
   // 동일한 카드와 key를 사용해 권한 확인 중 순서가 바뀌어도 내용은 중복되지 않습니다.
   const recentCard = (
     <View key="recent" style={styles.card}>
-        <Text style={styles.title}>최근 검사 · {partCode}</Text>
+        <Text style={styles.title}>최근 검사</Text>
         {!recent ? (
           <Text style={styles.description}>
             {vm.hasSuccessfulRead ? '최근 검사 내역이 없습니다.' : '최근 검사 조회 대기'}
@@ -224,7 +225,7 @@ export default function MonitoringLiveDashboardV4({
           <Pressable
             style={({ pressed }) => [styles.inspectionRow, pressed && styles.pressed]}
             accessibilityRole="button"
-            accessibilityLabel={'최근 검사 ' + (recent.inspectionNo ?? '검사번호 미제공') + ' 상세 보기'}
+            accessibilityLabel={`최근 검사 ${recent.inspectionNo ?? '검사번호 미제공'}, ${statusLabel(recent.displayState)}, 상세 보기`}
             onPress={() => openInspection(recent.inspectionId)}
           >
             <InspectionThumbnail key={recent.inspectionId} inspectionId={recent.inspectionId} url={recent.thumbnailUrl} />
@@ -239,7 +240,7 @@ export default function MonitoringLiveDashboardV4({
   );
   const queueCard = (
     <View key="queue" style={styles.card}>
-        <Text style={styles.title}>처리 필요 검사 · {partCode}</Text>
+        <Text style={styles.title}>처리 필요 검사</Text>
         <Text style={styles.filterLabel}>정렬</Text>
         <View style={styles.filterControls}>
           <Pressable
@@ -309,7 +310,7 @@ export default function MonitoringLiveDashboardV4({
             key={item.inspectionId}
             style={({ pressed }) => [styles.inspectionRow, pressed && styles.pressed]}
             accessibilityRole="button"
-            accessibilityLabel={(item.inspectionNo ?? '검사번호 미제공') + ' 상세 보기'}
+            accessibilityLabel={`${item.inspectionNo ?? '검사번호 미제공'}, ${statusLabel(item.displayState)}, 상세 보기`}
             onPress={() => openInspection(item.inspectionId)}
           >
             <InspectionThumbnail inspectionId={item.inspectionId} url={item.thumbnailUrl} />
@@ -392,6 +393,7 @@ export default function MonitoringLiveDashboardV4({
           {MONITORED_PARTS.map((code) => (
             <Pressable
               key={code}
+              testID={'monitor-part-' + code}
               accessibilityRole="button"
               accessibilityState={{ selected: partCode === code }}
               style={({ pressed }) => [styles.partButton, partCode === code && styles.partButtonActive, pressed && styles.pressed]}
@@ -402,11 +404,8 @@ export default function MonitoringLiveDashboardV4({
             >
               <Text
                 style={[styles.partButtonText, partCode === code && styles.partButtonTextActive]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.85}
               >
-                {code}
+                {partLabelV4(code)}
               </Text>
             </Pressable>
           ))}
@@ -422,7 +421,7 @@ export default function MonitoringLiveDashboardV4({
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.title}>{partCode} 공정 현황</Text>
+        <Text style={styles.title}>{partLabelV4(partCode)} 공정 현황</Text>
         {!vm.part ? (
           <Text style={styles.description}>
             {vm.hasSuccessfulRead ? '이 공정의 정보가 제공되지 않았습니다.' : '공정 데이터를 불러오는 중입니다.'}
@@ -458,8 +457,8 @@ const styles = StyleSheet.create({
   filterLabel: { color: '#334155', fontSize: 13, fontWeight: '700' },
   filterControls: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   filterButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 11, paddingVertical: 10, borderRadius: 9,
-    backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1' },
-  filterButtonActive: { backgroundColor: '#2054D8', borderColor: '#2054D8' },
+    backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#64748B' },
+  filterButtonActive: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
   filterButtonText: { color: '#475569', fontSize: 13, fontWeight: '700' },
   filterButtonTextActive: { color: '#FFFFFF' },
   refreshFilterButton: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 11, paddingVertical: 8,
@@ -470,22 +469,22 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.76 },
   headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   title: { fontSize: 17, fontWeight: '700', color: '#111827', flexShrink: 1 },
-  description: { fontSize: 13, color: '#64748B', lineHeight: 19 },
+  description: { fontSize: 13, color: '#475569', lineHeight: 19 },
   warning: { color: '#A74B12', fontSize: 13, lineHeight: 18 },
   connection: { color: '#008454', fontSize: 12, fontWeight: '700' },
   connectionStale: { color: '#A74B12' },
   partSelector: { flexDirection: 'row', gap: 6 },
   partButton: {
     flex: 1, minWidth: 0, minHeight: 44,
-    paddingHorizontal: 2, paddingVertical: 12, borderWidth: 1, borderColor: '#CBD5E1',
+    paddingHorizontal: 2, paddingVertical: 12, borderWidth: 1, borderColor: '#64748B',
     borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC',
   },
-  partButtonActive: { borderColor: '#2054D8', backgroundColor: '#2054D8' },
-  partButtonText: { fontSize: 11, fontWeight: '700', color: '#475569', textAlign: 'center' },
+  partButtonActive: { borderColor: '#1E293B', backgroundColor: '#1E293B' },
+  partButtonText: { fontSize: 13, fontWeight: '700', color: '#475569', textAlign: 'center' },
   partButtonTextActive: { color: '#FFFFFF' },
   metricRow: { flexDirection: 'row', gap: 10 },
   metric: { flex: 1, backgroundColor: '#F5F7FB', padding: 12, borderRadius: 10, gap: 6 },
-  metricLabel: { color: '#64748B', fontSize: 13 },
+  metricLabel: { color: '#475569', fontSize: 13 },
   metricValue: { color: '#111827', fontSize: 20, fontWeight: '700' },
   inspectionRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -497,7 +496,7 @@ const styles = StyleSheet.create({
   },
   thumbnailImage: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
   thumbnailImageLoading: { opacity: 0 },
-  thumbnailEmpty: { color: '#64748B', fontSize: 10, paddingHorizontal: 5, textAlign: 'center' },
+  thumbnailEmpty: { color: '#475569', fontSize: 13, paddingHorizontal: 5, textAlign: 'center' },
   rowInfo: { flex: 1, gap: 4, justifyContent: 'center' },
   itemTitle: { color: '#111827', fontSize: 14, fontWeight: '700' },
   itemStatus: { color: '#475569', fontSize: 13, fontWeight: '600' },

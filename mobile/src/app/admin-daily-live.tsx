@@ -13,7 +13,7 @@ import {createDailyHistoryReadsV4,idleDailyRead,type DailyReadState} from '../co
 
 const service=createDailyHistoryServiceV4(authV4);
 const parts:AutomationDailyPartV4[]=['DOOR','FRAME','COWL_COVER'];
-const ink='#111827',blue='#2054D8',muted='#64748B',red='#B42318';
+const ink='#111827',blue='#2054D8',muted='#475569',red='#B42318';
 function fraction(value:number|null,digits=2):string{
  return value==null?'미제공':`${(value*100).toFixed(digits)}%`;
 }
@@ -158,10 +158,10 @@ export default function AdminDailyLiveScreen(){
          <Text style={s.muted}>YYYY-MM-DD · 최대 92일. 오늘까지 포함하려면 종료일을 내일로 설정하세요.</Text>
          <View style={s.chips}>
            <View style={s.dateCell}><Text style={s.muted}>시작일</Text>
-             <TextInput value={from} onChangeText={x=>{clearResults();setFrom(x);}} style={s.input} autoCorrect={false}
+             <TextInput testID="daily-start-date" accessibilityLabel="접수 시작일" value={from} onChangeText={x=>{clearResults();setFrom(x);}} style={s.input} autoCorrect={false}
                placeholder="YYYY-MM-DD" maxLength={10}/></View>
            <View style={s.dateCell}><Text style={s.muted}>종료일 (미포함)</Text>
-             <TextInput value={to} onChangeText={x=>{clearResults();setTo(x);}} style={s.input} autoCorrect={false}
+             <TextInput testID="daily-end-exclusive-date" accessibilityLabel="접수 종료일 (미포함)" value={to} onChangeText={x=>{clearResults();setTo(x);}} style={s.input} autoCorrect={false}
                placeholder="YYYY-MM-DD" maxLength={10}/></View>
          </View>
          <Pressable style={s.primary} accessibilityRole="button" disabled={loading}
@@ -181,7 +181,7 @@ export default function AdminDailyLiveScreen(){
        {selected===row&&<View style={s.detailCard}>
          <Text style={s.strong}>기준 상세 · {selected.date} · {selected.policyVersion??'정책 없음'}</Text>
          <Text style={s.muted}>구간 폭은 확률 차이입니다. 0.05를 입력하면 기준에서 5%p 이내의 검사를 조회합니다. 입력 범위는 0.001~0.5입니다.</Text>
-         <TextInput value={band} onChangeText={x=>{reads.resetDetail();setBand(x);}} style={s.input}
+         <TextInput testID="daily-threshold-band" accessibilityLabel="기준 주변 확률 구간 폭" value={band} onChangeText={x=>{reads.resetDetail();setBand(x);}} style={s.input}
            keyboardType="decimal-pad" placeholder="0.05" />
          <Pressable style={s.outline} accessibilityRole="button" disabled={detailLoading}
            onPress={()=>{void viewDetail(selected);}}>
@@ -211,10 +211,10 @@ const s=StyleSheet.create({
  body:{paddingHorizontal:18,paddingBottom:35,gap:12},title:{fontSize:22,fontWeight:'700',color:ink},
  strong:{fontSize: 14,fontWeight:'700',color:ink},muted:{color:muted,fontSize: 13,lineHeight:18},
  card:{backgroundColor:'#FFF',borderRadius:14,borderColor:'#E4E7EC',borderWidth:1,padding:14,gap:12},
- chips:{flexDirection:'row',flexWrap:'wrap',gap:6},chip:{ justifyContent: 'center', minHeight: 44,borderWidth:1,borderRadius:9,borderColor:'#CBD5E1',padding:9},
- chipActive:{backgroundColor:blue,borderColor:blue},chipText:{fontSize: 12,fontWeight:'700',color:'#334155'},
+ chips:{flexDirection:'row',flexWrap:'wrap',gap:6},chip:{ justifyContent: 'center', minHeight: 44,borderWidth:1,borderRadius:9,borderColor:'#64748B',padding:9},
+ chipActive:{backgroundColor:'#1E293B',borderColor:'#1E293B'},chipText:{fontSize: 13,fontWeight:'700',color:'#334155'},
  chipTextActive:{color:'#FFF'},dateCell:{flex:1,minWidth:124,gap:6},
- input:{ minHeight: 44,borderWidth:1,borderColor:'#CBD5E1',borderRadius:9,padding:11,fontSize: 14,color:ink},
+ input:{ minHeight: 44,borderWidth:1,borderColor:'#64748B',borderRadius:9,padding:11,fontSize: 14,color:ink},
  primary:{ justifyContent: 'center', minHeight: 44,backgroundColor:blue,padding:13,borderRadius:10,alignItems:'center'},
  primaryText:{color:'#FFF',fontWeight:'700',fontSize: 14},
  outline:{ justifyContent: 'center', minHeight: 44,borderWidth:1,borderColor:blue,borderRadius:10,padding:10,alignItems:'center'},

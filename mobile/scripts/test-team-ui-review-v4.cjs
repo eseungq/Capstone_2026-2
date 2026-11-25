@@ -55,3 +55,55 @@ test('inspection detail keeps state, trace data, and all memo labels without dup
     assert.match(found[0].opening.getText(source),/accessibilityLabel=/);
   }
 });
+
+test('history and monitor keep actual part codes while using readable labels and status-aware accessible rows',()=>{
+  const {code:h,source}=parse('components/HistoryLiveScreenV4.tsx');
+  const m=parse('components/MonitoringLiveDashboardV4.tsx').code;
+  for(const [code,label] of [['DOOR','도어'],['FRAME','프레임'],['COWL_COVER','카울커버']]){
+    assert.ok(h.includes("value: '"+code+"', label: '"+label+"'"));
+    assert.ok(read('components/partLabelV4.ts').includes("case '"+code+"': return '"+label+"'"));
+  }
+  assert.match(h,/accessibilityLabel=\{\x60\$\{item\.inspectionNo.*stateLabels\[item\.displayState\].*partLabelV4\(item\.partCode\)/);
+  assert.doesNotMatch(h,/<Text style=\{styles\.itemTitle\} numberOfLines=/);
+  assert.match(h,/<Text style=\{styles\.itemState\}>\{partLabelV4\(item\.partCode\)\}/);
+  assert.match(m,/statusLabel\(item\.displayState\)/);
+  assert.match(m,/\{partLabelV4\(code\)\}/);
+  assert.match(m,/setPartCode\(code\)/);
+});
+test('batch checked state and date input labels are explicit',()=>{
+  const {code:b,source:bs}=parse('app/batch-fail-live.tsx');
+  const {code:d,source:ds}=parse('app/admin-daily-live.tsx');
+  const checkbox=elementsByTestID(bs,'batch-ai-defect-filter')[0];
+  assert.ok(checkbox);
+  assert.match(checkbox.opening.getText(bs),/aria-checked=\{filters\.aiDefectOnly\}/);
+  assert.match(checkbox.opening.getText(bs),/accessibilityState=\{\{checked:filters\.aiDefectOnly/);
+  for(const id of ['daily-start-date','daily-end-exclusive-date','daily-threshold-band']){
+    const fields=elementsByTestID(ds,id);
+    assert.equal(fields.length,1);
+    assert.match(fields[0].opening.getText(ds),/accessibilityLabel=/);
+  }
+});
+test('unchanged or duplicate policy values use neutral help, actual invalid edits use error style',()=>{
+  const {code}=parse('app/policy-live.tsx');
+  assert.match(code,/validInput\?s\.hint:invalidPassInput\?s\.errorText:s\.muted/);
+  assert.match(code,/failEditValid\?s\.hint:invalidFailInput\?s\.errorText:s\.muted/);
+  assert.match(code,/validationText = errorText\(cause\);\s*invalidPassInput = true;/);
+  assert.match(code,/failEditHint=errorText\(cause\);invalidFailInput=true;/);
+  assert.match(code,/disabled=\{!canWrite \|\| !validInput\}/);
+  assert.match(code,/disabled=\{!canWrite\|\|!failEditValid\}/);
+});
+test('control colors retain text and non-text contrast with neutral card backgrounds',()=>{
+  const luminance=hex=>hex.match(/[0-9a-f]{2}/gi).map(v=>parseInt(v,16)/255)
+    .map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4)
+    .reduce((sum,v,i)=>sum+v*[0.2126,0.7152,0.0722][i],0);
+  const contrast=(a,b)=>{const v=[luminance(a),luminance(b)].sort((x,y)=>y-x);return (v[0]+0.05)/(v[1]+0.05);};
+  for(const bg of ['#FFFFFF','#F5F7FB','#F8FAFC','#EEF2F8']){
+    assert.ok(contrast('#475569',bg)>=4.5);
+    assert.ok(contrast('#64748B',bg)>=3);
+  }
+  assert.ok(contrast('#FFFFFF','#1E293B')>=4.5);
+  for(const file of ['components/HistoryLiveScreenV4.tsx','components/MonitoringLiveDashboardV4.tsx','app/batch-fail-live.tsx','app/policy-live.tsx','app/admin-daily-live.tsx']){
+    const {code}=parse(file);
+    for(const color of ['#475569','#64748B','#1E293B'])assert.ok(code.includes(color),file+': '+color);
+  }
+});
