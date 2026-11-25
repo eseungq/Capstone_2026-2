@@ -327,7 +327,10 @@ test('history filter changes preserve other query options and reject stale reads
   const code=fs.readFileSync(path.join(__dirname,'../src/components/HistoryLiveScreenV4.tsx'),'utf8');
   const reset=code.slice(code.indexOf('const resetForFilter ='),code.indexOf('const setStatus ='));
   for(const statement of ['requestSerial.current += 1;','setPage(0);','setData(null);','setError(null);','setLoading(true);','setRefreshing(false);'])assert.ok(reset.includes(statement),statement);
-  const select=code.slice(code.indexOf('const selectPart ='),code.indexOf('const toMonitor ='));
+  const selectStart=code.indexOf('const selectPart =');
+  const selectEnd=code.indexOf('const toDetail =',selectStart);
+  assert.ok(selectStart>=0&&selectEnd>selectStart,'Locate the complete part-filter handler');
+  const select=code.slice(selectStart,selectEnd);
   assert.match(select,/if \(next === partCode\) return;/);
   assert.match(select,/resetForFilter\(\);\s*setPartCode\(next\);/);
   assert.doesNotMatch(select,/setStateFilter|setPeriod|load\(/);
