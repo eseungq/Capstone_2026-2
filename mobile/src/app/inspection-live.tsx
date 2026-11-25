@@ -76,7 +76,7 @@ function actionErrorMessage(error: unknown): string {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.fieldLabel}>{label}</Text>
       <Text style={styles.value}>{value}</Text>
     </View>
   );
@@ -526,6 +526,7 @@ export default function InspectionLiveScreen() {
     );
   };
 
+  const canShowConfirm = !roleLoading && role === 'WORKER' && visibleDetail?.canOfferConfirm === true;
   const canShowRetry = !roleLoading && (role === 'WORKER' || role === 'ADMIN') &&
     visibleDetail?.canOfferRetry === true;
   const canShowManual = !roleLoading && role === 'WORKER' &&
@@ -572,7 +573,20 @@ export default function InspectionLiveScreen() {
           style={({ pressed }) => [styles.backTouch, pressed && styles.backTouchPressed]}>
           <Text style={styles.back}>‹ 뒤로</Text>
         </Pressable>
-        <Text style={styles.title}>검사 상세{visibleDetail ? ' · ' + visibleDetail.displayStateLabel : ''}</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>검사 상세</Text>
+          {visibleDetail && <View style={[styles.stateBadge,
+            visibleDetail.displayState === 'REVIEW_PENDING' ? styles.reviewBadge :
+            visibleDetail.displayState === 'FAILED' || visibleDetail.displayState === 'AUTO_FAIL' ? styles.failBadge :
+            visibleDetail.displayState === 'AUTO_PASS' ? styles.passBadge : styles.neutralBadge]}>
+            <Text style={[styles.stateBadgeText,
+              visibleDetail.displayState === 'REVIEW_PENDING' ? styles.reviewBadgeText :
+              visibleDetail.displayState === 'FAILED' || visibleDetail.displayState === 'AUTO_FAIL' ? styles.failBadgeText :
+              visibleDetail.displayState === 'AUTO_PASS' ? styles.passBadgeText : styles.neutralBadgeText]}>
+              {visibleDetail.displayStateLabel}
+            </Text>
+          </View>}
+        </View>
         <Text style={styles.muted}>{visibleDetail ? visibleDetail.partCode + ' · ' + visibleDetail.inspectionNo : '검사 결과 조회'}</Text>
       </View>
 
@@ -774,7 +788,8 @@ export default function InspectionLiveScreen() {
                     <Text style={styles.label}>재확인 메모 (선택, 200자 이내)</Text>
                     <TextInput style={styles.commentInput} maxLength={200} multiline
                       placeholder="재확인 결과에 대한 설명을 남겨주세요."
-                      placeholderTextColor="#64748B"
+                      placeholderTextColor="#475569"
+                      testID="inspection-recheck-memo" accessibilityLabel="재확인 메모"
                       value={recheckComment} onChangeText={setRecheckComment} editable={!submitting} />
                     <View style={styles.buttonRow}>
                       <Pressable accessibilityRole="button"
@@ -803,7 +818,8 @@ export default function InspectionLiveScreen() {
                     <Text style={styles.label}>관리자 확인 메모 (선택, 200자 이내)</Text>
                     <TextInput style={styles.commentInput} maxLength={200} multiline
                       placeholder="예: 라인 담당자에게 전달"
-                      placeholderTextColor="#64748B"
+                      placeholderTextColor="#475569"
+                      testID="inspection-acknowledge-memo" accessibilityLabel="관리자 확인 메모"
                       value={acknowledgeNote} onChangeText={setAcknowledgeNote} editable={!submitting} />
                     <Pressable accessibilityRole="button" disabled={submitting !== null}
                       style={({ pressed }) => [styles.button, pressed && styles.buttonPressed,
@@ -860,37 +876,22 @@ export default function InspectionLiveScreen() {
               {!roleLoading && role === 'ADMIN' && visibleDetail.canOfferConfirm && (
                 <Text style={styles.muted}>관리자 계정은 REVIEW를 조회할 수 있지만 PASS/FAIL 판정은 제출할 수 없습니다.</Text>
               )}
-              {!roleLoading && role === 'WORKER' && visibleDetail.canOfferConfirm && (
+              {canShowConfirm && (
                 <>
                   <Text style={styles.label}>판정 메모 (선택, 최대 200자)</Text>
                   <TextInput
                     style={styles.commentInput}
                     placeholder="판정 근거를 입력하세요."
-                    placeholderTextColor="#64748B"
+                    placeholderTextColor="#475569"
+                    testID="inspection-review-memo"
+                    accessibilityLabel="판정 메모"
                     value={comment}
                     onChangeText={setComment}
                     maxLength={200}
                     multiline
                     editable={!submitting}
                   />
-                  <View style={styles.buttonRow}>
-                    <Pressable
-                      style={({ pressed }) => [styles.button, styles.buttonFlex, pressed && styles.buttonPressed, submitting && styles.disabledButton]}
-                      disabled={submitting !== null}
-                      onPress={() => requestConfirm('PASS')}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.buttonText}>PASS 확정</Text>
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [styles.button, styles.buttonFlex, styles.failButton, pressed && styles.failButtonPressed, submitting && styles.disabledButton]}
-                      disabled={submitting !== null}
-                      onPress={() => requestConfirm('FAIL')}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.buttonText}>FAIL 확정</Text>
-                    </Pressable>
-                  </View>
+
                 </>
               )}
               {visibleDetail.canOfferManual && (
@@ -981,6 +982,33 @@ export default function InspectionLiveScreen() {
           </>
         )}
       </ScrollView>
+      {canShowConfirm && (
+        <View style={styles.confirmFooter} testID="inspection-review-actions">
+          <Text style={styles.muted}>사진과 AI 결과를 확인한 후 판정하세요.</Text>
+          <View style={styles.buttonRow}>
+            <Pressable
+              testID="inspection-confirm-pass"
+              accessibilityRole="button" accessibilityLabel="PASS 확정"
+              accessibilityState={{ disabled: submitting !== null }}
+              style={({ pressed }) => [styles.button, styles.buttonFlex, pressed && styles.buttonPressed, submitting && styles.disabledButton]}
+              disabled={submitting !== null}
+              onPress={() => requestConfirm('PASS')}>
+              <Text style={styles.buttonText}>PASS 확정</Text>
+            </Pressable>
+            <Pressable
+              testID="inspection-confirm-fail"
+              accessibilityRole="button" accessibilityLabel="FAIL 확정"
+              accessibilityState={{ disabled: submitting !== null }}
+              style={({ pressed }) => [styles.button, styles.buttonFlex, styles.failButton, pressed && styles.failButtonPressed, submitting && styles.disabledButton]}
+              disabled={submitting !== null}
+              onPress={() => requestConfirm('FAIL')}>
+              <Text style={styles.buttonText}>FAIL 확정</Text>
+            </Pressable>
+          </View>
+          {submitting === 'confirm' && <Text style={styles.muted}>서버에 판정 저장 중…</Text>}
+          {actionError && <Text style={styles.errorText}>판정 요청 오류: {actionError}</Text>}
+        </View>
+      )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -993,13 +1021,23 @@ const styles = StyleSheet.create({
   backTouch: { justifyContent: 'center', minHeight: 44, alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, marginLeft: -8 },
   backTouchPressed: { backgroundColor: '#E9EFFC' },
   title: { color: '#111827', fontSize: 23, fontWeight: '700' },
+  titleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  stateBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, maxWidth: '100%' },
+  stateBadgeText: { fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  reviewBadge: { backgroundColor: '#FFF3E5' }, reviewBadgeText: { color: '#92400E' },
+  failBadge: { backgroundColor: '#FFF0ED' }, failBadgeText: { color: '#B42318' },
+  passBadge: { backgroundColor: '#EAFBF2' }, passBadgeText: { color: '#067647' },
+  neutralBadge: { backgroundColor: '#E9EFFC' }, neutralBadgeText: { color: '#334155' },
+  confirmFooter: { backgroundColor: '#FFFFFF', paddingHorizontal: 20, paddingVertical: 10, gap: 6,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#CBD5E1' },
   body: { paddingHorizontal: 20, paddingBottom: 35, gap: 12 },
   card: { backgroundColor: '#FFF', borderRadius: 14, borderWidth: 1, borderColor: '#E4E7EC', padding: 16, gap: 10 },
   cardTitle: { color: '#111827', fontSize: 17, fontWeight: '700' },
-  field: { gap: 3 },
-  label: { color: '#64748B', fontSize: 13},
-  value: { color: '#111827', fontSize: 14, fontWeight: '500' },
-  muted: { color: '#64748B', fontSize: 13, lineHeight: 18 },
+  field: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  fieldLabel: { flex: 0.42, minWidth: 0, color: '#475569', fontSize: 13, lineHeight: 19 },
+  value: { flex: 0.58, minWidth: 0, textAlign: 'right', color: '#111827', fontSize: 14, lineHeight: 20, fontWeight: '500' },
+  label: { color: '#475569', fontSize: 13 },
+  muted: { color: '#475569', fontSize: 13, lineHeight: 18 },
   inspectionImage: { height: 265, width: '100%', backgroundColor: '#EEF2F8', borderRadius: 10 },
   receiptSummary: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: 4, paddingVertical: 2 },
   receiptValue: { color: '#334155', fontSize: 13, fontWeight: '600', flexShrink: 1 },
@@ -1008,18 +1046,18 @@ const styles = StyleSheet.create({
   imageRow: { flexDirection: 'row', gap: 8, alignItems: 'stretch' },
   imageCard: { flex: 1, minWidth: 0, padding: 10 },
   compactImage: { height: 137 },
-  imageOpenText: { color: '#2054D8', fontSize: 12, marginTop: 7, fontWeight: '600' },
+  imageOpenText: { color: '#2054D8', fontSize: 13, marginTop: 7, fontWeight: '600' },
   photoTouch: { borderRadius: 10, overflow: 'hidden' },
   photoTouchPressed: { opacity: 0.84, backgroundColor: '#EDF2FF' },
   button: { justifyContent: 'center', minHeight: 44, backgroundColor: '#2054D8', padding: 13, borderRadius: 10, alignItems: 'center' },
   buttonPressed: { backgroundColor: '#193EAA' },
   buttonText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
   disabledButton: { opacity: 0.5 },
-  buttonRow: { flexDirection: 'row', gap: 8 },
+  buttonRow: { flexDirection: 'row', gap: 12 },
   buttonFlex: { flex: 1 },
   failButton: { backgroundColor: '#B42318' },
   failButtonPressed: { backgroundColor: '#8E1D16' },
-  commentInput: { minHeight: 70, backgroundColor: '#F5F7FB', borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 10, padding: 12, color: '#111827', textAlignVertical: 'top' },
+  commentInput: { minHeight: 70, fontSize: 14, backgroundColor: '#F5F7FB', borderWidth: 1, borderColor: '#64748B', borderRadius: 10, padding: 12, color: '#111827', textAlignVertical: 'top' },
   submitStatus: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   successText: { color: '#067647', fontSize: 13, lineHeight: 20 },
   secondaryButton: { justifyContent: 'center', minHeight: 44, borderWidth: 1, borderColor: '#2054D8', borderRadius: 10, padding: 12 },
