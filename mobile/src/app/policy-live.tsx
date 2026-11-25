@@ -2,7 +2,7 @@ import Pressable from '../components/TouchPressable';
 import React, { useCallback, useRef, useState } from 'react';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -26,6 +26,12 @@ function openPolicyVisit() {
 }
 type PolicyVisit = ReturnType<typeof openPolicyVisit>;
 type WriteAction = 'save' | 'activate' | 'fail-threshold' | 'auto-fail';
+type PolicySection = 'pass' | 'fail' | 'versions';
+const POLICY_SECTIONS: {value: PolicySection; label: string}[] = [
+  {value: 'pass', label: '자동 통과'},
+  {value: 'fail', label: '자동 불량'},
+  {value: 'versions', label: '버전 관리'},
+];
 
 const C = {
   bg: '#F5F7FB', white: '#FFFFFF', ink: '#111827', muted: '#64748B',
@@ -80,6 +86,14 @@ function activationDetails(policy: AdminPolicyV4): string {
 }
 
 export default function PolicyLiveScreen() {
+  const [section, setSection] = useState<PolicySection>('pass');
+  const [showPolicyDetails, setShowPolicyDetails] = useState(false);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const selectSection = (next: PolicySection) => {
+    Keyboard.dismiss();
+    setSection(next);
+    scrollRef.current?.scrollTo({y: 0, animated: false});
+  };
   const [policies, setPolicies] = useState<AdminPolicyV4[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -165,7 +179,7 @@ export default function PolicyLiveScreen() {
       if (existing) {
         validationText = existing.active
           ? '현재 적용 중인 기준치입니다. 다른 값을 입력해 주세요.'
-          : `같은 설정의 ${existing.policyVersion} 정책이 이미 저장돼 있습니다. 아래 정책 목록에서 기존 버전을 적용해 주세요.`;
+          : `같은 설정의 ${existing.policyVersion} 정책이 이미 저장돼 있습니다. 버전 관리에서 기존 버전을 적용해 주세요.`;
       } else {
         validInput = true;
         validationText = '검증 범위 안의 값입니다. 저장 시 새 비활성 정책 버전이 생성됩니다.';
@@ -222,8 +236,13 @@ export default function PolicyLiveScreen() {
       setActionNotice(null);
       try {
         await operation(visit);
+        // 성공 응답 후에는 저장된 버전을 보여주기만 합니다. 적용은 별도 확인을 거칩니다.
+        if (visit.isCurrent()) selectSection('versions');
       } catch (cause) {
-        if (visit.isCurrent()) setActionError(errorText(cause) + '\n다시 시도하기 전에 목록을 새로고침해 변경 사항을 확인해 주세요.');
+        if (visit.isCurrent()) {
+          setActionError(errorText(cause) + '\n다시 시도하기 전에 목록을 새로고침해 변경 사항을 확인해 주세요.');
+          scrollRef.current?.scrollTo({y: 0, animated: false});
+        }
       } finally {
         if (writeLock.current === visit) writeLock.current = null;
         if (visit.isCurrent()) setWriting(null);
@@ -280,7 +299,7 @@ export default function PolicyLiveScreen() {
           }
           const result = await visit.service.activate(current);
           visit.assertCurrent();
-          setActionNotice(`${result.policyVersion} 정책 적용 응답을 받았습니다. 아래 서버 목록에서 활성 상태를 확인해 주세요.`);
+          setActionNotice(`${result.policyVersion} 정책 적용 응답을 받았습니다. 버전 관리의 서버 목록에서 활성 상태를 확인해 주세요.`);
           await load(false);
         }) },
       ],
@@ -350,10 +369,10 @@ export default function PolicyLiveScreen() {
         <Text style={s.subtitle}>관리자 · COWL_COVER</Text>
       </View>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <ScrollView ref={scrollRef} style={s.scroll} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <View style={s.notice}>
           <Text style={s.noticeText}>
-            통과·불량 기준을 저장하면 새 정책 버전이 생깁니다. 적용할 버전을 선택해야 새 검사에 반영됩니다.
+            저장은 새 비활성 버전 생성입니다. 버전 관리에서 별도로 적용해야 새 검사에 반영됩니다.
           </Text>
         </View>
         {(loading || refreshing) && (
@@ -375,28 +394,84 @@ export default function PolicyLiveScreen() {
         )}
         {access === 'admin' && !loading && (
           <>
-            <Card title="1. 현재 적용 중인 정책">
+            <Card title="현재 적용 중인 정책">
               {!active ? (
                 <Text style={s.errorText}>현재 적용 중인 카울커버 정책이 없습니다. 서버에서 적용 상태를 확인해 주세요.</Text>
               ) : (
                 <>
                   <Row label="정책 버전" value={active.policyVersion} />
-                  <Row label="AI 모델" value={active.modelVersion} />
-                  <Row label="보정기" value={active.calibratorVersion ?? '미제공'} />
-                  <Row label="활성 기준치" value={percentageTextV4(active.passThreshold, 4)} />
-                  <Row label="검증 범위" value={`${percentageTextV4(active.validatedMin, 4)} ~ ${percentageTextV4(active.validatedMax, 4)}`} />
+                  <View style={s.metrics}>
+                    <View style={s.metric}>
+                      <Text style={s.metricLabel}>자동 통과 기준</Text>
+                      <Text style={s.metricValue}>{percentageTextV4(active.passThreshold, 4)}</Text>
+                    </View>
+                    <View style={s.metric}>
+                      <Text style={s.metricLabel}>자동 불량</Text>
+                      <Text style={[s.metricValue, active.autoFailEnabled === true && s.failEnabled]}>
+                        {active.autoFailEnabled===null?'미지원':active.autoFailEnabled?'켜짐':'꺼짐'}
+                      </Text>
+                      {active.autoFailEnabled===true && <Text style={s.muted}>{percentageTextV4(active.failThreshold,4)}</Text>}
+                    </View>
+                  </View>
+                  <Row label="통과 검증 범위" value={`${percentageTextV4(active.validatedMin, 4)} ~ ${percentageTextV4(active.validatedMax, 4)}`} />
                   <Row label="정책 상태" value={`${active.ready ? '준비됨' : '미준비'} / 적용 중`} />
-                  <Row label="자동 불량" value={active.autoFailEnabled===null?'미지원':active.autoFailEnabled?'켜짐':'꺼짐'} />
+                  <Pressable style={s.detailsToggle} accessibilityRole="button"
+                    accessibilityState={{expanded:showPolicyDetails}} onPress={()=>setShowPolicyDetails(v=>!v)}>
+                    <Text style={s.secondaryText}>{showPolicyDetails?'모델·보정기 정보 접기':'모델·보정기 정보 보기'}</Text>
+                    <Text style={s.secondaryText}>{showPolicyDetails?'−':'+'}</Text>
+                  </Pressable>
+                  {showPolicyDetails && <>
+                    <Row label="AI 모델" value={active.modelVersion} />
+                    <Row label="보정기" value={active.calibratorVersion ?? '미제공'} />
+                  </>}
                 </>
               )}
               <Button title="정책 새로고침" secondary onPress={() => { void load(false); }}
                 disabled={!canWrite} />
             </Card>
 
+            <View style={s.sectionTabs}>
+              {POLICY_SECTIONS.map(item=>(
+                <Pressable key={item.value} style={[s.sectionTab,section===item.value&&s.sectionTabActive,writing!==null&&s.disabled]}
+                  accessibilityRole="button" accessibilityState={{selected:section===item.value,disabled:writing!==null}}
+                  disabled={writing!==null} onPress={()=>selectSection(item.value)}>
+                  <Text style={[s.sectionTabText,section===item.value&&s.sectionTabTextActive]}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {writing && (
+              <View style={s.status}>
+                <ActivityIndicator />
+                <Text style={s.muted}>실제 서버에 정책 요청 중입니다. 두 번 제출하지 마세요.</Text>
+              </View>
+            )}
+            {actionNotice && <View style={s.successCard}><Text style={s.successText}>{actionNotice}</Text></View>}
+            {actionError && <View style={s.errorCard}><Text style={s.errorText}>{actionError}</Text></View>}
+
+            {section === 'pass' && (
+            <Card title="자동 통과 기준 조정">
+              <Text style={s.muted}>
+                현재 정책의 허용 범위 안에서 백분율(%)을 입력하세요.
+              </Text>
+              <Text style={s.formLabel}>새 기준치 입력 (%)</Text>
+              <TextInput style={s.input} value={percentInput}
+                onChangeText={(v) => { editedInput.current = true; setPercentInput(v); }}
+                placeholder="예: 1.00" keyboardType="decimal-pad" maxLength={9}
+                editable={canWrite && activeHasBounds} selectTextOnFocus
+                accessibilityLabel="새 자동 통과 기준 백분율" />
+              <Text style={[s.hint, !validInput && s.errorText]}>{validationText}</Text>
+              <Button title={writing === 'save' ? '새 버전 저장 중…' : '새 정책 버전 저장'}
+                onPress={confirmSave} disabled={!canWrite || !validInput} />
+              <Text style={s.muted}>저장 직후 새 정책은 비활성이며, 이전 활성 정책은 그대로 유지됩니다.</Text>
+            </Card>
+            )}
+
+            {section === 'fail' && (
             <Card title="자동 불량 정책 · 별도 검증·적용">
               <Text style={s.muted}>
                 자동 불량 기본값은 꺼짐입니다. 기준 등록/켜기/끄기는 각각 새 비활성 정책 버전을 만듭니다.
-                활성화는 아래 정책 목록에서 별도로 선택해야 하며, 시험 승인 전에는 적용하지 마세요.
+                활성화는 버전 관리에서 별도로 선택해야 하며, 시험 승인 전에는 적용하지 마세요.
               </Text>
               {!active ? <Text style={s.errorText}>활성 정책을 확인한 뒤 사용할 수 있습니다.</Text> : <>
                 <Row label="현재 자동 불량" value={active.autoFailEnabled===null?'정보 없음':active.autoFailEnabled?'켜짐':'꺼짐'} />
@@ -407,18 +482,18 @@ export default function PolicyLiveScreen() {
                   <Text style={s.errorText}>현재 정책에서는 자동 불량 설정을 사용할 수 없습니다.</Text>
                 )}
                 {active.autoFailEnabled!==null && <>
-                  <Text style={s.label}>불량 기준 입력 (%)</Text>
+                  <Text style={s.formLabel}>불량 기준 입력 (%)</Text>
                   <TextInput style={s.input} value={failPercent} placeholder="불량 기준 (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
                     accessibilityLabel="자동 불량 기준 백분율" />
                   <Text style={s.muted}>최솟값과 최댓값이 같으면 시험용 고정 기준입니다.</Text>
-                  <Text style={s.label}>불량 기준 최솟값 (%)</Text>
+                  <Text style={s.formLabel}>불량 기준 최솟값 (%)</Text>
                   <TextInput style={s.input} value={failMinPercent} placeholder="최솟값 (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailMinPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
                     accessibilityLabel="불량 기준 최솟값" />
-                  <Text style={s.label}>불량 기준 최댓값 (%)</Text>
+                  <Text style={s.formLabel}>불량 기준 최댓값 (%)</Text>
                   <TextInput style={s.input} value={failMaxPercent} placeholder="최댓값 (%)"
                     onChangeText={x=>{editedFailInput.current=true;setFailMaxPercent(x);}}
                     keyboardType="decimal-pad" maxLength={9} editable={canWrite}
@@ -434,30 +509,16 @@ export default function PolicyLiveScreen() {
                     onPress={()=>confirmAutoFailToggle(false)}
                     disabled={!canWrite||!canToggleOff}/>
                   <Text style={s.muted}>
-                    불량 기준이 등록된 정책에서 켜기 버전을 저장할 수 있습니다. 새 비활성 기준 버전은 아래 정책 목록에서 바로 켜기 버전을 만들 수 있으며, 적용은 별도입니다.
+                    불량 기준이 등록된 정책에서 켜기 버전을 저장할 수 있습니다. 새 비활성 기준 버전은 버전 관리에서 바로 켜기 버전을 만들 수 있으며, 적용은 별도입니다.
                   </Text>
                 </>}
               </>}
             </Card>
+            )}
 
-            <Card title="2. 기준치 조정 · 새 버전 저장">
-              <Text style={s.muted}>
-                현재 정책의 허용 범위 안에서 백분율(%)을 입력하세요.
-              </Text>
-              <Text style={s.label}>새 기준치 입력 (%)</Text>
-              <TextInput style={s.input} value={percentInput}
-                onChangeText={(v) => { editedInput.current = true; setPercentInput(v); }}
-                placeholder="예: 1.00" keyboardType="decimal-pad" maxLength={9}
-                editable={canWrite && activeHasBounds} selectTextOnFocus
-                accessibilityLabel="새 자동 통과 기준 백분율" />
-              <Text style={[s.hint, !validInput && s.errorText]}>{validationText}</Text>
-              <Button title={writing === 'save' ? '새 버전 저장 중…' : '새 정책 버전 저장'}
-                onPress={confirmSave} disabled={!canWrite || !validInput} />
-              <Text style={s.muted}>저장 직후 새 정책은 비활성이며, 이전 활성 정책은 그대로 유지됩니다.</Text>
-            </Card>
-
+            {section === 'versions' && (<>
             {currentSaved && (
-              <Card title="3. 마지막으로 저장한 새 버전">
+              <Card title="마지막으로 저장한 새 버전">
                 <Row label="정책 버전" value={currentSaved.policyVersion} />
                 <Row label="자동 통과 기준" value={percentageTextV4(currentSaved.passThreshold, 4)} />
                 <Row label="불량 기준" value={percentageTextV4(currentSaved.failThreshold,4)} />
@@ -471,7 +532,7 @@ export default function PolicyLiveScreen() {
               </Card>
             )}
 
-            <Card title="4. 정책 버전 목록 · 복귀">
+            <Card title="정책 버전 목록 · 복귀">
               <Text style={s.muted}>
                 서버 기준 최신 생성순입니다. 현재 적용 정책 외에 준비된 버전을 선택해 원래 기준으로 복귀할 수 있습니다.
               </Text>
@@ -506,14 +567,7 @@ export default function PolicyLiveScreen() {
                 );
               })}
             </Card>
-            {writing && (
-              <View style={s.status}>
-                <ActivityIndicator />
-                <Text style={s.muted}>실제 서버에 정책 요청 중입니다. 두 번 제출하지 마세요.</Text>
-              </View>
-            )}
-            {actionNotice && <View style={s.successCard}><Text style={s.successText}>{actionNotice}</Text></View>}
-            {actionError && <View style={s.errorCard}><Text style={s.errorText}>{actionError}</Text></View>}
+            </>)}
             <Text style={s.footer}>
               각 검사의 이력에는 접수 당시 적용한 정책이 표시됩니다.
             </Text>
@@ -527,6 +581,18 @@ export default function PolicyLiveScreen() {
 
 const s = StyleSheet.create({
   backTouch: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  metrics: { flexDirection: 'row', gap: 8 },
+  metric: { flex: 1, minWidth: 0, backgroundColor: C.bg, borderRadius: 10, padding: 10, gap: 4 },
+  metricLabel: { color: C.muted, fontSize: 13, lineHeight: 18 },
+  metricValue: { color: C.ink, fontSize: 20, fontWeight: '700' },
+  failEnabled: { color: C.red },
+  detailsToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, paddingHorizontal: 4 },
+  sectionTabs: { flexDirection: 'row', gap: 6 },
+  sectionTab: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.white },
+  sectionTabActive: { backgroundColor: C.blue, borderColor: C.blue },
+  sectionTabText: { color: C.ink, fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  sectionTabTextActive: { color: C.white },
+  formLabel: { color: C.ink, fontSize: 13, lineHeight: 18, fontWeight: '600' },
   screen: { flex: 1, backgroundColor: C.bg },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14, gap: 6 },
   back: { color: C.blue, fontSize: 14, fontWeight: '600' },

@@ -211,3 +211,45 @@ test('worker monitoring puts the pending queue before recent inspections without
   assert.match(queue, /\{isAuthenticatedWorker && \(/);
   assert.match(queue, /params: \{partCode, sort: queueSort, aiDefectOnly: String\(aiDefectOnly\)\}/);
 });
+
+test('policy screen defaults to pass editing and separates fail editing and version management', () => {
+  const code = fs.readFileSync(path.join(__dirname, '../src/app/policy-live.tsx'), 'utf8');
+  const source = ts.createSourceFile('policy-live.tsx', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  assert.equal(source.parseDiagnostics.length, 0);
+  assert.match(code, /useState<PolicySection>\('pass'\)/);
+  assert.match(code, /\{access === 'admin' && !loading && \(/);
+  assert.match(code, /accessibilityState=\{\{selected:section===item.value,disabled:writing!==null\}\}/);
+  assert.match(code, /onPress=\{\(\)=>selectSection\(item.value\)\}/);
+  assert.match(code, /Keyboard\.dismiss\(\);/);
+  const ui = code.slice(code.indexOf('<Card title="현재 적용 중인 정책">'));
+  const pass = ui.indexOf("{section === 'pass' && (");
+  const fail = ui.indexOf("{section === 'fail' && (");
+  const versions = ui.indexOf("{section === 'versions' && (");
+  assert.ok(pass > 0 && fail > pass && versions > fail);
+  assert.match(ui.slice(0,pass), /정책 버전/);
+  assert.match(ui.slice(0,pass), /자동 통과 기준/);
+  assert.match(ui.slice(0,pass), /통과 검증 범위/);
+  assert.match(ui.slice(pass,fail), /onPress=\{confirmSave\}/);
+  assert.match(ui.slice(fail,versions), /onPress=\{confirmSaveFail\}/);
+  assert.match(ui.slice(fail,versions), /confirmAutoFailToggle\(true\)/);
+  assert.match(ui.slice(fail,versions), /팀 승인 시험 범위/);
+  assert.match(ui.slice(versions), /confirmActivate\(currentSaved\)/);
+  assert.match(ui.slice(versions), /confirmActivate\(policy\)/);
+  assert.match(ui.slice(versions), /원래 정책으로 복귀/);
+});
+
+test('policy save feedback stays visible and successful writes only switch to version management', () => {
+  const code = fs.readFileSync(path.join(__dirname, '../src/app/policy-live.tsx'), 'utf8');
+  const start = code.indexOf('const confirmedWrite =');
+  const end = code.indexOf('const confirmSave =',start);
+  const wrapper = code.slice(start,end);
+  assert.match(wrapper, /await operation\(visit\);/);
+  assert.match(wrapper, /if \(visit\.isCurrent\(\)\) selectSection\('versions'\);/);
+  assert.doesNotMatch(wrapper, /\.activate\(|confirmActivate\(/);
+  const ui = code.slice(code.indexOf('<Card title="현재 적용 중인 정책">'));
+  const first = ui.indexOf("{section === 'pass' && (");
+  assert.ok(ui.indexOf('{actionNotice &&') > 0 && ui.indexOf('{actionNotice &&') < first);
+  assert.ok(ui.indexOf('{actionError &&') > 0 && ui.indexOf('{actionError &&') < first);
+  assert.match(ui, /disabled=\{!canWrite \|\| !validInput\}/);
+  assert.match(ui, /disabled=\{!canWrite\|\|!failEditValid\}/);
+});
