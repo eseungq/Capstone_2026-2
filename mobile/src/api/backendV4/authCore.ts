@@ -184,7 +184,14 @@ export function createAuthV4(config: AuthV4Config) {
       }
       await withVault(async () => {
         if (generation !== epoch) throw new Error('이전 로그인 요청이 취소됐습니다.');
-        const previous = await config.vault.read();
+        let previous: AuthSessionV4 | null = null;
+        try {
+          previous = await config.vault.read();
+        } catch {
+          // The new server-authenticated session may replace an unreadable old
+          // value. If this login is cancelled after writing, the unknown prior
+          // state must be cleared, never guessed or restored.
+        }
         if (generation !== epoch) throw new Error('이전 로그인 요청이 취소됐습니다.');
         await config.vault.write(parsed);
         // A later login can supersede this request while SecureStore is writing.

@@ -53,6 +53,32 @@ test('an uncontested login still saves and restores its own account',async()=>{
   assert.equal((await auth.login('A','test')).loginId,'A');
   assert.equal((await auth.restore()).loginId,'A');
 });
+test('a temporary previous-session read failure does not block a valid new login',async()=>{
+  let stored=session('existing'),reads=0;
+  const vault={async read(){if(++reads===1)throw Error('temporary read failure');return stored;},async write(s){stored=s;},async clear(){stored=null;}};
+  const auth=createAuthV4({baseUrl:'https://test.invalid/api/v1',vault,fetchImpl:async()=>Response.json({data:session('A')})});
+  assert.equal((await auth.login('A','test')).loginId,'A');
+  assert.equal((await auth.restore()).loginId,'A');
+});
+for(const secondSucceeds of [false,true]){
+  test(`unknown previous-session value is cleared on cancellation without overwriting newer login (${secondSucceeds})`,async()=>{
+    let stored=session('unreadable-prior'),reads=0,clears=0;
+    const started=deferred(),release=deferred();
+    const vault={async read(){if(++reads===1)throw Error('temporary read failure');return stored;},async clear(){clears++;stored=null;},async write(s){if(s.loginId==='A'){started.resolve();await release.promise;}stored=s;}};
+    const auth=createAuthV4({baseUrl:'https://test.invalid/api/v1',vault,fetchImpl:async(_url,opts)=>{
+      const id=JSON.parse(opts.body).loginId;
+      return id==='A'||secondSucceeds?Response.json({data:session(id)}):Response.json({error:{code:'AUTH_INVALID_CREDENTIALS'}},{status:401});
+    }});
+    const a=auth.login('A','test').then(()=>true,()=>false);
+    assert.equal(await Promise.race([started.promise.then(()=>true),a.then(()=>false)]),true,'new session must reach storage despite the read error');
+    const b=auth.login('B','test').then(()=>true,()=>false);await flush();
+    const reader=auth.restore();release.resolve();
+    assert.equal(await a,false);assert.equal(await b,secondSucceeds);
+    assert.notEqual((await reader).loginId,'A');
+    const restored=await auth.restore();assert.equal(restored.loginId,secondSucceeds?'B':null);
+    assert.equal(clears,1);
+  });
+}
 
 // Execute the production screen functions with controllable hooks and services.
 // Native pixel layout is outside this harness; event handlers/state are exercised.
