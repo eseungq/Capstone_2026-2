@@ -88,7 +88,7 @@ export default function AdminDailyLiveScreen(){
  return <SafeAreaView style={s.root}>
    <Stack.Screen options={{headerShown:false}}/>
    <View style={s.header}>
-     <Pressable accessibilityRole="button" onPress={()=>router.back()}>
+     <Pressable accessibilityRole="button" onPress={()=>router.back()} style={s.backTouch}>
        <Text style={s.link}>‹ 관리자 설정으로 돌아가기</Text>
      </Pressable>
      <Text style={s.title}>날짜별 자동 판정 이력</Text>
@@ -175,21 +175,22 @@ export default function AdminDailyLiveScreen(){
  </SafeAreaView>;
 }
 const s=StyleSheet.create({
+  backTouch: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
  root:{flex:1,backgroundColor:'#F5F7FB'},header:{padding:18,gap:8},scroll:{flex:1},
  body:{paddingHorizontal:18,paddingBottom:35,gap:12},title:{fontSize:22,fontWeight:'700',color:ink},
- strong:{fontSize:13,fontWeight:'700',color:ink},muted:{color:muted,fontSize:11,lineHeight:18},
+ strong:{fontSize: 14,fontWeight:'700',color:ink},muted:{color:muted,fontSize: 13,lineHeight:18},
  card:{backgroundColor:'#FFF',borderRadius:14,borderColor:'#E4E7EC',borderWidth:1,padding:14,gap:12},
- chips:{flexDirection:'row',flexWrap:'wrap',gap:6},chip:{borderWidth:1,borderRadius:9,borderColor:'#CBD5E1',padding:9},
- chipActive:{backgroundColor:blue,borderColor:blue},chipText:{fontSize:11,fontWeight:'700',color:'#334155'},
+ chips:{flexDirection:'row',flexWrap:'wrap',gap:6},chip:{ justifyContent: 'center', minHeight: 44,borderWidth:1,borderRadius:9,borderColor:'#CBD5E1',padding:9},
+ chipActive:{backgroundColor:blue,borderColor:blue},chipText:{fontSize: 12,fontWeight:'700',color:'#334155'},
  chipTextActive:{color:'#FFF'},dateCell:{flex:1,minWidth:124,gap:6},
- input:{borderWidth:1,borderColor:'#CBD5E1',borderRadius:9,padding:11,fontSize:13,color:ink},
- primary:{backgroundColor:blue,padding:13,borderRadius:10,alignItems:'center'},
- primaryText:{color:'#FFF',fontWeight:'700',fontSize:13},
- outline:{borderWidth:1,borderColor:blue,borderRadius:10,padding:10,alignItems:'center'},
- link:{color:blue,fontSize:12,fontWeight:'700'},error:{color:red,fontSize:12,lineHeight:20},
+ input:{ minHeight: 44,borderWidth:1,borderColor:'#CBD5E1',borderRadius:9,padding:11,fontSize: 14,color:ink},
+ primary:{ justifyContent: 'center', minHeight: 44,backgroundColor:blue,padding:13,borderRadius:10,alignItems:'center'},
+ primaryText:{color:'#FFF',fontWeight:'700',fontSize: 14},
+ outline:{ justifyContent: 'center', minHeight: 44,borderWidth:1,borderColor:blue,borderRadius:10,padding:10,alignItems:'center'},
+ link:{color:blue,fontSize: 13,fontWeight:'700'},error:{color:red,fontSize:12,lineHeight:20},
  line:{flexDirection:'row',alignItems:'flex-start',justifyContent:'space-between',gap:10},
- lineLabel:{flex:0.56,color:muted,fontSize:11,lineHeight:17},
- lineValue:{flex:0.44,color:ink,fontSize:11,fontWeight:'600',textAlign:'right',lineHeight:17},
+ lineLabel:{flex:0.56,color:muted,fontSize: 13,lineHeight: 18},
+ lineValue:{flex:0.44,color:ink,fontSize: 13,fontWeight:'600',textAlign:'right',lineHeight: 18},
  history:{borderTopWidth:1,borderTopColor:'#E4E7EC',paddingVertical:12,gap:8},
  band:{backgroundColor:'#F8FAFC',padding:12,borderRadius:10,gap:9},
  item:{borderTopWidth:1,borderTopColor:'#E4E7EC',paddingTop:9,gap:4},

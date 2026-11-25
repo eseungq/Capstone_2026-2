@@ -82,7 +82,7 @@ export default function RechecksLiveScreen() {
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} accessibilityRole="button">
+        <Pressable onPress={() => router.back()} accessibilityRole="button" style={styles.backTouch}>
           <Text style={styles.link}>‹ 뒤로</Text>
         </Pressable>
         <Text style={styles.title}>AUTO_PASS 표본 재확인</Text>
@@ -204,30 +204,31 @@ export default function RechecksLiveScreen() {
 }
 
 const styles = StyleSheet.create({
+  backTouch: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   screen: { flex: 1, backgroundColor: '#F5F7FB' },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, gap: 7 },
   title: { fontSize: 22, color: '#111827', fontWeight: '700' },
-  sub: { fontSize: 12, color: '#64748B' },
+  sub: { fontSize: 13, color: '#64748B' },
   body: { paddingHorizontal: 20, paddingBottom: 28, gap: 12 },
   notice: { backgroundColor: '#EBF1FF', borderRadius: 12, padding: 12 },
-  noticeText: { fontSize: 12, lineHeight: 19, color: '#2054D8' },
+  noticeText: { fontSize: 13, lineHeight: 19, color: '#2054D8' },
   sectionTitle: { fontSize: 14, color: '#111827', fontWeight: '700' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  filter: { borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFF',
+  filter: { justifyContent: 'center', minHeight: 44, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFF',
     borderRadius: 10, paddingHorizontal: 11, paddingVertical: 11 },
   selected: { backgroundColor: '#2054D8', borderColor: '#2054D8' },
-  filterText: { fontSize: 11, color: '#475569', fontWeight: '600' },
+  filterText: { fontSize: 12, color: '#475569', fontWeight: '600' },
   selectedText: { color: '#FFF' },
   card: { padding: 14, borderRadius: 13, borderWidth: 1, borderColor: '#E4E7EC',
     backgroundColor: '#FFF', gap: 9 },
-  itemTitle: { fontSize: 13, color: '#111827', fontWeight: '700' },
+  itemTitle: { fontSize: 14, color: '#111827', fontWeight: '700' },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   statusText: { fontSize: 12, fontWeight: '700', color: '#067647' },
-  muted: { fontSize: 12, color: '#64748B', lineHeight: 19 },
-  link: { fontSize: 13, color: '#2054D8', fontWeight: '700' },
+  muted: { fontSize: 13, color: '#64748B', lineHeight: 19 },
+  link: { fontSize: 14, color: '#2054D8', fontWeight: '700' },
   errorText: { fontSize: 12, color: '#B42318', lineHeight: 18 },
   error: { backgroundColor: '#FFF0ED' },
-  secondaryButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10,
+  secondaryButton: { justifyContent: 'center', minHeight: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10,
     paddingHorizontal: 13, paddingVertical: 11, alignItems: 'center' },
   pressed: { opacity: 0.75 },
   disabled: { opacity: 0.35 },

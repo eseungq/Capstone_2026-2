@@ -343,7 +343,7 @@ export default function PolicyLiveScreen() {
     <SafeAreaView style={s.screen} edges={['top', 'bottom']}>
       <Stack.Screen options={{headerShown: false}} />
       <View style={s.header}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()}>
+        <Pressable accessibilityRole="button" onPress={() => router.back()} style={s.backTouch}>
           <Text style={s.back}>‹ 설정으로 돌아가기</Text>
         </Pressable>
         <Text style={s.title}>카울커버 자동 판정 정책</Text>
@@ -526,39 +526,40 @@ export default function PolicyLiveScreen() {
 }
 
 const s = StyleSheet.create({
+  backTouch: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   screen: { flex: 1, backgroundColor: C.bg },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14, gap: 6 },
-  back: { color: C.blue, fontSize: 13, fontWeight: '600' },
+  back: { color: C.blue, fontSize: 14, fontWeight: '600' },
   title: { color: C.ink, fontSize: 23, lineHeight: 32, fontWeight: '700' },
-  subtitle: { color: C.muted, fontSize: 11, lineHeight: 17 },
+  subtitle: { color: C.muted, fontSize: 13, lineHeight: 18},
   scroll: { flex: 1 },
   body: { paddingHorizontal: 20, paddingBottom: 35, gap: 12 },
   card: { padding: 15, backgroundColor: C.white, borderRadius: 14, borderWidth: 1, borderColor: C.border, gap: 10 },
   cardTitle: { color: C.ink, fontWeight: '700', fontSize: 16 },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  label: { color: C.muted, fontSize: 12, lineHeight: 18, flex: 0.46 },
-  value: { color: C.ink, fontSize: 12, lineHeight: 18, textAlign: 'right', flex: 0.54, fontWeight: '600' },
-  muted: { color: C.muted, fontSize: 12, lineHeight: 19 },
+  label: { color: C.muted, fontSize: 13, lineHeight: 18, flex: 0.46 },
+  value: { color: C.ink, fontSize: 13, lineHeight: 18, textAlign: 'right', flex: 0.54, fontWeight: '600' },
+  muted: { color: C.muted, fontSize: 13, lineHeight: 19 },
   evidenceCheck: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, padding: 12 },
   input: { borderWidth: 1, borderColor: '#D5DCE8', borderRadius: 10, minHeight: 46,
     backgroundColor: '#F8FAFC', color: C.ink, paddingHorizontal: 14, fontSize: 16 },
-  hint: { fontSize: 12, lineHeight: 19, color: C.green },
+  hint: { fontSize: 13, lineHeight: 19, color: C.green },
   button: { borderRadius: 10, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   primary: { backgroundColor: C.blue },
   secondary: { backgroundColor: C.white, borderWidth: 1, borderColor: C.blue },
-  buttonText: { fontWeight: '700', fontSize: 13, textAlign: 'center' },
+  buttonText: { fontWeight: '700', fontSize: 14, textAlign: 'center' },
   primaryText: { color: C.white },
   secondaryText: { color: C.blue },
   disabled: { opacity: 0.45 },
   notice: { backgroundColor: C.pale, padding: 13, borderRadius: 12 },
-  noticeText: { color: C.blue, fontSize: 12, lineHeight: 19 },
+  noticeText: { color: C.blue, fontSize: 13, lineHeight: 19 },
   status: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 11 },
   policyItem: { borderRadius: 10, backgroundColor: '#F8FAFC', padding: 12, borderWidth: 1,
     borderColor: C.border, gap: 7 },
   policyName: { color: C.ink, fontSize: 13, fontWeight: '700' },
   errorCard: { borderRadius: 12, padding: 12, backgroundColor: C.redPale, gap: 9 },
-  errorText: { color: C.red, fontSize: 12, lineHeight: 19 },
+  errorText: { color: C.red, fontSize: 13, lineHeight: 19 },
   successCard: { borderRadius: 12, padding: 12, backgroundColor: C.greenPale },
-  successText: { color: C.green, fontSize: 12, lineHeight: 20 },
-  footer: { color: C.muted, fontSize: 11, lineHeight: 18, paddingHorizontal: 3 },
+  successText: { color: C.green, fontSize: 13, lineHeight: 20 },
+  footer: { color: C.muted, fontSize: 12, lineHeight: 18, paddingHorizontal: 3 },
 });

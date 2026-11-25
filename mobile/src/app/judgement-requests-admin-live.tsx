@@ -111,7 +111,7 @@ export default function JudgementRequestsAdminLiveScreen(){
     <ScrollView ref={scrollRef} style={{flex:1}} contentContainerStyle={s.body}
       onLayout={revealNote} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
       <View style={s.top}>
-        <Pressable onPress={()=>router.back()}><Text style={s.link}>‹ 관리자 화면으로</Text></Pressable>
+        <Pressable onPress={()=>router.back()} style={s.backTouch} accessibilityRole="button"><Text style={s.link}>‹ 관리자 화면으로</Text></Pressable>
         <Text style={s.title}>판정 확인 요청 관리</Text>
         <Text style={s.muted}>요청별 유지·정정 근거를 남깁니다. 최초 판정은 보존됩니다.</Text>
       </View>
@@ -205,23 +205,24 @@ export default function JudgementRequestsAdminLiveScreen(){
   </SafeAreaView>;
 }
 const s=StyleSheet.create({
+  backTouch: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
  root:{flex:1,backgroundColor:'#F5F7FB'},top:{paddingVertical:18,gap:8},title:{fontSize:22,fontWeight:'700',color:'#111827'},
  body:{paddingHorizontal:18,paddingBottom:16,gap:12},
  footer:{paddingHorizontal:18,paddingVertical:8,borderTopWidth:StyleSheet.hairlineWidth,borderColor:'#E4E7EC',backgroundColor:'#FFFFFF'},
  card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:14,gap:12},
- link:{fontSize:12,color:'#2054D8',fontWeight:'700'},strong:{fontSize:13,color:'#111827',fontWeight:'700'},
- muted:{fontSize:12,color:'#64748B',lineHeight:18},error:{fontSize:12,color:'#B42318',lineHeight:18},
- success:{color:'#067647',fontWeight:'700',fontSize:12},
+ link:{fontSize: 14,color:'#2054D8',fontWeight:'700'},strong:{fontSize: 14,color:'#111827',fontWeight:'700'},
+ muted:{fontSize: 13,color:'#64748B',lineHeight:18},error:{fontSize: 13,color:'#B42318',lineHeight:18},
+ success:{color:'#067647',fontWeight:'700',fontSize: 13},
  row:{flexDirection:'row',gap:8},rowWrap:{flexDirection:'row',flexWrap:'wrap',gap:6},
- filter:{flex:1,borderRadius:9,borderWidth:1,borderColor:'#CBD5E1',alignItems:'center',paddingVertical:11,paddingHorizontal:5},
+ filter:{ justifyContent: 'center', minHeight: 44,flex:1,borderRadius:9,borderWidth:1,borderColor:'#CBD5E1',alignItems:'center',paddingVertical:11,paddingHorizontal:5},
  filterOn:{backgroundColor:'#2054D8',borderColor:'#2054D8'},
- filterText:{color:'#334155',fontWeight:'700',fontSize:11},filterTextOn:{color:'#FFFFFF'},
- part:{padding:9,borderRadius:8,borderWidth:1,borderColor:'#CBD5E1'},
+ filterText:{color:'#334155',fontWeight:'700',fontSize: 12},filterTextOn:{color:'#FFFFFF'},
+ part:{ justifyContent: 'center', minHeight: 44,padding:9,borderRadius:8,borderWidth:1,borderColor:'#CBD5E1'},
  partOn:{backgroundColor:'#2054D8',borderColor:'#2054D8'},
- outline:{borderColor:'#2054D8',borderWidth:1,borderRadius:9,padding:12,alignItems:'center'},
+ outline:{ justifyContent: 'center', minHeight: 44,borderColor:'#2054D8',borderWidth:1,borderRadius:9,padding:12,alignItems:'center'},
  entry:{borderTopWidth:1,borderTopColor:'#E4E7EC',paddingVertical:12,gap:6},
  input:{borderWidth:1,borderColor:'#CBD5E1',borderRadius:10,padding:12,minHeight:90,
-   fontSize:13,color:'#111827',textAlignVertical:'top'},
- submit:{backgroundColor:'#2054D8',borderRadius:10,padding:14,alignItems:'center'},
- submitText:{color:'#FFFFFF',fontWeight:'700',fontSize:13},disabled:{opacity:.5},
+   fontSize: 14,color:'#111827',textAlignVertical:'top'},
+ submit:{ justifyContent: 'center', minHeight: 44,backgroundColor:'#2054D8',borderRadius:10,padding:14,alignItems:'center'},
+ submitText:{color:'#FFFFFF',fontWeight:'700',fontSize: 14},disabled:{opacity:.5},
 });

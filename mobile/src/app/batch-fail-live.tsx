@@ -37,7 +37,7 @@ export default function BatchFailLiveScreen() {
         <Stack.Screen options={{headerShown:false}} />
         <View style={s.heading}>
           <Text style={s.title}>대기열 조회 조건을 확인할 수 없습니다.</Text>
-          <Pressable accessibilityRole="button" onPress={()=>router.back()}>
+          <Pressable accessibilityRole="button" onPress={()=>router.back()} style={s.backTouch}>
             <Text style={s.back}>‹ 돌아가기</Text>
           </Pressable>
         </View>
@@ -251,7 +251,7 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
     <SafeAreaView style={s.screen}>
       <Stack.Screen options={{headerShown:false}} />
       <View style={s.heading}>
-        <Pressable accessibilityRole="button" onPress={()=>router.back()}>
+        <Pressable accessibilityRole="button" onPress={()=>router.back()} style={s.backTouch}>
           <Text style={s.back}>‹ 모니터링으로 돌아가기</Text>
         </Pressable>
         <Text style={s.title}>REVIEW 일괄 FAIL 판정</Text>
@@ -319,7 +319,7 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
               {selected.map((item,index)=>(
                 <View key={item.inspectionId} style={s.line}>
                   <Text style={s.strong}>{index+1}. {item.inspectionNo} · {item.partCode}</Text>
-                  <Pressable accessibilityRole="button" disabled={submitting}
+                  <Pressable accessibilityRole="button" style={s.removeTouch} disabled={submitting}
                     onPress={()=>{
                       confirmation.invalidate();
                       setSelected(old=>old.filter(x=>x.inspectionId!==item.inspectionId));
@@ -451,34 +451,36 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
 }
 
 const s = StyleSheet.create({
+  removeTouch: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' },
+  backTouch: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   screen:{flex:1,backgroundColor:'#F5F7FB'},
   heading:{paddingHorizontal:18,paddingTop:10,paddingBottom:14,gap:7},
-  back:{color:'#2054D8',fontSize:13,fontWeight:'700'},
+  back:{color:'#2054D8',fontSize: 14,fontWeight:'700'},
   modalHeading:{paddingHorizontal:18,paddingTop:12,paddingBottom:16,gap:9},
   modalBackButton:{alignSelf:'flex-start',minHeight:44,justifyContent:'center',paddingVertical:7},
   title:{color:'#111827',fontSize:23,fontWeight:'700'},
   body:{paddingHorizontal:18,paddingBottom:30,gap:12},
   card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:14,gap:11},
   cardTitle:{color:'#111827',fontSize:16,fontWeight:'700'},
-  strong:{color:'#111827',fontSize:12,fontWeight:'700',flexShrink:1},
-  muted:{color:'#64748B',fontSize:11,lineHeight:17},
-  error:{color:'#B42318',fontSize:12,lineHeight:18},
-  line:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,paddingVertical:8,
+  strong:{color:'#111827',fontSize: 14,fontWeight:'700',flexShrink:1},
+  muted:{color:'#64748B',fontSize: 13,lineHeight: 18},
+  error:{color:'#B42318',fontSize: 13,lineHeight:18},
+  line:{ minHeight: 44,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,paddingVertical:8,
     borderTopColor:'#E4E7EC',borderTopWidth:1},
   rowText:{flex:1,gap:5},
-  outline:{borderColor:'#CBD5E1',borderWidth:1,borderRadius:8,paddingHorizontal:10,paddingVertical:9,
+  outline:{ justifyContent: 'center', minHeight: 44,borderColor:'#CBD5E1',borderWidth:1,borderRadius:8,paddingHorizontal:10,paddingVertical:9,
     alignSelf:'flex-start',backgroundColor:'#FFFFFF'},
   choices:{flexDirection:'row',flexWrap:'wrap',gap:6},
   activeChoice:{backgroundColor:'#2054D8',borderColor:'#2054D8'},
   activeChoiceText:{color:'#FFFFFF'},
-  outlineText:{color:'#2054D8',fontSize:12,fontWeight:'700'},
+  outlineText:{color:'#2054D8',fontSize: 13,fontWeight:'700'},
   photo:{width:'100%',height:250,backgroundColor:'#EEF2F8',borderRadius:8},
-  action:{backgroundColor:'#2054D8',borderRadius:9,padding:12,alignItems:'center'},
-  actionText:{color:'#FFFFFF',fontSize:13,fontWeight:'700',textAlign:'center'},
-  danger:{backgroundColor:'#B42318',borderRadius:10,padding:13,alignItems:'center'},
+  action:{ justifyContent: 'center', minHeight: 44,backgroundColor:'#2054D8',borderRadius:9,padding:12,alignItems:'center'},
+  actionText:{color:'#FFFFFF',fontSize: 14,fontWeight:'700',textAlign:'center'},
+  danger:{ justifyContent: 'center', minHeight: 44,backgroundColor:'#B42318',borderRadius:10,padding:13,alignItems:'center'},
   disabled:{opacity:0.45},
-  remove:{color:'#B42318',fontSize:12,fontWeight:'700'},
+  remove:{color:'#B42318',fontSize: 13,fontWeight:'700'},
   input:{backgroundColor:'#F8FAFC',borderColor:'#CBD5E1',borderWidth:1,borderRadius:9,
-    padding:11,color:'#111827',minHeight:62,textAlignVertical:'top',fontSize:12},
+    padding:11,color:'#111827',minHeight:62,textAlignVertical:'top',fontSize: 14},
   result:{borderTopWidth:1,borderTopColor:'#E4E7EC',paddingVertical:10,gap:5},
 });

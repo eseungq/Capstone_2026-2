@@ -127,7 +127,7 @@ function JudgementRequestForm({id}:{id:string}){
       <ScrollView ref={scrollRef} style={s.flex} contentContainerStyle={s.body}
         onLayout={revealFocusedInput} keyboardShouldPersistTaps="handled" keyboardDismissMode="none">
         <View style={s.top}>
-          <Pressable onPress={()=>router.back()}><Text style={s.link}>‹ 검사 상세로 돌아가기</Text></Pressable>
+          <Pressable onPress={()=>router.back()} style={s.backTouch} accessibilityRole="button"><Text style={s.link}>‹ 검사 상세로 돌아가기</Text></Pressable>
           <Text style={s.title}>시스템 판정 확인 요청</Text>
           <Text style={s.muted}>실물·추가 자료와 다른 시스템 판정이 의심될 때만 요청합니다. 최초 판정은 그대로 보존됩니다.</Text>
         </View>
@@ -179,19 +179,20 @@ function JudgementRequestForm({id}:{id:string}){
   </SafeAreaView>;
 }
 const s=StyleSheet.create({
+  backTouch: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   root:{flex:1,backgroundColor:'#F5F7FB'},flex:{flex:1},top:{paddingVertical:18,gap:9},
   body:{paddingHorizontal:18,paddingBottom:16,gap:12},
   footer:{paddingHorizontal:18,paddingVertical:8,borderTopWidth:StyleSheet.hairlineWidth,borderColor:'#E4E7EC',backgroundColor:'#FFFFFF'},
-  title:{fontSize:22,fontWeight:'700',color:'#111827'},muted:{fontSize:12,lineHeight:19,color:'#64748B'},
-  link:{fontSize:13,fontWeight:'700',color:'#2054D8'},strong:{fontSize:13,fontWeight:'700',color:'#111827'},
+  title:{fontSize:22,fontWeight:'700',color:'#111827'},muted:{fontSize: 13,lineHeight:19,color:'#64748B'},
+  link:{fontSize: 14,fontWeight:'700',color:'#2054D8'},strong:{fontSize: 14,fontWeight:'700',color:'#111827'},
   card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:15,gap:12},
   error:{color:'#B42318',fontSize:13,lineHeight:19},success:{color:'#067647',fontSize:13},
-  row:{flexDirection:'row',gap:8},choice:{flex:1,alignItems:'center',padding:13,borderWidth:1,
+  row:{flexDirection:'row',gap:8},choice:{ justifyContent: 'center', minHeight: 44,flex:1,alignItems:'center',padding:13,borderWidth:1,
     borderColor:'#CBD5E1',borderRadius:10},choiceOn:{backgroundColor:'#2054D8',borderColor:'#2054D8'},
   choiceText:{color:'#334155',fontWeight:'700'},choiceOnText:{color:'#FFFFFF'},
-  input:{borderWidth:1,borderColor:'#CBD5E1',borderRadius:10,padding:12,color:'#111827',fontSize:13},
+  input:{ minHeight: 44,borderWidth:1,borderColor:'#CBD5E1',borderRadius:10,padding:12,color:'#111827',fontSize: 14},
   multi:{minHeight:110,textAlignVertical:'top'},history:{borderTopColor:'#E4E7EC',borderTopWidth:1,paddingTop:10,gap:5},
-  outline:{borderWidth:1,borderColor:'#2054D8',borderRadius:10,padding:11,alignItems:'center'},
-  submit:{backgroundColor:'#2054D8',padding:14,borderRadius:10,alignItems:'center'},
-  submitText:{fontSize:13,color:'#FFFFFF',fontWeight:'700'},disabled:{opacity:.5},
+  outline:{ justifyContent: 'center', minHeight: 44,borderWidth:1,borderColor:'#2054D8',borderRadius:10,padding:11,alignItems:'center'},
+  submit:{ justifyContent: 'center', minHeight: 44,backgroundColor:'#2054D8',padding:14,borderRadius:10,alignItems:'center'},
+  submitText:{fontSize: 14,color:'#FFFFFF',fontWeight:'700'},disabled:{opacity:.5},
 });
