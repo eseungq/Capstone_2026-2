@@ -80,7 +80,7 @@ function RuleCard({ rule, index }: { rule: RecheckRuleSummaryV4; index: number }
     <Field label="보정기 버전" value={textOrNone(rule.calibratorVersion)} />
     <View style={styles.divider}/>
     <Text style={styles.sectionTitle}>실제 수집 결과</Text>
-    <Field label="AUTO_PASS 검사" value={countText(rule.autoPassCount)} />
+    <Field label="자동 통과 검사" value={countText(rule.autoPassCount)} />
     <Field label="추출 결정·누락"
       value={countText(rule.decidedCount) + ' / ' + countText(rule.undecidedCount)} />
     <Field label="재확인 PASS·FAIL"
@@ -89,7 +89,7 @@ function RuleCard({ rule, index }: { rule: RecheckRuleSummaryV4; index: number }
       completedCount, rule.sampledCount, rule.completionRate,
     )} />
     <View style={styles.highlight}>
-      <Text style={styles.highlightTitle}>AUTO_PASS 추정 불량률</Text>
+      <Text style={styles.highlightTitle}>자동 통과 추정 불량률</Text>
       <Text style={styles.highlightValue}>{formatRecheckRateV4(rule.estimatedDefectRateInAutoPass)}</Text>
       <Text style={styles.muted}>자동 통과된 검사 내 불량 비율 추정값이며 전체 불량률이 아닙니다.</Text>
     </View>
@@ -104,7 +104,7 @@ function RuleCard({ rule, index }: { rule: RecheckRuleSummaryV4; index: number }
           )}</Text>
         </View>
         <Text style={styles.muted}>
-          AUTO_PASS {countText(s.autoPassCount)} · 결정 누락 {countText(s.undecidedCount)} · 대기 {countText(s.pendingCount)}
+          자동 통과 {countText(s.autoPassCount)} · 결정 누락 {countText(s.undecidedCount)} · 대기 {countText(s.pendingCount)}
         </Text>
         <Text style={styles.muted}>
           재확인 PASS {countText(s.passCount)} · FAIL {countText(s.failCount)}
@@ -130,7 +130,7 @@ function RuleCard({ rule, index }: { rule: RecheckRuleSummaryV4; index: number }
           <Field label="가상 선정" value={countText(compare.sampledCount ?? 0)} />
           <Field label="재확인 미완료" value={countText(compare.unverifiedCount ?? 0)} />
           <Field label="PASS·FAIL" value={countText(compare.passCount ?? 0) + ' / ' + countText(compare.failCount ?? 0)} />
-          <Field label="AUTO_PASS 추정 불량률" value={formatRecheckRateV4(
+          <Field label="자동 통과 추정 불량률" value={formatRecheckRateV4(
             compare.estimatedDefectRateInAutoPass,
           )} />
           {compare.partial === true && <Notice>일부만 완료되어 결과가 치우칠 수 있습니다</Notice>}
@@ -192,13 +192,13 @@ export default function RecheckSummaryLiveScreen() {
         <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.backTouch}>
           <Text style={styles.link}>‹ 뒤로</Text>
         </Pressable>
-        <Text style={styles.title}>AUTO_PASS 표본 재확인 요약</Text>
+        <Text style={styles.title}>자동 통과 표본 재확인 요약</Text>
         <Text style={styles.muted}>관리자 전용 · 조회만 가능</Text>
       </View>
       <ScrollView contentContainerStyle={styles.body}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={()=>{if(!loading&&authorized)void load();}}/>}>
         <Notice>
-          AUTO_PASS 추정 불량률은 전체 불량률이 아닙니다. 같은 규칙이어도 부품·정책·모델·보정기 버전이 다르면 별도 결과로 표시합니다.
+          자동 통과 추정 불량률은 전체 불량률이 아닙니다. 같은 규칙이어도 부품·정책·모델·보정기 버전이 다르면 별도 결과로 표시합니다.
         </Notice>
         <Text style={styles.sectionTitle}>조회 기간</Text>
         <View style={styles.row}>
@@ -239,7 +239,7 @@ export default function RecheckSummaryLiveScreen() {
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>전체 기록 건수 (조건별 불량률은 합산하지 않음)</Text>
               <View style={styles.metrics}>
-                <MetricPair title="AUTO_PASS" value={countText(summary.autoPassCount)}/>
+                <MetricPair title="자동 통과" value={countText(summary.autoPassCount)}/>
                 <MetricPair title="추출 결정" value={countText(summary.decidedCount)}/>
                 <MetricPair title="결정 누락" value={countText(summary.undecidedCount)}/>
                 <MetricPair title="규칙 없는 결정 누락" value={countText(summary.undecidedWithoutRuleCount)}/>
@@ -249,7 +249,7 @@ export default function RecheckSummaryLiveScreen() {
             <Text style={styles.sectionTitle}>규칙·정책·모델·보정기별 결과</Text>
             {summary.rules.length === 0 && <View style={styles.card}>
               <Text style={styles.muted}>
-                선택한 기간에 표본 추출 규칙에 연결된 AUTO_PASS 기록이 없습니다.
+                선택한 기간에 표본 추출 규칙에 연결된 자동 통과 기록이 없습니다.
               </Text>
             </View>}
             {summary.rules.map((rule,index) => (
@@ -259,16 +259,16 @@ export default function RecheckSummaryLiveScreen() {
             ))}
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>대기 시간 비교 · 서버 기록</Text>
-              <WaitCard label="REVIEW 확인" value={summary.waits.review}/>
-              <WaitCard label="AUTO_PASS 재확인" value={summary.waits.recheck}/>
+              <WaitCard label="판정 대기 검사 확인" value={summary.waits.review}/>
+              <WaitCard label="자동 통과 재확인" value={summary.waits.recheck}/>
               <Text style={styles.muted}>
                 평균·중앙값은 완료된 건만, 대기 중인 건은 따로 집계합니다.
               </Text>
             </View>
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>화면 체류 시간 비교 · 제출된 건만</Text>
-              <DwellCard label="REVIEW 확인" value={summary.dwell.review}/>
-              <DwellCard label="AUTO_PASS 재확인" value={summary.dwell.recheck}/>
+              <DwellCard label="판정 대기 검사 확인" value={summary.dwell.review}/>
+              <DwellCard label="자동 통과 재확인" value={summary.dwell.recheck}/>
               <Text style={styles.muted}>
                 제출하지 않고 나간 건은 기록하지 않았습니다. 화면 체류가 실제 작업 시간과 같지는 않습니다.
               </Text>

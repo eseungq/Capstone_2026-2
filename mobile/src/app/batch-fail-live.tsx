@@ -1,3 +1,4 @@
+import { qualityLabelV4 } from '../components/partLabelV4';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
@@ -254,7 +255,7 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
         <Pressable accessibilityRole="button" onPress={()=>router.back()} style={s.backTouch}>
           <Text style={s.back}>‹ 모니터링으로 돌아가기</Text>
         </Pressable>
-        <Text style={s.title}>REVIEW 일괄 FAIL 판정</Text>
+        <Text style={s.title}>판정 대기 일괄 FAIL 판정</Text>
         <Text style={s.muted}>
           검사를 하나씩 상세 검토한 뒤 직접 선택합니다. 서버에 제출하면 건별로 FAIL 판정이 기록됩니다.
         </Text>
@@ -267,7 +268,7 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
         ) : (
           <>
             <View style={s.card}>
-              <Text style={s.cardTitle}>확인 대기 검사 · {filters.partCode ?? '전체 부품'}</Text>
+              <Text style={s.cardTitle}>판정 대기 검사 · {filters.partCode ?? '전체 부품'}</Text>
               <View style={s.choices}>
                 {(['RECEIVED', 'PRIORITY'] as const).map(sort => (
                   <Pressable key={sort} accessibilityRole="button"
@@ -293,12 +294,12 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
               </Pressable>
               {browse.status==='loading' && <ActivityIndicator />}
               {browse.error && <Text style={s.error}>대기열을 불러오지 못했습니다. 다시 조회해 주세요.</Text>}
-              {browse.status==='ready' && browse.items.length===0 && <Text style={s.muted}>이 조건에 해당하는 확인 대기 검사가 없습니다.</Text>}
+              {browse.status==='ready' && browse.items.length===0 && <Text style={s.muted}>이 조건에 해당하는 판정 대기 검사가 없습니다.</Text>}
               {browse.items.map(item=>(
                 <View key={item.inspectionId} style={s.line}>
                   <View style={s.rowText}>
                     <Text style={s.strong}>{item.inspectionNo ?? '검사번호 미제공'} · {item.partCode}</Text>
-                    <Text style={s.muted}>AI 예측: {item.predictedQuality ?? '미제공'} · REVIEW</Text>
+                    <Text style={s.muted}>AI 예측: {qualityLabelV4(item.predictedQuality)} · 판정 대기</Text>
                   </View>
                   <Pressable accessibilityRole="button" style={s.outline}
                     disabled={previewLoading || submitting} onPress={()=>{void openDetail(item);}}>
@@ -439,7 +440,7 @@ function BatchFailQueue({initialFilters}: {initialFilters: ReviewQueueFiltersV4}
                     </>
                   )}
                   {preview.displayState !== 'REVIEW_PENDING' &&
-                    <Text style={s.error}>현재 REVIEW 대기가 아니어서 선택할 수 없습니다.</Text>}
+                    <Text style={s.error}>현재 판정 대기 상태가 아니어서 선택할 수 없습니다.</Text>}
                 </>
               )}
             </View>

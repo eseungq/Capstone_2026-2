@@ -156,7 +156,7 @@ function JudgementRequestForm({id}:{id:string}){
           <Text style={s.strong}>요청할 판정 (현재 판정과 달라야 함)</Text>
           <View style={s.row}>
             {(['PASS','FAIL'] as const).map(value=><Pressable key={value}
-              style={[s.choice,claim===value&&s.choiceOn,value===current&&s.disabled]} disabled={value===current || submitting} onPress={()=>setClaim(value)}
+              style={[s.choice,claim===value&&(value==='PASS'?s.choicePass:s.choiceFail),value===current&&s.disabled]} disabled={value===current || submitting} onPress={()=>setClaim(value)}
               accessibilityRole="button" accessibilityState={{selected:claim===value,disabled:value===current || submitting}}>
               <Text style={[s.choiceText,claim===value&&s.choiceOnText]}>{value}</Text>
             </Pressable>)}
@@ -189,7 +189,7 @@ const s=StyleSheet.create({
   card:{backgroundColor:'#FFFFFF',borderColor:'#E4E7EC',borderWidth:1,borderRadius:14,padding:15,gap:12},
   error:{color:'#B42318',fontSize:13,lineHeight:19},success:{color:'#067647',fontSize:13},
   row:{flexDirection:'row',gap:8},choice:{ justifyContent: 'center', minHeight: 44,flex:1,alignItems:'center',padding:13,borderWidth:1,
-    borderColor:'#64748B',borderRadius:10},choiceOn:{backgroundColor:'#1E293B',borderColor:'#1E293B'},
+    borderColor:'#64748B',borderRadius:10},choicePass:{backgroundColor:'#2054D8',borderColor:'#2054D8'},choiceFail:{backgroundColor:'#B42318',borderColor:'#B42318'},
   choiceText:{color:'#334155',fontWeight:'700'},choiceOnText:{color:'#FFFFFF'},
   input:{ minHeight: 44,borderWidth:1,borderColor:'#64748B',borderRadius:10,padding:12,color:'#111827',fontSize: 14},
   multi:{minHeight:110,textAlignVertical:'top'},history:{borderTopColor:'#E4E7EC',borderTopWidth:1,paddingTop:10,gap:5},

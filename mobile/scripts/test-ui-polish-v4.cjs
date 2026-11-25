@@ -273,6 +273,7 @@ test('inspection photo layout uses side-by-side panels only for two available UR
   assert.match(code,/!url && styles\.missingImageCard/);
   assert.match(code,/<Text style=\{styles\.muted\}>\{missingText\}<\/Text>/);
   assert.match(code,/missingText=\{gradcamMissing\}/);
+  assert.match(code,/\{visibleDetail\.gradcamImageUrl && <ImagePanel embedded/);
   assert.match(code,/resizeMode="contain"/);
   assert.match(code,/onError=\{\(\) => onLoadError\(url\)\}/);
   assert.match(code,/params: \{ inspectionId: id, kind: 'gradcam' \}/);

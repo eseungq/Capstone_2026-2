@@ -18,7 +18,7 @@ function imageUrl(detail: InspectionViewV4, kind: ImageKind): string | null {
 
 function missingImageText(detail: InspectionViewV4, kind: ImageKind): string {
   if (kind === 'original') return '원본 이미지가 제공되지 않았습니다.';
-  if (detail.gradcamStatus === 'NOT_REQUIRED') return 'GOOD 예측에 대한 판단 근거 이미지는 생성되지 않았습니다.';
+  if (detail.gradcamStatus === 'NOT_REQUIRED') return '정상 예측에 대한 판단 근거 이미지는 생성되지 않았습니다.';
   if (detail.gradcamStatus === 'NO_ACTIVATION') return 'AI의 위치별 강조 반응이 없어 판단 근거 이미지를 제공할 수 없습니다.';
   if (detail.gradcamStatus === 'FAILED') return 'AI 판단 근거 이미지 생성에 실패했습니다.';
   return 'AI 판단 근거 이미지를 제공하지 않았습니다.';

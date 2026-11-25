@@ -27,7 +27,7 @@ type MonitoredPart = (typeof MONITORED_PARTS)[number];
 function statusLabel(displayState: string): string {
   switch (displayState) {
     case 'FAILED': return 'AI 분석 실패';
-    case 'REVIEW_PENDING': return '작업자 확인 필요';
+    case 'REVIEW_PENDING': return '판정 대기';
     case 'REVIEW_DONE': return '판정 완료';
     case 'AUTO_PASS': return '자동 통과';
     case 'AUTO_FAIL': return '자동 불량';
@@ -291,24 +291,29 @@ export default function MonitoringLiveDashboardV4({
             </Text>
           </Pressable>
           <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: aiDefectOnly }}
-            style={[styles.filterButton, aiDefectOnly && styles.filterButtonActive]}
+            testID="monitor-ai-defect-checkbox"
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: aiDefectOnly }}
+            aria-checked={aiDefectOnly}
+            style={styles.checkboxRow}
             onPress={() => { setAiDefectOnly((prev) => !prev); setVisibleQueueCount(INITIAL_VISIBLE_QUEUE_COUNT); }}
           >
-            <Text style={[styles.filterButtonText, aiDefectOnly && styles.filterButtonTextActive]}>
+            <View style={[styles.checkboxBox, aiDefectOnly && styles.checkboxChecked]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <Text style={styles.checkboxMark}>{aiDefectOnly?'✓':''}</Text>
+            </View>
+            <Text style={styles.filterButtonText}>
               AI 불량 의심만
             </Text>
           </Pressable>
         </View>
         {queueSort === 'PRIORITY' && (
           <Text style={styles.description}>
-            GOOD 예측·자동 통과 기준 초과 REVIEW를 먼저, 나머지는 뒤에 표시합니다. 각 그룹은 오래된 순입니다.
+            정상 예측 중 자동 통과 기준을 초과한 판정 대기 검사를 먼저, 나머지는 뒤에 표시합니다. 각 그룹은 오래된 순입니다.
           </Text>
         )}
         {aiDefectOnly && (
           <Text style={styles.description}>
-            AI가 DEFECT로 예측한 REVIEW 검사만 조회합니다. 작업자 최종 불량 판정과는 다릅니다.
+            AI가 불량으로 예측한 판정 대기 검사만 조회합니다. 작업자 최종 불량 판정과는 다릅니다.
           </Text>
         )}
         {filteredMode && (
@@ -352,7 +357,7 @@ export default function MonitoringLiveDashboardV4({
                     : 'AI 예측: ' + qualityLabelV4(item.predictedQuality)}
               </Text>
               {item.reviewReason === 'ABOVE_THRESHOLD' && (
-                <Text style={styles.priorityHint}>자동 통과 기준 초과 · REVIEW</Text>
+                <Text style={styles.priorityHint}>판정 대기</Text>
               )}
               {item.displayState === 'REVIEW_PENDING' && (
                 <Text style={styles.description}>
@@ -404,7 +409,7 @@ export default function MonitoringLiveDashboardV4({
               pathname: '/batch-fail-live',
               params: {partCode, sort: queueSort, aiDefectOnly: String(aiDefectOnly)},
             })}>
-            <Text style={styles.batchFailEntryText}>REVIEW 상세 검토 후 일괄 FAIL 판정 ›</Text>
+            <Text style={styles.batchFailEntryText}>판정 대기 상세 검토 후 일괄 FAIL 판정 ›</Text>
           </Pressable>
         )}
       </View>
@@ -458,9 +463,9 @@ export default function MonitoringLiveDashboardV4({
           <>
             <View style={styles.metricRow}>
               <Pressable testID="monitor-review-history" accessibilityRole="button"
-                accessibilityLabel={`확인 대기 ${vm.part.pendingReviewCount}건, 이력 보기`}
+                accessibilityLabel={`판정 대기 ${vm.part.pendingReviewCount}건, 이력 보기`}
                 disabled={!verifiedRole} onPress={()=>openFilteredHistory('REVIEW_PENDING')} style={styles.metric}>
-                <Text style={styles.metricLabel}>작업자 확인 필요</Text>
+                <Text style={styles.metricLabel}>판정 대기</Text>
                 <Text style={styles.metricValue}>{vm.part.pendingReviewCount}건 ›</Text>
               </Pressable>
               <Pressable testID="monitor-failed-history" accessibilityRole="button"
@@ -479,7 +484,7 @@ export default function MonitoringLiveDashboardV4({
         accessibilityRole="button" accessibilityLabel="자동 통과 표본 재확인 목록"
         onPress={()=>router.push('/rechecks-live')}>
         <View style={styles.headingRow}>
-          <Text style={styles.title}>표본 재확인</Text>
+          <Text style={styles.title}>자동 통과 표본 재확인</Text>
           <Text style={styles.detailLink}>{recheckCount===null?(recheckError?'조회 실패 ›':'조회 중… ›'):`${recheckCount}건 ›`}</Text>
         </View>
         <Text style={styles.description}>전체 부품 재확인 대기 · 목록에서 최신 상태 확인</Text>
@@ -499,6 +504,10 @@ const styles = StyleSheet.create({
   filterControls: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   filterButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 11, paddingVertical: 10, borderRadius: 9,
     backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#64748B' },
+  checkboxRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, paddingVertical: 8 },
+  checkboxBox: { width: 22, height: 22, borderRadius: 4, borderWidth: 1.5, borderColor: '#64748B', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  checkboxChecked: { backgroundColor: '#2054D8', borderColor: '#2054D8' },
+  checkboxMark: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   filterButtonActive: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
   filterButtonText: { color: '#475569', fontSize: 13, fontWeight: '700' },
   filterButtonTextActive: { color: '#FFFFFF' },

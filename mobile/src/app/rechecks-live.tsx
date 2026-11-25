@@ -86,7 +86,7 @@ export default function RechecksLiveScreen() {
         <Pressable onPress={() => router.back()} accessibilityRole="button" style={styles.backTouch}>
           <Text style={styles.link}>‹ 뒤로</Text>
         </Pressable>
-        <Text style={styles.title}>AUTO_PASS 표본 재확인</Text>
+        <Text style={styles.title}>자동 통과 표본 재확인</Text>
         <Text style={styles.sub}>
           {role === 'ADMIN' ? '관리자 조회 · 확인함 처리' : role === 'WORKER' ? '작업자 조회 · 재확인' : '권한 확인 중'}
         </Text>
@@ -95,14 +95,14 @@ export default function RechecksLiveScreen() {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={()=>{if(!loading)void load();}}/>}>
         <View style={styles.notice}>
           <Text style={styles.noticeText}>
-            원래 AUTO_PASS의 PASS · SYSTEM 판정은 유지됩니다. REVIEW 업무 대기열과 재확인 대기열은 별도입니다.
+            원래 자동 통과의 시스템 PASS 판정은 유지됩니다. 판정 대기 업무 대기열과 재확인 대기열은 별도입니다.
           </Text>
         </View>
         {role === 'ADMIN' && (
           <Pressable accessibilityRole="button"
             style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
             onPress={() => router.push('/recheck-summary-live')}>
-            <Text style={styles.link}>관리자 공동시험 요약 · AUTO_PASS 추정 불량률 보기 ›</Text>
+            <Text style={styles.link}>관리자 공동시험 요약 · 자동 통과 추정 불량률 보기 ›</Text>
           </Pressable>
         )}
         <Text style={styles.sectionTitle}>조회 유형</Text>
@@ -145,7 +145,7 @@ export default function RechecksLiveScreen() {
           <>
             <Text style={styles.muted}>
               {filter === 'FAIL_UNACKNOWLEDGED' ? '재확인 FAIL 중 관리자가 아직 확인하지 않은 건만 표시' :
-                filter === 'PENDING' ? '선정된 AUTO_PASS 중 작업자 재확인 대기' : '재확인이 제출된 기록'}
+                filter === 'PENDING' ? '선정된 자동 통과 중 작업자 재확인 대기' : '재확인이 제출된 기록'}
               {' · 총 '}{data.totalElements}건
             </Text>
             {data.items.length === 0 && (

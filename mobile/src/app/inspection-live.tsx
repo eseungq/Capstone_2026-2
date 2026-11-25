@@ -86,13 +86,13 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 function ImagePanel({
-  title, url, missingText, caption, onLoadError, onOpen, compact = false,
+  title, url, missingText, caption, onLoadError, onOpen, compact = false, embedded = false,
 }: {
   title: string; url: string | null; missingText: string; caption?: string;
-  onLoadError: (url: string) => void; onOpen: () => void; compact?: boolean;
+  onLoadError: (url: string) => void; onOpen: () => void; compact?: boolean; embedded?: boolean;
 }) {
   return (
-    <View style={[styles.card, compact && styles.imageCard, !url && styles.missingImageCard]}>
+    <View style={[embedded ? styles.embeddedPhoto : styles.card, compact && styles.imageCard, !url && styles.missingImageCard]}>
       <Text style={styles.cardTitle}>{title}</Text>
       {url ? (
         <Pressable accessibilityRole="button" accessibilityLabel={title + ' 크게 보기'}
@@ -363,7 +363,7 @@ export default function InspectionLiveScreen() {
       });
       if (action === 'confirm') {
         if (!judgement || latest.displayState !== 'REVIEW_PENDING' || latest.finalJudgement !== null) {
-          throw new Error('검사 상태가 변경되었습니다. REVIEW_PENDING 검사만 최종 판정할 수 있습니다.');
+          throw new Error('검사 상태가 변경되었습니다. 판정 대기 검사만 최종 판정할 수 있습니다.');
         }
         const reply = await writer.confirm(origin, {
           finalJudgement: judgement,
@@ -475,7 +475,7 @@ export default function InspectionLiveScreen() {
       setDetail(latest);
       if (latest.displayState !== 'AUTO_PASS' || latest.finalJudgement !== 'PASS' ||
           latest.judgedBy !== 'SYSTEM' || !latest.recheck) {
-        throw new Error('현재 검사는 AUTO_PASS 재확인 표본이 아닙니다.');
+        throw new Error('현재 검사는 자동 통과 재확인 표본이 아닙니다.');
       }
       if (action === 'recheck') {
         if (latest.recheck.result !== null || !result) {
@@ -514,7 +514,7 @@ export default function InspectionLiveScreen() {
   const requestRecheck = (result: FinalJudgementV4) => {
     if (!visibleDetail?.recheck || visibleDetail.recheck.result !== null || submitting) return;
     Alert.alert(
-      'AUTO_PASS 표본 재확인 제출',
+      '자동 통과 표본 재확인 제출',
       visibleDetail.inspectionNo + '의 재확인 결과를 ' + result +
         '로 제출할까요? 원래 PASS · SYSTEM은 바뀌지 않습니다.',
       [
@@ -581,7 +581,7 @@ export default function InspectionLiveScreen() {
   const gradcamMissing = visibleDetail?.gradcamStatus === 'NO_ACTIVATION'
     ? 'AI 예측은 완료됐지만, 위치별 강조 반응이 없어 판단 근거 이미지를 제공하기 어렵습니다.'
     : visibleDetail?.gradcamStatus === 'NOT_REQUIRED'
-      ? 'AI가 GOOD으로 예측하여 판단 근거 이미지를 생성하지 않았습니다.'
+      ? 'AI가 정상으로 예측하여 판단 근거 이미지를 생성하지 않았습니다.'
       : visibleDetail?.gradcamStatus === 'FAILED'
         ? '판단 근거 이미지 생성에 실패했습니다. 원본 사진과 AI 예측을 참고하세요.'
         : 'AI 판단 근거 이미지가 제공되지 않았습니다.';
@@ -604,7 +604,7 @@ export default function InspectionLiveScreen() {
               visibleDetail.displayState === 'REVIEW_PENDING' ? styles.reviewBadgeText :
               visibleDetail.displayState === 'FAILED' || visibleDetail.displayState === 'AUTO_FAIL' ? styles.failBadgeText :
               visibleDetail.displayState === 'AUTO_PASS' ? styles.passBadgeText : styles.neutralBadgeText]}>
-              {visibleDetail.displayStateLabel}
+              {visibleDetail.displayState === 'REVIEW_PENDING' ? '판정 대기' : visibleDetail.displayStateLabel}
             </Text>
           </View>}
         </View>
@@ -713,8 +713,9 @@ export default function InspectionLiveScreen() {
                 })}
               />
             ) : (
-              <View style={visibleDetail.originalImageUrl && visibleDetail.gradcamImageUrl ? styles.imageRow : styles.imageStack}>
-                <ImagePanel key={`original-${imageRetryRevision}`} title="원본 사진" url={visibleDetail.originalImageUrl}
+              <View style={styles.card}>
+                <View style={visibleDetail.originalImageUrl && visibleDetail.gradcamImageUrl ? styles.imageRow : styles.imageStack}>
+                <ImagePanel embedded key={`original-${imageRetryRevision}`} title="원본 사진" url={visibleDetail.originalImageUrl}
                   missingText="원본 이미지가 제공되지 않았습니다."
                   compact={!!visibleDetail.originalImageUrl && !!visibleDetail.gradcamImageUrl}
                   onLoadError={handleImageError}
@@ -723,7 +724,7 @@ export default function InspectionLiveScreen() {
                     params: { inspectionId: id, kind: 'original' },
                   })}
                 />
-                <ImagePanel key={`gradcam-${imageRetryRevision}`} title="AI 판단 근거" url={visibleDetail.gradcamImageUrl}
+                {visibleDetail.gradcamImageUrl && <ImagePanel embedded key={`gradcam-${imageRetryRevision}`} title="AI 판단 근거" url={visibleDetail.gradcamImageUrl}
                   missingText={gradcamMissing}
                   compact={!!visibleDetail.originalImageUrl && !!visibleDetail.gradcamImageUrl}
                   onLoadError={handleImageError}
@@ -731,7 +732,9 @@ export default function InspectionLiveScreen() {
                     pathname: '/inspection-image-live',
                     params: { inspectionId: id, kind: 'gradcam' },
                   })}
-                />
+                />}
+                </View>
+                {!visibleDetail.gradcamImageUrl && visibleDetail.gradcamStatus === 'FAILED' && <Text style={styles.muted}>{gradcamMissing}</Text>}
               </View>
             )}
 
@@ -748,7 +751,6 @@ export default function InspectionLiveScreen() {
                       ? '미준비 / 미제공'
                       : `${(visibleDetail.calibratedDefectProbability * 100).toFixed(2)}%`}
                   />
-                  {visibleDetail.reviewReasonText && <Field label="확인 필요 사유" value={visibleDetail.reviewReasonText} />}
                 </>
               )}
               <Field label={visibleDetail.judgedBy === 'SYSTEM' ? '최초 시스템 판정' : '최종 작업자 판정'}
@@ -781,7 +783,7 @@ export default function InspectionLiveScreen() {
 
             {visibleDetail.recheck && (
               <View style={styles.card}>
-                <Text style={styles.cardTitle}>AUTO_PASS 표본 재확인</Text>
+                <Text style={styles.cardTitle}>자동 통과 표본 재확인</Text>
                 <Text style={styles.muted}>
                   원래 검사 판정: 시스템 판정 PASS. 재확인 결과는 별도 기록입니다.
                 </Text>
@@ -799,7 +801,7 @@ export default function InspectionLiveScreen() {
                     <Text style={styles.errorText}>{visibleDetail.recheck.acknowledgedAt
                       ? '재확인 불량 · 관리자 확인함 (해결 완료 아님)'
                       : '재확인 불량 · 관리자의 추가 확인이 필요합니다.'}</Text>
-                    <Text style={styles.muted}>원래 AUTO_PASS 상태와 시스템의 PASS 판정은 유지됩니다.</Text>
+                    <Text style={styles.muted}>원래 자동 통과 상태와 시스템의 PASS 판정은 유지됩니다.</Text>
                   </View>
                 )}
                 {visibleDetail.recheck.result === 'FAIL' && (
@@ -878,7 +880,7 @@ export default function InspectionLiveScreen() {
                 {visibleDetail.judgementRequests.length === 0 ? (
                   <Text style={styles.muted}>판정 확인 요청 기록이 없습니다.</Text>
                 ) : visibleDetail.judgementRequests.map(request => (
-                  <View key={request.requestId} style={styles.field}>
+                  <View key={request.requestId} style={styles.requestHistory}>
                     <Text style={styles.muted}>
                       {request.status === 'OPEN' ? '검토 대기' : request.status === 'KEPT' ? '유지 처리' : '정정 완료'}
                       {' · '}작업자 주장 {request.claimedJudgement}
@@ -907,7 +909,7 @@ export default function InspectionLiveScreen() {
                 <Text style={styles.errorText}>작업자 또는 관리자 계정으로 로그인해 주세요.</Text>
               )}
               {!roleLoading && role === 'ADMIN' && visibleDetail.canOfferConfirm && (
-                <Text style={styles.muted}>관리자 계정은 REVIEW를 조회할 수 있지만 PASS/FAIL 판정은 제출할 수 없습니다.</Text>
+                <Text style={styles.muted}>관리자 계정은 판정 대기 검사를 조회할 수 있지만 PASS/FAIL 판정은 제출할 수 없습니다.</Text>
               )}
               {canShowConfirm && (
                 <>
@@ -944,7 +946,7 @@ export default function InspectionLiveScreen() {
                     ? (role === 'ADMIN'
                       ? '관리자 계정은 표본 재확인 상태를 조회만 할 수 있습니다. 재확인 PASS/FAIL은 작업자 전용입니다.'
                       : role === 'WORKER'
-                        ? '일반 REVIEW 판정이나 FAILED 후속 요청은 없습니다. 표본 재확인은 위 카드에서 제출해 주세요.'
+                        ? '일반 판정 대기 검사 처리나 FAILED 후속 요청은 없습니다. 표본 재확인은 위 카드에서 제출해 주세요.'
                         : '재확인 PASS/FAIL 제출은 작업자 계정에서만 가능합니다.')
                     : '현재 서버 상태에서는 제출 가능한 일반 판정 또는 후속 검사 요청이 없습니다.'}</Text>
               )}
@@ -1055,10 +1057,12 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#FFF', borderRadius: 14, borderWidth: 1, borderColor: '#E4E7EC', padding: 16, gap: 10 },
   cardTitle: { color: '#111827', fontSize: 17, fontWeight: '700' },
   field: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  requestHistory: { minWidth: 0, alignSelf: 'stretch', gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#CBD5E1', paddingTop: 10 },
+  embeddedPhoto: { minWidth: 0, gap: 8 },
   fieldLabel: { flex: 0.42, minWidth: 0, color: '#475569', fontSize: 13, lineHeight: 19 },
   value: { flex: 0.58, minWidth: 0, textAlign: 'right', color: '#111827', fontSize: 14, lineHeight: 20, fontWeight: '500' },
   label: { color: '#475569', fontSize: 13 },
-  muted: { color: '#475569', fontSize: 13, lineHeight: 18 },
+  muted: { color: '#475569', fontSize: 13, lineHeight: 18, maxWidth: '100%', flexShrink: 1 },
   inspectionImage: { height: 265, width: '100%', backgroundColor: '#EEF2F8', borderRadius: 10 },
   receiptSummary: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: 4, paddingVertical: 2 },
   receiptValue: { color: '#334155', fontSize: 13, fontWeight: '600', flexShrink: 1 },

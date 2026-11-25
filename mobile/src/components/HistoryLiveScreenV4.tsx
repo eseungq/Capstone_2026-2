@@ -30,7 +30,7 @@ type PartFilter = '' | 'DOOR' | 'FRAME' | 'COWL_COVER';
 const states: { value: StateFilter; label: string }[] = [
   { value: 'ALL', label: '전체' },
   { value: 'ANALYZING', label: '분석 중' },
-  { value: 'REVIEW_PENDING', label: '확인 대기' },
+  { value: 'REVIEW_PENDING', label: '판정 대기' },
   { value: 'REVIEW_DONE', label: '판정 완료' },
   { value: 'FAILED', label: '분석 실패' },
   { value: 'AUTO_PASS', label: '자동 통과' },
@@ -49,7 +49,7 @@ const parts: { value: PartFilter; label: string }[] = [
 ];
 const stateLabels: Record<DisplayStateV4, string> = {
   ANALYZING: '분석 중',
-  REVIEW_PENDING: '확인 대기',
+  REVIEW_PENDING: '판정 대기',
   REVIEW_DONE: '판정 완료',
   FAILED: '분석 실패',
   AUTO_PASS: '자동 통과',

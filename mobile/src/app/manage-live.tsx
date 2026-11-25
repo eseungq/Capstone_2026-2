@@ -10,7 +10,7 @@ const entries = [
   {id:'judgements',title:'판정 확인 요청',desc:'시스템 판정 유지·정정 요청 검토',route:'/judgement-requests-admin-live'},
   {id:'policy',title:'자동 판정 정책',desc:'자동 통과·자동 불량 기준 및 버전 관리',route:'/policy-live'},
   {id:'daily',title:'날짜별 자동 판정 이력',desc:'날짜·정책별 집계 및 기준 주변 검사',route:'/admin-daily-live'},
-  {id:'rechecks',title:'표본 재확인',desc:'재확인 결과·관리자 확인함 및 공동시험 요약',route:'/rechecks-live'},
+  {id:'rechecks',title:'자동 통과 표본 재확인',desc:'재확인 결과·관리자 확인함 및 공동시험 요약',route:'/rechecks-live'},
 ] as const;
 
 export default function ManageLiveScreen(){

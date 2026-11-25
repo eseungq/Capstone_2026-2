@@ -10,7 +10,7 @@ export function partLabelV4(code: string): string {
 }
 
 export function qualityLabelV4(value:string|null|undefined):string{
-  return value==='GOOD'?'정상 예측':value==='DEFECT'?'불량 예측':value??'미제공';
+  return value==='GOOD'?'정상':value==='DEFECT'?'불량':value??'미제공';
 }
 export function stratumLabelV4(value:string):string{
   return value==='NEAR'?'기준 근접 구간':value==='MID'?'중간 구간':value==='LOW'?'낮은 구간':value;
