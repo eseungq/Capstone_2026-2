@@ -1,0 +1,17 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>결함 부위 지정</title>
+<style>body{font:18px system-ui;max-width:1300px;margin:25px auto}canvas{width:100%;height:auto;touch-action:none;border:1px solid #aaa}button{font:inherit;padding:10px}article{margin:30px 0}header{position:sticky;top:0;background:white;padding:15px;z-index:2}</style>
+<header><b>결함 주변 사각형 지정 — 3장</b> <button id="export">영역 JSON 내보내기</button><div id="message"></div></header>
+<p>각 사진의 눈에 보이는 주요 결함을 드래그로 감싸세요. CAM이나 노란 주석을 따라 그리지 않습니다. 다른 위치와 같은 크기로 비교하기 위해 한 장당 사각형 하나를 사용합니다. 너무 넓게 잡지 말고 결함 주변을 포함하세요. 다시 드래그하면 해당 사진의 사각형이 교체됩니다.</p>
+<p>sample_00은 비교 사례, sample_01·02는 CAM이 놓친 사례입니다. 원본·라벨을 수정하지 않으며 정밀한 결함 마스크를 만드는 작업이 아닙니다. 결함을 확신할 수 없다면 그리지 말고 알려주세요.</p><main id="cases"></main>
+<script>
+const source=__DATA__,boxes={};
+for(const sample of source.cases){const a=document.createElement('article'),h=document.createElement('h2');h.textContent=sample.id+' · '+sample.imageName;a.append(h);const c=document.createElement('canvas');a.append(c);document.getElementById('cases').append(a);const ctx=c.getContext('2d'),im=new Image();let start=null;
+function draw(box){ctx.drawImage(im,0,0);if(box){ctx.strokeStyle='red';ctx.lineWidth=4;ctx.strokeRect(box[0]*c.width,box[1]*c.height,(box[2]-box[0])*c.width,(box[3]-box[1])*c.height)}}
+im.onload=()=>{c.width=im.naturalWidth;c.height=im.naturalHeight;draw(boxes[sample.id])};im.src=sample.id+'.jpg';
+function point(e){const r=c.getBoundingClientRect();return [Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))]}
+c.onpointerdown=e=>{e.preventDefault();start=point(e);c.setPointerCapture(e.pointerId)};
+c.onpointermove=e=>{if(!start)return;const p=point(e);draw([Math.min(start[0],p[0]),Math.min(start[1],p[1]),Math.max(start[0],p[0]),Math.max(start[1],p[1])])};
+c.onpointerup=e=>{if(!start)return;const p=point(e),b=[Math.min(start[0],p[0]),Math.min(start[1],p[1]),Math.max(start[0],p[0]),Math.max(start[1],p[1])];start=null;if(b[2]-b[0]>.002&&b[3]-b[1]>.002)boxes[sample.id]=b;draw(boxes[sample.id]);document.getElementById('message').textContent=Object.keys(boxes).length+'/3장 지정됨'};
+c.onpointercancel=()=>{start=null;draw(boxes[sample.id])};}
+document.getElementById('export').onclick=()=>{if(source.cases.some(c=>!boxes[c.id])){document.getElementById('message').textContent='세 사진 모두 영역을 지정하세요.';return}const payload={...source,selectedBy:'human',exportedAt:new Date().toISOString(),cases:source.cases.map(c=>({...c,box:boxes[c.id]}))};const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='cam_roi_'+new Date().toISOString().replaceAll(':','-')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);document.getElementById('message').textContent='파일을 다운로드했습니다. 원본 사진은 변경되지 않았습니다.'};
+</script></html>

@@ -1,0 +1,15 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>도어 유사 후보 검토</title>
+<style>body{font:18px sans-serif;max-width:1200px;margin:25px auto;background:#fafafa}article{padding:20px 0;border-top:1px solid #aaa}.pair{display:flex;gap:15px}.pair a{width:49%;color:#222}.pair img{width:100%;max-height:600px;object-fit:contain}select,input,button,textarea{font:inherit;margin:8px 0}textarea{display:block;width:95%;height:70px}button{padding:12px}#message{white-space:pre-wrap;color:#823100}</style>
+<h1>도어 유사 후보 — 이번 차수 __COUNT__쌍</h1>
+<p>왼쪽은 기존 내부 검증, 오른쪽은 기존 학습 사진입니다. 표시된 품질은 차기 라벨 제안이며 최종 실물 정답의 보장은 아닙니다. 이전 07·11번 품질 확인과 다른 신규 번호입니다. 사진을 누르면 원본을 엽니다.</p>
+<p>같은 사진: 같은 촬영 이미지의 복제·재인코딩 등. 같은 실물 의심: 다른 촬영이지만 같은 부품으로 의심할 단서가 있음. 배경·차종·색만 같으면 확정하지 말고 보류할 수 있습니다. 모든 선택에 짧은 근거를 적어주세요.</p>
+<label>검토자 <input id="reviewer" autocomplete="name"></label><br><button id="export">검토 JSON 내보내기</button><p id="message" role="status"></p>
+__CARDS__
+<script>
+const queue=__QUEUE_JSON__, sourceHash=__QUEUE_SHA_JSON__, key='door-priority-'+sourceHash;
+function collect(){return {reviewer:document.getElementById('reviewer').value.trim(),records:queue.map((r,i)=>({...r,decision:document.getElementById('decision_'+i).value,reason:document.getElementById('reason_'+i).value.trim()}))}}
+function save(){try{localStorage.setItem(key,JSON.stringify(collect()))}catch(e){}}
+try{const old=JSON.parse(localStorage.getItem(key)||'null');if(old){document.getElementById('reviewer').value=old.reviewer||'';old.records.forEach((r,i)=>{if(i<queue.length&&r.caseId===queue[i].caseId){document.getElementById('decision_'+i).value=r.decision||'UNREVIEWED';document.getElementById('reason_'+i).value=r.reason||''}})}}catch(e){}
+document.addEventListener('input',save);document.addEventListener('change',save);
+document.getElementById('export').onclick=()=>{const data=collect(),reviewed=data.records.filter(r=>r.decision!=='UNREVIEWED'),missing=reviewed.filter(r=>!r.reason);const msg=document.getElementById('message');if(!data.reviewer){msg.textContent='검토자를 입력해 주세요.';return}if(!reviewed.length){msg.textContent='한 건 이상의 판단을 선택해 주세요.';return}if(missing.length){msg.textContent='근거를 입력해 주세요: '+missing.map(r=>r.caseId).join(', ');return}save();const output={schema:'door-remaining-candidate-review-v1',sourceQueueSHA256:sourceHash,exportedAt:new Date().toISOString(),reviewedAt:new Date().toISOString(),applied:false,originalsModified:false,...data};const url=URL.createObjectURL(new Blob([JSON.stringify(output,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='door_similarity_priority_review_'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);msg.textContent='다운로드를 요청했습니다. 다운로드 폴더에서 JSON 파일을 확인해 주세요. 검토 '+reviewed.length+'/'+queue.length+'건.';};
+</script></html>
