@@ -288,9 +288,9 @@
       "path": "ai_api/e02_integration/__init__.py",
       "origin": "DGX project",
       "sourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "publishedSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSHA256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "environmentLiteralsChanged": false,
-      "formattingNormalized": false
+      "formattingNormalized": true
     },
     {
       "path": "ai_api/e02_integration/build_cam_comparison49.py",
@@ -968,9 +968,9 @@
       "path": "cowl_model/__init__.py",
       "origin": "DGX project",
       "sourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "publishedSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSHA256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "environmentLiteralsChanged": false,
-      "formattingNormalized": false
+      "formattingNormalized": true
     },
     {
       "path": "cowl_model/audit_similarity.py",
@@ -1056,9 +1056,9 @@
       "path": "door_experiment/__init__.py",
       "origin": "DGX project",
       "sourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "publishedSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSHA256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "environmentLiteralsChanged": false,
-      "formattingNormalized": false
+      "formattingNormalized": true
     },
     {
       "path": "door_experiment/boundary_review.py",
@@ -1872,9 +1872,9 @@
       "path": "outputs/frame_layercam28_20261109.2V8EMY/demo.py",
       "origin": "DGX project",
       "sourceSHA256": "8e8e46451bdf3f9368284bf10d762fc594d45083effbb9cc9255aedba2d1a25c",
-      "publishedSHA256": "6cd87ad82a7e23f3907262a8eb0a81364b3c6d076dbbf130e134129fd601c89f",
+      "publishedSHA256": "ef9d0d5590bc8403b43b98b9d453ee43ea1eccc197e09f004fdef6cb6103e342",
       "environmentLiteralsChanged": true,
-      "formattingNormalized": false
+      "formattingNormalized": true
     },
     {
       "path": "outputs/frame_layercam28_20261109.2V8EMY/frame_layercam28.py",
@@ -1904,7 +1904,7 @@
       "path": "outputs/frame_test_api_jet_20261108.0mqEHz/cutover.py",
       "origin": "DGX project",
       "sourceSHA256": "d0d4140cd22b95db6c58a883812318984bc51e992d61918fb4272c414ea850bb",
-      "publishedSHA256": "6f59de4af85d90f8e0b2a0236d5db4384c578e373d6d23a430cf2201951f8f16",
+      "publishedSHA256": "034c8b927356f8b102cddafce6c46f13f2014c25ab61bd2350fc00d78a746770",
       "environmentLiteralsChanged": true,
       "formattingNormalized": true
     },
@@ -1920,9 +1920,9 @@
       "path": "outputs/frame_test_api_jet_20261108.0mqEHz/package.py",
       "origin": "DGX project",
       "sourceSHA256": "5b6c6be9372630ceab42892bf4e1eb3b57eb574e0489a5f29ead9176c7a47ca6",
-      "publishedSHA256": "da269c7c09fe09fac233a562375380799ca59317314b44ee38fbce54af710891",
+      "publishedSHA256": "8a103831711fe3179ea95952f12eab1c80dff6383e489e4764b5614c3dd05662",
       "environmentLiteralsChanged": true,
-      "formattingNormalized": false
+      "formattingNormalized": true
     },
     {
       "path": "outputs/frame_validation_audit_20261108.AuDWbR/frame_validation_audit_20261108.py",

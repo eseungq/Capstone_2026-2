@@ -86,4 +86,3 @@ live=dict(framePid=new.pid,frameModels=listing(8773),doorModels=listing(8771),
           palette=report['camPalette'],alpha=report['camAlpha'])
 (stage/'cutover.json').write_text(json.dumps(live,indent=2)+'\n')
 print(json.dumps(live))
-

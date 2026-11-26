@@ -81,4 +81,3 @@ report = dict(modelVersion=MODEL_VERSION, checkpointSHA256=FRAME_SHA256, camLaye
 serialized = json.dumps(report, ensure_ascii=False, indent=2)
 (out / 'report.json').write_text(serialized + '\n')
 print(serialized)
-
