@@ -1,0 +1,2136 @@
+{
+  "schema": "dgx-ai-source-snapshot-v1",
+  "date": "2026-11-26",
+  "purpose": "Authored AI source supplement; not a deployment or independent validation",
+  "changes": "Only documented private path and team-host string substitutions; numeric parameters and code AST otherwise preserved; LF normalization and Python trailing-space cleanup only where AST is identical",
+  "files": [
+    {
+      "path": "ai_api/__init__.py",
+      "origin": "DGX project",
+      "sourceSHA256": "4bd2f8030790a5cb7289f19aad0fae7ba9afabf09188210769532b11dceaafea",
+      "publishedSHA256": "4bd2f8030790a5cb7289f19aad0fae7ba9afabf09188210769532b11dceaafea",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/audit_data.py",
+      "origin": "DGX project",
+      "sourceSHA256": "899a50e82143425f107d739ad50a4fde8ce73e6c99823e33c80d40de3d59bfce",
+      "publishedSHA256": "899a50e82143425f107d739ad50a4fde8ce73e6c99823e33c80d40de3d59bfce",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/audit_door_good_evidence.py",
+      "origin": "DGX project",
+      "sourceSHA256": "854425bd81758a1084b6c5145269ffa43d37c45310b4aa9f9b9e39c59ae9b2e2",
+      "publishedSHA256": "854425bd81758a1084b6c5145269ffa43d37c45310b4aa9f9b9e39c59ae9b2e2",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/audit_door_leakage.py",
+      "origin": "DGX project",
+      "sourceSHA256": "946720bd06900c7dc7fb6965d25e23d1ddfa521e3464ce4008795c8dedd502ea",
+      "publishedSHA256": "946720bd06900c7dc7fb6965d25e23d1ddfa521e3464ce4008795c8dedd502ea",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/audit_followup.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7543f65fceb1bb2ee0c3ce94758308d2fd8f2b4a6e15de351a43b1378fd137fc",
+      "publishedSHA256": "7543f65fceb1bb2ee0c3ce94758308d2fd8f2b4a6e15de351a43b1378fd137fc",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/audit_frame.py",
+      "origin": "DGX project",
+      "sourceSHA256": "94e73900d819afe78365b0d73ff55d5186f369841a45038510530e9b4c04ebd5",
+      "publishedSHA256": "94e73900d819afe78365b0d73ff55d5186f369841a45038510530e9b4c04ebd5",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/audit_score_evidence.py",
+      "origin": "DGX project",
+      "sourceSHA256": "9968c25f15c8342232b12f37d9a4e1270dd222c75eaa28956f9a943d2dfc9428",
+      "publishedSHA256": "9968c25f15c8342232b12f37d9a4e1270dd222c75eaa28956f9a943d2dfc9428",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/backend_contract.py",
+      "origin": "DGX project",
+      "sourceSHA256": "a6370eed077adaa908cfebd505507e354402ef3e3fd8f1b9b6e244355292447d",
+      "publishedSHA256": "a6370eed077adaa908cfebd505507e354402ef3e3fd8f1b9b6e244355292447d",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_encoding.py",
+      "origin": "DGX project",
+      "sourceSHA256": "dfb9b660a4c8eb5a676306262a83b72e25ca1f5c3afab7588b9468503e86c849",
+      "publishedSHA256": "dfb9b660a4c8eb5a676306262a83b72e25ca1f5c3afab7588b9468503e86c849",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_followup_20261104/import_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "1d41404bf2a552c0d1eb767247b0e0f8918a90b443f95cbbfbd4fc47eda4c532",
+      "publishedSHA256": "87319bba281a12a8a90657b2ccf56d78ba802eb550e69c032b1f1d1eb4669953",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_followup_20261104/launch.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d5971c51fcdd61ecea06c879a275cc8034fa52d8d8372e2a4c77e619b016360f",
+      "publishedSHA256": "d5971c51fcdd61ecea06c879a275cc8034fa52d8d8372e2a4c77e619b016360f",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_followup_20261104/prepare.py",
+      "origin": "DGX project",
+      "sourceSHA256": "60c5ec7ec2e7712557467f737f634745aaef5a798d33b4e2c0248bfdf40185c9",
+      "publishedSHA256": "efcb263a832650d8f849d184fda9ad1cf41b75dd4b99ecd5f77bf941214fc55b",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_followup_20261104/run.py",
+      "origin": "DGX project",
+      "sourceSHA256": "8809f02ad5da66a84033d2a9590ec518e6baebbb43201b1e8af0948a06bb0029",
+      "publishedSHA256": "8809f02ad5da66a84033d2a9590ec518e6baebbb43201b1e8af0948a06bb0029",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_followup_20261104/run.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "0c7e13482e2fab5372d9710097e0eaac5253b5335d1a572485e28e5d111da7a3",
+      "publishedSHA256": "05c1f5282577b929083e659b52b21441959476b081f8d091055622f7337f71cd",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_methods_20261104/audit_coordinates.py",
+      "origin": "DGX project",
+      "sourceSHA256": "224e74ba104228faa044e761592f9750296658ab9d8e5d494728a4fa329daa09",
+      "publishedSHA256": "5e94c6914d820d0d7793f1c40bc69848df9a7883d46342275de2fc74de5bf434",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_methods_20261104/launch.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7e86987bec243a2cf6ddc625c3adbe9f59238b3720e6efaf668f1cbdb85b8b51",
+      "publishedSHA256": "7e86987bec243a2cf6ddc625c3adbe9f59238b3720e6efaf668f1cbdb85b8b51",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_methods_20261104/prepare.py",
+      "origin": "DGX project",
+      "sourceSHA256": "5c250fa5552712b722eabef1b254213cb641127115862f5d432e17126dfc6a27",
+      "publishedSHA256": "a8c2659c3ec3d596f5455b4443c9476ecdecffb88db6ff589140fb05e40047d1",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_methods_20261104/preview_style_only.py",
+      "origin": "DGX project",
+      "sourceSHA256": "6c01001bbc190045759e08aa095a65d33886bdc67f8313f92292872653b54bdc",
+      "publishedSHA256": "032635f65192afff0def0df6ef1575c3de88cbbffc76ecb24c75ce5fce391156",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_methods_20261104/run.py",
+      "origin": "DGX project",
+      "sourceSHA256": "576a46d8351a945fd6b90be2f8cd9b009393a5d6ca5316d27bcd4962ada196d8",
+      "publishedSHA256": "576a46d8351a945fd6b90be2f8cd9b009393a5d6ca5316d27bcd4962ada196d8",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_methods_20261104/run.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "45c3b7295f9631dd89652f0569b4ca6261eff91cc7f458a91d295e9b21918be7",
+      "publishedSHA256": "75f34345ae3b07562541c1b697288d5e4a6bb971638bcccf09e0f49e2fadf836",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_model_comparison_20261104/launch.py",
+      "origin": "DGX project",
+      "sourceSHA256": "4fb0a429fe3606f06bc0f9ac4f95019c1971e0912016eceed4124f46b54ae0bd",
+      "publishedSHA256": "4fb0a429fe3606f06bc0f9ac4f95019c1971e0912016eceed4124f46b54ae0bd",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_model_comparison_20261104/prepare.py",
+      "origin": "DGX project",
+      "sourceSHA256": "fb7c32fff34852994d9b28477f1f77e93f35ec5671c2d4e0e68dc589d5943e2d",
+      "publishedSHA256": "60266cca8f15a256ff2a2132509ee68bda97de8786af25ffcfa0611d578c2b69",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_model_comparison_20261104/run.py",
+      "origin": "DGX project",
+      "sourceSHA256": "5289dd862b1f0ddf89fb0b8d49b85f2f894a03b1062d0d2d72a662864fb6adf3",
+      "publishedSHA256": "5289dd862b1f0ddf89fb0b8d49b85f2f894a03b1062d0d2d72a662864fb6adf3",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cam_model_comparison_20261104/run.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "1fd730d447a38e24754108808d1fdcea7351b95cee06946d5114b1e8948ea0fc",
+      "publishedSHA256": "4069d57b286d1ff7194c8dbd9f02df4a584b37268bcf06235ce02025c69a7c95",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/capture_review_template.html",
+      "origin": "DGX project",
+      "sourceSHA256": "61f9447c9a6874c3305a94a8f57977bd3debce62a0fd1c77296e2ed1a8fb538f",
+      "publishedSHA256": "61f9447c9a6874c3305a94a8f57977bd3debce62a0fd1c77296e2ed1a8fb538f",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/capture_selection.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e2ea309c8bb91f58207e120059eb4d6c7bd4b69ce31c8686319dbd6414139ed4",
+      "publishedSHA256": "e2ea309c8bb91f58207e120059eb4d6c7bd4b69ce31c8686319dbd6414139ed4",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/compatibility.py",
+      "origin": "DGX project",
+      "sourceSHA256": "70fae3ba7175c80f123498a062088321f05cc784e9c873815555fdc0211131f2",
+      "publishedSHA256": "70fae3ba7175c80f123498a062088321f05cc784e9c873815555fdc0211131f2",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/consolidate_capture_reviews.py",
+      "origin": "DGX project",
+      "sourceSHA256": "fb3701736dd397732b6ca053cb99dd3d319c6bc6a75113edc1d0449e1ed6f533",
+      "publishedSHA256": "fb3701736dd397732b6ca053cb99dd3d319c6bc6a75113edc1d0449e1ed6f533",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/contract.py",
+      "origin": "DGX project",
+      "sourceSHA256": "39ef30aeb9db7cc1403381d08a25ee3c732ba889d909194ffd381837f938e2f3",
+      "publishedSHA256": "39ef30aeb9db7cc1403381d08a25ee3c732ba889d909194ffd381837f938e2f3",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cpu_session_20261104/queue_cam.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e1f3e52eae27e30259bbba3afeb0733e8bd6113f99ac05bd5f395abcde5ef3b8",
+      "publishedSHA256": "2cd0fd25b851199a2ff0fbf52ca86b0436400783c1356388380d2f3a57c0f198",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cpu_session_20261104/register.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7cc1c5bc32912e9f2289928b6edee1e3ecd2cfadbbd1e23d76e5988a790ff8ca",
+      "publishedSHA256": "c3c9316a7cb9b30aa32ad31c4e4d39d896b0d581a11cdf7822c1a1e8a35680a1",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/cpu_session_20261104/start_session.py",
+      "origin": "DGX project",
+      "sourceSHA256": "5e9d4238033931c340c3cb8590df3a021f95180713710772278275b8ecd5c418",
+      "publishedSHA256": "1e1a74834e6c78138257afbb0831b89e6baf4d986dd432481ece7c574fb429cd",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/diagnostics.py",
+      "origin": "DGX project",
+      "sourceSHA256": "beb424eaa6aab06e9ab4730a83924e8583eddabcb7630bf0ee9ed0846c0ba18b",
+      "publishedSHA256": "beb424eaa6aab06e9ab4730a83924e8583eddabcb7630bf0ee9ed0846c0ba18b",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/duplicate_groups.py",
+      "origin": "DGX project",
+      "sourceSHA256": "bb9576851db91f209347ccf95e47a7599e7da3a6c6e2ffe02b547b2589ea22d1",
+      "publishedSHA256": "bb9576851db91f209347ccf95e47a7599e7da3a6c6e2ffe02b547b2589ea22d1",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_engine.py",
+      "origin": "DGX project",
+      "sourceSHA256": "f09b0179f8fbf3f7408d777abfddc8a26aad06ffa19b5bbd453319216485e303",
+      "publishedSHA256": "f09b0179f8fbf3f7408d777abfddc8a26aad06ffa19b5bbd453319216485e303",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/__init__.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSHA256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": true
+    },
+    {
+      "path": "ai_api/e02_integration/build_cam_comparison49.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e9e0e08699135e1210f058f41bd5edfeb46fe8199834eaac52d48ea440873051",
+      "publishedSHA256": "f840587693c5bf08233a5b7c03fb1124018c8b8148101dfa00e77ff4dfa90b65",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/diagnose_cam_cpu.py",
+      "origin": "DGX project",
+      "sourceSHA256": "ff06e43da0412b36c1ec568b8120e281d277802d01ef0433c78ec669031777f0",
+      "publishedSHA256": "ff06e43da0412b36c1ec568b8120e281d277802d01ef0433c78ec669031777f0",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/handler.py",
+      "origin": "DGX project",
+      "sourceSHA256": "589dfd4648b01a5cae223d8de0d1c0de6051d52f508d8f8f0b7bd4e7b8297527",
+      "publishedSHA256": "589dfd4648b01a5cae223d8de0d1c0de6051d52f508d8f8f0b7bd4e7b8297527",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/run_cam_cpu.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "eefad72b5a11e6dae26278e1b877d675f2b50b0486eb455a8c6f49b03b8b0d70",
+      "publishedSHA256": "eefad72b5a11e6dae26278e1b877d675f2b50b0486eb455a8c6f49b03b8b0d70",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/run_team_server.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "54d219d8135cc8e60b06b0591546d1b289962ebc11f5e9aaaa726e6d39fcee25",
+      "publishedSHA256": "783386b0c88d6b224fd0135b0f320e40fe6f093957987367da5c6a1be8e301e4",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/run_verify.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "ca677c200b7710f37a047122c89cd6a0fa32656b43e9e456e94fabffacd0fb1a",
+      "publishedSHA256": "ca677c200b7710f37a047122c89cd6a0fa32656b43e9e456e94fabffacd0fb1a",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/serve.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d9fa14cdf02470ed9802f98bf951b829f9aa01c268ad0c6848209ab7e510d5c5",
+      "publishedSHA256": "d9fa14cdf02470ed9802f98bf951b829f9aa01c268ad0c6848209ab7e510d5c5",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/test_503_server.py",
+      "origin": "DGX project",
+      "sourceSHA256": "9e1b12e272850b94e1808984bef2ecf66706f056bc921eee7d9e4489ff9eae2c",
+      "publishedSHA256": "3c5f10e358fe5c2fb70ce44a3cebedb31962ab6d3d975496716c3db51f4be230",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/timing.py",
+      "origin": "DGX project",
+      "sourceSHA256": "8740cbce36418fc5228a0b0d6eac857f541314fb940b9921d9cc3c0dbcca4f90",
+      "publishedSHA256": "8740cbce36418fc5228a0b0d6eac857f541314fb940b9921d9cc3c0dbcca4f90",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/verify_http.py",
+      "origin": "DGX project",
+      "sourceSHA256": "2691398c5a87ab6982c7614ba1da6023a9a758a6debbc85dc0955b84b0800407",
+      "publishedSHA256": "2691398c5a87ab6982c7614ba1da6023a9a758a6debbc85dc0955b84b0800407",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/verify_stub_http.py",
+      "origin": "DGX project",
+      "sourceSHA256": "b3792ff6d167387f565a390c13e551c61095307b7b893683aed884558fc52238",
+      "publishedSHA256": "b3792ff6d167387f565a390c13e551c61095307b7b893683aed884558fc52238",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_integration/wire.py",
+      "origin": "DGX project",
+      "sourceSHA256": "b638b43710751f6341f4848f7d434b5521712d415f5fccee121dfd9cda893771",
+      "publishedSHA256": "b638b43710751f6341f4848f7d434b5521712d415f5fccee121dfd9cda893771",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/e02_service.py",
+      "origin": "DGX project",
+      "sourceSHA256": "1d35e7d59b5d24e88bf83998b92e2d00a62e9305ddf201733275d2f8ac32cf9a",
+      "publishedSHA256": "1d35e7d59b5d24e88bf83998b92e2d00a62e9305ddf201733275d2f8ac32cf9a",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/focused_cam.py",
+      "origin": "DGX project",
+      "sourceSHA256": "f5de4a2fd1c383f54b65d438124457431a5399187d66966b71faa7c2e3df6931",
+      "publishedSHA256": "f5de4a2fd1c383f54b65d438124457431a5399187d66966b71faa7c2e3df6931",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/framing_template.html",
+      "origin": "DGX project",
+      "sourceSHA256": "f54b8b5fa14a0a86e3390007b6921499cc1f3e377b724c2eee8237c70c503725",
+      "publishedSHA256": "f54b8b5fa14a0a86e3390007b6921499cc1f3e377b724c2eee8237c70c503725",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/import_door_remaining_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "824d3bc9f5d87d9538f4edcdc352dbf5a60d6bf312dbf6ca530938e05220b2cc",
+      "publishedSHA256": "824d3bc9f5d87d9538f4edcdc352dbf5a60d6bf312dbf6ca530938e05220b2cc",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/label_review_template.html",
+      "origin": "DGX project",
+      "sourceSHA256": "92db21a39c67e91ad818577992e110452fcc093c8240defae92b6f3d2d7f3f57",
+      "publishedSHA256": "92db21a39c67e91ad818577992e110452fcc093c8240defae92b6f3d2d7f3f57",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/manage_dev.py",
+      "origin": "DGX project",
+      "sourceSHA256": "498d9f9d54c546a083ec633efb5cdcfe0dc40a35b06fa0ce0810fa055c5b84f0",
+      "publishedSHA256": "498d9f9d54c546a083ec633efb5cdcfe0dc40a35b06fa0ce0810fa055c5b84f0",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/merge_door_quality_evidence.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7ae88c8b91944867d53c4557bcc7e854fe69586d4cf9ee6a5c64f33fee67bd1a",
+      "publishedSHA256": "2ebe5e6772af1c4c0b82d7adb30956dcfd27dfc86c7d09b9b807ad9daeb1985a",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_backend_samples.py",
+      "origin": "DGX project",
+      "sourceSHA256": "c2e906430af0847b4aca6d33a196f7f947580435a90980a11b1d462a0c65235e",
+      "publishedSHA256": "ac74d677a23845efcee258bc133dff25000253a5c98d218412bf3c9cea7f35a7",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_capture_audit.py",
+      "origin": "DGX project",
+      "sourceSHA256": "c8430b37f4ee95e3585a6913069905f92022295b295f0b24fff546fe55660b2d",
+      "publishedSHA256": "c8430b37f4ee95e3585a6913069905f92022295b295f0b24fff546fe55660b2d",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_capture_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "2b5572b4d83c8b9aa5d12ec09360a3ea37f6568459a0277113c7e9ea133a8763",
+      "publishedSHA256": "d927fdafbe5ad73a087c8c103e4080ef67c04cefbb21c645d9488f30ffee89e2",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_door_data_readiness.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e559788ad3379d9d5856cf53ca42718ec0dd3daad225bdc6a821ee78fee61e6b",
+      "publishedSHA256": "62e67b093dd418df94786d285cc6999207a5ffc592b61b4c4c69901a2810b19c",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_experiment_draft.py",
+      "origin": "DGX project",
+      "sourceSHA256": "737ede2391546b35c025b86dc97052fec0614ee75c2a77dc93ab1dac7f7bb983",
+      "publishedSHA256": "737ede2391546b35c025b86dc97052fec0614ee75c2a77dc93ab1dac7f7bb983",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_frame_run.py",
+      "origin": "DGX project",
+      "sourceSHA256": "bacc213cb803dbde08dcb9ac98aebd3286882487982e4ee8d8f3daa6acf80eda",
+      "publishedSHA256": "67a218d3c7eb6d693a6e0f71d432c0ae59775e22969820eb5dfa57a74683f838",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_framing.py",
+      "origin": "DGX project",
+      "sourceSHA256": "9aa5528b62225d732a43457bca33529890fffaa8a56264299045723a68d0a366",
+      "publishedSHA256": "9aa5528b62225d732a43457bca33529890fffaa8a56264299045723a68d0a366",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_label_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "21a2912e1551917b51ddc4bd489c29e10f734ea4b538f8a5c2c34b0d41d94ad9",
+      "publishedSHA256": "21a2912e1551917b51ddc4bd489c29e10f734ea4b538f8a5c2c34b0d41d94ad9",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_regions.py",
+      "origin": "DGX project",
+      "sourceSHA256": "ea468ca1c050c45a843462fd6be6be17604c43050d0e52923546bc5983341e13",
+      "publishedSHA256": "ea468ca1c050c45a843462fd6be6be17604c43050d0e52923546bc5983341e13",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "8c3a1c56c93d2b500a5384a835b6e68e82a96868fb942e7f83fbc53287bbdfd1",
+      "publishedSHA256": "8c3a1c56c93d2b500a5384a835b6e68e82a96868fb942e7f83fbc53287bbdfd1",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_roi.py",
+      "origin": "DGX project",
+      "sourceSHA256": "9b66319ab8c2c650d010f9acf0631cfbb2bcf6e5a88ef70c5bc9244616263ffe",
+      "publishedSHA256": "9b66319ab8c2c650d010f9acf0631cfbb2bcf6e5a88ef70c5bc9244616263ffe",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_scope_inventory.py",
+      "origin": "DGX project",
+      "sourceSHA256": "5573f73957cb66e8545bb98b24c64b3bd598b07ef44581e10c9d370f956ee51a",
+      "publishedSHA256": "5573f73957cb66e8545bb98b24c64b3bd598b07ef44581e10c9d370f956ee51a",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_scope_reference.py",
+      "origin": "DGX project",
+      "sourceSHA256": "4f7a61f0deda55d1bec1a1c9dc397dbf534b11bf8186ed4f19290089942af62c",
+      "publishedSHA256": "4f7a61f0deda55d1bec1a1c9dc397dbf534b11bf8186ed4f19290089942af62c",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prepare_split_candidate.py",
+      "origin": "DGX project",
+      "sourceSHA256": "05efdca836b1863c76e57e54269036bf568cf8d9195d78fb1dcdf00848854982",
+      "publishedSHA256": "05efdca836b1863c76e57e54269036bf568cf8d9195d78fb1dcdf00848854982",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/preview_all_parts.py",
+      "origin": "DGX project",
+      "sourceSHA256": "a952e9e69191bcb26937a0bded389290336e83643af8de489737a6ce76c499d4",
+      "publishedSHA256": "a952e9e69191bcb26937a0bded389290336e83643af8de489737a6ce76c499d4",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/preview_electrical_parts.py",
+      "origin": "DGX project",
+      "sourceSHA256": "59be89ee2a64c3f4139bc9720f646e9dae702ab28c6e1e99dcc1ca8dd419d559",
+      "publishedSHA256": "59be89ee2a64c3f4139bc9720f646e9dae702ab28c6e1e99dcc1ca8dd419d559",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/prioritize_door_similarity.py",
+      "origin": "DGX project",
+      "sourceSHA256": "9b17eb373b9a0267ef48b45662ad031ddcc0372d986d0a72303876e081cfd2ec",
+      "publishedSHA256": "9b17eb373b9a0267ef48b45662ad031ddcc0372d986d0a72303876e081cfd2ec",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/rank_similarity.py",
+      "origin": "DGX project",
+      "sourceSHA256": "6a1e0e2ca69eca414875a0137b5a1eeb615350d75b929d3f5c8f57a487d8a678",
+      "publishedSHA256": "6a1e0e2ca69eca414875a0137b5a1eeb615350d75b929d3f5c8f57a487d8a678",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/reconcile_door_evidence.py",
+      "origin": "DGX project",
+      "sourceSHA256": "4daca678faadf09c40582da75e4bd6c25d8140a4eca26823deeb68e973203b7b",
+      "publishedSHA256": "4daca678faadf09c40582da75e4bd6c25d8140a4eca26823deeb68e973203b7b",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/refresh_door_split.py",
+      "origin": "DGX project",
+      "sourceSHA256": "79e041f19758975f7f572ccbcf2bd294f238a973f3ca652fabedf26a188c2996",
+      "publishedSHA256": "79e041f19758975f7f572ccbcf2bd294f238a973f3ca652fabedf26a188c2996",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/regions_template.html",
+      "origin": "DGX project",
+      "sourceSHA256": "c8159e57a823c6e91f0b1438936ee459b299ffe39f16d73dc1a5a31ffa3449f8",
+      "publishedSHA256": "c8159e57a823c6e91f0b1438936ee459b299ffe39f16d73dc1a5a31ffa3449f8",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/review_template.html",
+      "origin": "DGX project",
+      "sourceSHA256": "255325d04124588f4fdcb09ce007a6266c768dcc61d58c5f6ff29aec424e2bb1",
+      "publishedSHA256": "255325d04124588f4fdcb09ce007a6266c768dcc61d58c5f6ff29aec424e2bb1",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/roi_template.html",
+      "origin": "DGX project",
+      "sourceSHA256": "411b7fc57e7520b64e4a7be86be19c6a350255936a5f94164ea13c232bfae9f4",
+      "publishedSHA256": "411b7fc57e7520b64e4a7be86be19c6a350255936a5f94164ea13c232bfae9f4",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/run_e02_http.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "265b0612d9c4448a5aa24a327b3c4964b1cfb8a898b10ef52010672fee40abd9",
+      "publishedSHA256": "265b0612d9c4448a5aa24a327b3c4964b1cfb8a898b10ef52010672fee40abd9",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/run_focused.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "13c6d54286c1f8537d3dc62083cd63e6aa2c387eab3982e3982a203d06171347",
+      "publishedSHA256": "dcc703e7e728cdc263506a9d1fd60e32fd89c3f1a2024c14c2b1149b4db23ea0",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/run_gpu.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "259de589fb14798697673b746b47cf2bcb50612b425a58b43b0d7bf80757b0a8",
+      "publishedSHA256": "a48c237353505d8a7d807754466e57ebd96675de6e1472b4d41e9d619e102e07",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/search_capture_candidates.py",
+      "origin": "DGX project",
+      "sourceSHA256": "4d81a652cfc6490c66647b212e23f2e1bead143d7990f18b5b6a946f5da95b05",
+      "publishedSHA256": "4d81a652cfc6490c66647b212e23f2e1bead143d7990f18b5b6a946f5da95b05",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/search_scratch_scope.py",
+      "origin": "DGX project",
+      "sourceSHA256": "21d9bdedd466b0213cf925a316cd19b83f979540fa9eba0aa30fd199fb7b4242",
+      "publishedSHA256": "21d9bdedd466b0213cf925a316cd19b83f979540fa9eba0aa30fd199fb7b4242",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/server.py",
+      "origin": "DGX project",
+      "sourceSHA256": "55f83e407f97bbf091be0b1a65aa4c9dd7ef3ba0d1c9abe2ed11eb4810a09a3a",
+      "publishedSHA256": "55f83e407f97bbf091be0b1a65aa4c9dd7ef3ba0d1c9abe2ed11eb4810a09a3a",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/setup_followup.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e147d5e692a6cc95f0419d80d283fdf6468ab89c69a0d2286443a77f439bec04",
+      "publishedSHA256": "ddb064037877d7b9100802da59f845be34725bff4ac9d8a12583c159c53612e0",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/similarity_priority_template.html",
+      "origin": "DGX project",
+      "sourceSHA256": "758bc3bedcebd95b315b11ff2f2e1ab9efd10ccd86b9774112667d61fded76dd",
+      "publishedSHA256": "758bc3bedcebd95b315b11ff2f2e1ab9efd10ccd86b9774112667d61fded76dd",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/similarity_review_history.py",
+      "origin": "DGX project",
+      "sourceSHA256": "13f5b4733e47fc3cc1cd86aeef95ce832b65c4e8cb1a221e8c1ac9d497a8ad81",
+      "publishedSHA256": "13f5b4733e47fc3cc1cd86aeef95ce832b65c4e8cb1a221e8c1ac9d497a8ad81",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/generate_fixture_examples.py",
+      "origin": "DGX project",
+      "sourceSHA256": "f5850849b118ac414965827caf660ccdc01dabf2012821030f88979da3061337",
+      "publishedSHA256": "f5850849b118ac414965827caf660ccdc01dabf2012821030f88979da3061337",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/regions_dom_test.js",
+      "origin": "DGX project",
+      "sourceSHA256": "203e88a5470ae913275a9d6745856d5c2fdc80a392b73df40fbd8d7459a56c4e",
+      "publishedSHA256": "203e88a5470ae913275a9d6745856d5c2fdc80a392b73df40fbd8d7459a56c4e",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_api.py",
+      "origin": "DGX project",
+      "sourceSHA256": "3c6fef29abd18a63c35c436c15793101f0e782f800258c0d5da453139709ac8f",
+      "publishedSHA256": "6cfcb6a53260c4c9548dea247f6c4fa61476b44d7e361c579c8a837baf3bcda4",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_audit_data.py",
+      "origin": "DGX project",
+      "sourceSHA256": "bd0df76bd871d8410762532f671604cb9c06df7602d05e5685b4c592598f1b73",
+      "publishedSHA256": "bd0df76bd871d8410762532f671604cb9c06df7602d05e5685b4c592598f1b73",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_backend_contract.py",
+      "origin": "DGX project",
+      "sourceSHA256": "0a591c476a77bf68d6223a4c091bf46623e6dea8213bd11002eed61b8969cf55",
+      "publishedSHA256": "0a591c476a77bf68d6223a4c091bf46623e6dea8213bd11002eed61b8969cf55",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_cam_encoding.py",
+      "origin": "DGX project",
+      "sourceSHA256": "45300781b1fce9974ed20aa848ff5375a2e72fa58926b02220a551ae9d4f6f01",
+      "publishedSHA256": "45300781b1fce9974ed20aa848ff5375a2e72fa58926b02220a551ae9d4f6f01",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_capture_selection.py",
+      "origin": "DGX project",
+      "sourceSHA256": "07b51618668127dce0f7d6af0df1b7b0699bb2098e8c3b46912f51867e016345",
+      "publishedSHA256": "07b51618668127dce0f7d6af0df1b7b0699bb2098e8c3b46912f51867e016345",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_compatibility.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e274912bff12632f8158979ddb7810f563e780917c7c1512d9a8aefe16896d2e",
+      "publishedSHA256": "e274912bff12632f8158979ddb7810f563e780917c7c1512d9a8aefe16896d2e",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_dev_management.py",
+      "origin": "DGX project",
+      "sourceSHA256": "f6ab52987e0f0dfbc71a1f75318191a3116352dd6567a1bc34b379e8fa400b3e",
+      "publishedSHA256": "f6ab52987e0f0dfbc71a1f75318191a3116352dd6567a1bc34b379e8fa400b3e",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_diagnostics.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d53472ecd9bebb8fadadef1d51e1bdcee2fb8e857ebbe4892b69b2d551176b33",
+      "publishedSHA256": "d53472ecd9bebb8fadadef1d51e1bdcee2fb8e857ebbe4892b69b2d551176b33",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_door_label_policy.py",
+      "origin": "DGX project",
+      "sourceSHA256": "5ac9419cbbc4285a124e7427091d422f7e2182f05c949ff624c4eaeb9780a0de",
+      "publishedSHA256": "5ac9419cbbc4285a124e7427091d422f7e2182f05c949ff624c4eaeb9780a0de",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_duplicate_groups.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d79613ada1751c7eae3991e06e2a9703ac7ebbe8138fd367a37f9ee11d3d0fc6",
+      "publishedSHA256": "d79613ada1751c7eae3991e06e2a9703ac7ebbe8138fd367a37f9ee11d3d0fc6",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_e02_candidate.py",
+      "origin": "DGX project",
+      "sourceSHA256": "582337882d55d97c8649f550eb7bc4d5a02af124c873d428711eb2f13723d30f",
+      "publishedSHA256": "582337882d55d97c8649f550eb7bc4d5a02af124c873d428711eb2f13723d30f",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_focused.py",
+      "origin": "DGX project",
+      "sourceSHA256": "f5834d5835863d779d980b283ecfe8e26534fd48f1bfc5debb0cac08e26e81be",
+      "publishedSHA256": "46cff56f31d3d9f40abe2dc794c4691444b06294280b0cc45e67d5eb55c676fe",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_followup.py",
+      "origin": "DGX project",
+      "sourceSHA256": "aa338c97938fb79e0e6d48f564f66bca25dc4a6e418f30cbe617403169a2b71b",
+      "publishedSHA256": "aa338c97938fb79e0e6d48f564f66bca25dc4a6e418f30cbe617403169a2b71b",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_frame_audit.py",
+      "origin": "DGX project",
+      "sourceSHA256": "750a079782d6a4ceed8de1aa7b6dc1de3919f567aa3c92f51c3c45d8d329b24e",
+      "publishedSHA256": "750a079782d6a4ceed8de1aa7b6dc1de3919f567aa3c92f51c3c45d8d329b24e",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_frame_run.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7cd0ac4f27baff8e7f496e386b4b23d76950b29278f2ff2311246b15ca62a8f0",
+      "publishedSHA256": "7cd0ac4f27baff8e7f496e386b4b23d76950b29278f2ff2311246b15ca62a8f0",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_framing.py",
+      "origin": "DGX project",
+      "sourceSHA256": "bc8a22937bf73aa17bba490cd25a1c5803f27367d5eab37207cff2237642519a",
+      "publishedSHA256": "bc8a22937bf73aa17bba490cd25a1c5803f27367d5eab37207cff2237642519a",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_good_evidence.py",
+      "origin": "DGX project",
+      "sourceSHA256": "b5a563eda774aae2e89fb9abfefb312eae75955252072ce9a7ba3ef02600a141",
+      "publishedSHA256": "b5a563eda774aae2e89fb9abfefb312eae75955252072ce9a7ba3ef02600a141",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_integration_preparation.py",
+      "origin": "DGX project",
+      "sourceSHA256": "b7328c0388eb4fc37799478e0a18d2793b7cd0416d10a8a6c4e253e08fd8c62a",
+      "publishedSHA256": "b7328c0388eb4fc37799478e0a18d2793b7cd0416d10a8a6c4e253e08fd8c62a",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_launcher.py",
+      "origin": "DGX project",
+      "sourceSHA256": "b92d9522898471919d9fc39edaa960a2a09733728559740ef87e1f3cf80f4814",
+      "publishedSHA256": "c539fb68b587f46fdf532e21c1a2fa4f9134c0049ff99d985318b7769b9006ad",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_prepare_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "62cdb6b611a3369ac7e520be410c51b9efb921bac2577f710ae64fe7ee6d50ff",
+      "publishedSHA256": "62cdb6b611a3369ac7e520be410c51b9efb921bac2577f710ae64fe7ee6d50ff",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_quality_clarification.py",
+      "origin": "DGX project",
+      "sourceSHA256": "b0a681cee11f2ae2cd2d35181ce3213c67cbebeaa89a9f13fbd92b7672a68c97",
+      "publishedSHA256": "b0a681cee11f2ae2cd2d35181ce3213c67cbebeaa89a9f13fbd92b7672a68c97",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_rank_similarity.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d68f7771e0abd1391844fa94cd2a90d8e674bad23dbfa25618cc0d5eabbaec67",
+      "publishedSHA256": "d68f7771e0abd1391844fa94cd2a90d8e674bad23dbfa25618cc0d5eabbaec67",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_refresh_door_split.py",
+      "origin": "DGX project",
+      "sourceSHA256": "88b2e12df85122968545b0fffd855a78c9ad7b04acf1b3c6110b8d5d9ffbf6d4",
+      "publishedSHA256": "88b2e12df85122968545b0fffd855a78c9ad7b04acf1b3c6110b8d5d9ffbf6d4",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_scratch_scope.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d065ae52dcef17995ca2c7cbe36c36436e804461f72bfb2575cc27b39e47a8cb",
+      "publishedSHA256": "d065ae52dcef17995ca2c7cbe36c36436e804461f72bfb2575cc27b39e47a8cb",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_similarity_priority.py",
+      "origin": "DGX project",
+      "sourceSHA256": "2b011875f6ca887f0b77e807f3936c8113da85fb6b39130917807d35597fedd6",
+      "publishedSHA256": "2b011875f6ca887f0b77e807f3936c8113da85fb6b39130917807d35597fedd6",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_similarity_review_history.py",
+      "origin": "DGX project",
+      "sourceSHA256": "cd6bf7789cf79152e0d5fec5ca149fb5364f65dc2e35f57207bb6556adccb311",
+      "publishedSHA256": "cd6bf7789cf79152e0d5fec5ca149fb5364f65dc2e35f57207bb6556adccb311",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/tests/test_split_candidate.py",
+      "origin": "DGX project",
+      "sourceSHA256": "b6ef110a47727d384461aaba3988d7bab1cd78f1454485eb1910d7330b04f687",
+      "publishedSHA256": "b6ef110a47727d384461aaba3988d7bab1cd78f1454485eb1910d7330b04f687",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/verify_backend_profile.py",
+      "origin": "DGX project",
+      "sourceSHA256": "9fcab44e138825a9a2ffdaee964cf30121157dd8a7a78663fbbabcfc0b8fd11d",
+      "publishedSHA256": "9fcab44e138825a9a2ffdaee964cf30121157dd8a7a78663fbbabcfc0b8fd11d",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/verify_e02_http.py",
+      "origin": "DGX project",
+      "sourceSHA256": "860a833789e4bcb18d276722187b6b541916b580eebae88e9ce513c89a7ef221",
+      "publishedSHA256": "860a833789e4bcb18d276722187b6b541916b580eebae88e9ce513c89a7ef221",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/verify_gpu.py",
+      "origin": "DGX project",
+      "sourceSHA256": "81a2819dc17118029c2fe093a9f6e301eebad1326e4de4423d778265efbd17bf",
+      "publishedSHA256": "f5870a92825c39bf992dc73e5873c80e378497f5005a18f1e1c04fea8b7c5c7b",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "ai_api/verify_integration.py",
+      "origin": "DGX project",
+      "sourceSHA256": "1c04d39490cc56cb3b775d47c63f00e5231f2ae25f7a85c9ece11db0a433c713",
+      "publishedSHA256": "1c04d39490cc56cb3b775d47c63f00e5231f2ae25f7a85c9ece11db0a433c713",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "cowl_model/__init__.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSHA256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": true
+    },
+    {
+      "path": "cowl_model/audit_similarity.py",
+      "origin": "DGX project",
+      "sourceSHA256": "4ba60ef5107f5e64f1cf2fcb802845705f054c4e6c4a73ba3f0825759d7988f1",
+      "publishedSHA256": "4ba60ef5107f5e64f1cf2fcb802845705f054c4e6c4a73ba3f0825759d7988f1",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "cowl_model/import_followup.py",
+      "origin": "DGX project",
+      "sourceSHA256": "36293a0db3b523747855c3f846dfe778dc23e454c3ed2a14a41f72d6f347c285",
+      "publishedSHA256": "36293a0db3b523747855c3f846dfe778dc23e454c3ed2a14a41f72d6f347c285",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "cowl_model/import_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "b7a837d4b91d6af666e654de59f59e10e308d2ca86de12085425e7f77d02c027",
+      "publishedSHA256": "b7a837d4b91d6af666e654de59f59e10e308d2ca86de12085425e7f77d02c027",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "cowl_model/import_similarity_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "8f3ff877fe7ec86abefb2de93e46b6def97f8ace7bf072e9951a82a9c4cfd65d",
+      "publishedSHA256": "8f3ff877fe7ec86abefb2de93e46b6def97f8ace7bf072e9951a82a9c4cfd65d",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "cowl_model/inspect_data.py",
+      "origin": "DGX project",
+      "sourceSHA256": "24cfd0325e6eccb03264e867e4cd5c51844cc359287fc74338656c9c01d0700b",
+      "publishedSHA256": "24cfd0325e6eccb03264e867e4cd5c51844cc359287fc74338656c9c01d0700b",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "cowl_model/prepare_followup.py",
+      "origin": "DGX project",
+      "sourceSHA256": "623c040ed08f80ac3c37c35184b74f737d57451afcdf2c2f9df5538fff7e6831",
+      "publishedSHA256": "b4e409e62135ec79613c348a9dbea38fa32f8d47d8b9bfc400c250254c8ac8bc",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "cowl_model/prepare_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e0ff54430fbdd398da03c79e098e42b84498dade664a0b9b23e2bf44acd35770",
+      "publishedSHA256": "e0ff54430fbdd398da03c79e098e42b84498dade664a0b9b23e2bf44acd35770",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "cowl_model/prepare_similarity_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "c2a5ca98fff647a7b415bdb96a9cbaca256e01ac514c4155dac6d60711860721",
+      "publishedSHA256": "c2a5ca98fff647a7b415bdb96a9cbaca256e01ac514c4155dac6d60711860721",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "cowl_model/run_similarity.py",
+      "origin": "DGX project",
+      "sourceSHA256": "521a671a0b80bb57a8318797d68f737dead25c5f7ec8332c9bb58e1aaf0ef4ae",
+      "publishedSHA256": "521a671a0b80bb57a8318797d68f737dead25c5f7ec8332c9bb58e1aaf0ef4ae",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "cowl_model/run_similarity.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "3d4108e39848e7bf5275207accddfa592fbe2d68a9cb4fd43377ce368303ceaf",
+      "publishedSHA256": "3d4108e39848e7bf5275207accddfa592fbe2d68a9cb4fd43377ce368303ceaf",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/__init__.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "publishedSHA256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": true
+    },
+    {
+      "path": "door_experiment/boundary_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "fa6818e4a10c3f7d75bc13fa765812744d869872b8e611dc412097714a11b3e8",
+      "publishedSHA256": "fa6818e4a10c3f7d75bc13fa765812744d869872b8e611dc412097714a11b3e8",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/check_independence.py",
+      "origin": "DGX project",
+      "sourceSHA256": "1307548e42b222b6549071e89bcfcc0a00005271fe10e63af0de7ccebda73670",
+      "publishedSHA256": "1307548e42b222b6549071e89bcfcc0a00005271fe10e63af0de7ccebda73670",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/freeze_development_split.py",
+      "origin": "DGX project",
+      "sourceSHA256": "9924165c4e6c20636c8c099c0af18f2d66819c96fcc9d401a189240e05ed0b35",
+      "publishedSHA256": "9924165c4e6c20636c8c099c0af18f2d66819c96fcc9d401a189240e05ed0b35",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/import_cam_observations.py",
+      "origin": "DGX project",
+      "sourceSHA256": "2dc59ab204fdfde68ef3895f15a6c60606a71d12a8bc4b07d76aa94664c534ad",
+      "publishedSHA256": "2dc59ab204fdfde68ef3895f15a6c60606a71d12a8bc4b07d76aa94664c534ad",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/import_independence_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "8e5d6fdca83a50c1ca8ddc557e1baddf5e971b9e15ded501a22456412d868723",
+      "publishedSHA256": "8e5d6fdca83a50c1ca8ddc557e1baddf5e971b9e15ded501a22456412d868723",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/import_label_recheck.py",
+      "origin": "DGX project",
+      "sourceSHA256": "795a1396e3622930e9db0424f29a869d460100e6b8938e25f47bef4e1bdc6996",
+      "publishedSHA256": "795a1396e3622930e9db0424f29a869d460100e6b8938e25f47bef4e1bdc6996",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/import_neighborhood_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "1305fa736b700c63e06331601fc5fe194fdb7f07d2ac0b373d5b36e2900dc1a6",
+      "publishedSHA256": "1305fa736b700c63e06331601fc5fe194fdb7f07d2ac0b373d5b36e2900dc1a6",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/import_triage_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "a3a932a3228e2a7937e1af6b90d55800b092e7ba64387cd3db40ad850f76024c",
+      "publishedSHA256": "a3a932a3228e2a7937e1af6b90d55800b092e7ba64387cd3db40ad850f76024c",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/preflight.py",
+      "origin": "DGX project",
+      "sourceSHA256": "8a1c696e8889e20b0e3cc5266995eaccd64b991ecbedb05ddafbcff56f41f0e0",
+      "publishedSHA256": "8a1c696e8889e20b0e3cc5266995eaccd64b991ecbedb05ddafbcff56f41f0e0",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/prepare_conservative_split.py",
+      "origin": "DGX project",
+      "sourceSHA256": "43081756ce5a8fb54fc9b94bb1d01f6055abf19e18526a1f9c2f911233696c09",
+      "publishedSHA256": "43081756ce5a8fb54fc9b94bb1d01f6055abf19e18526a1f9c2f911233696c09",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/prepare_independence_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d1586739f4c28c27f250244a2bfb56154376a783a649cc04568da015220340e5",
+      "publishedSHA256": "d1586739f4c28c27f250244a2bfb56154376a783a649cc04568da015220340e5",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/prepare_label_recheck.py",
+      "origin": "DGX project",
+      "sourceSHA256": "9ff9753460d017aa1ce60143cf80b776f200e5ce899e08a5428f6f939852d149",
+      "publishedSHA256": "9ff9753460d017aa1ce60143cf80b776f200e5ce899e08a5428f6f939852d149",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/prepare_model_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "af397414327897d202814a8d6c8888ceb7c94979d80df3c1c1d5c974889cb7a2",
+      "publishedSHA256": "af397414327897d202814a8d6c8888ceb7c94979d80df3c1c1d5c974889cb7a2",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/prepare_neighborhood_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "2a79e595c814e8b456332ca2bda30cdb020c866ec008c2a1742a391f7f8f63a7",
+      "publishedSHA256": "2a79e595c814e8b456332ca2bda30cdb020c866ec008c2a1742a391f7f8f63a7",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/prepare_revision.py",
+      "origin": "DGX project",
+      "sourceSHA256": "3e8f13e7af57d905922881dccb27ac09790c57d18d2424f191c6a9edd35f42ac",
+      "publishedSHA256": "3e8f13e7af57d905922881dccb27ac09790c57d18d2424f191c6a9edd35f42ac",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/prepare_triage_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "688a784f268091f410cdd4377e3e4ab4b71c5e614432d7ba42f849f3e5496236",
+      "publishedSHA256": "688a784f268091f410cdd4377e3e4ab4b71c5e614432d7ba42f849f3e5496236",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "0ea8c20d306f7fdcadfc9e755d357292466c1cba5de2ce5665cf929a1146f3a9",
+      "publishedSHA256": "0ea8c20d306f7fdcadfc9e755d357292466c1cba5de2ce5665cf929a1146f3a9",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/review_latest_10.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "ff82c374745485efe2c0fcb7726c7330d9579ff9c9b2be9e6aa25be3e47b5f56",
+      "publishedSHA256": "ff82c374745485efe2c0fcb7726c7330d9579ff9c9b2be9e6aa25be3e47b5f56",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/review_neighborhoods.py",
+      "origin": "DGX project",
+      "sourceSHA256": "c6e58725a393cb7f07cbeed887e93fa67e26d19333c4efbc418ffc16506803f8",
+      "publishedSHA256": "c6e58725a393cb7f07cbeed887e93fa67e26d19333c4efbc418ffc16506803f8",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/run_boundary_10.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "7dbbe74aa1127e80682f311a2f6ba0e78b63bea0d298fbec0bd9c99370214f39",
+      "publishedSHA256": "7dbbe74aa1127e80682f311a2f6ba0e78b63bea0d298fbec0bd9c99370214f39",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/run_gpu.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "721c0711d25fff84f399d01684379a097dfcc6d7a6986c17918336c8f80018c2",
+      "publishedSHA256": "721c0711d25fff84f399d01684379a097dfcc6d7a6986c17918336c8f80018c2",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/run_gpu_10.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "8aaaa070ee6f426801df6851e0c5f39cd27026ab7b92d53240c11747a05b3968",
+      "publishedSHA256": "8aaaa070ee6f426801df6851e0c5f39cd27026ab7b92d53240c11747a05b3968",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/test_preflight.py",
+      "origin": "DGX project",
+      "sourceSHA256": "dcf9ab173e5448500d25264d6bef4dea9314ff28dc0cc7fed10579f937150a2e",
+      "publishedSHA256": "dcf9ab173e5448500d25264d6bef4dea9314ff28dc0cc7fed10579f937150a2e",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/train.py",
+      "origin": "DGX project",
+      "sourceSHA256": "9179596e1b6fe1880b7e1cc6499efdadf3a8daa27aaa6ae88ebcdd06904456f3",
+      "publishedSHA256": "9179596e1b6fe1880b7e1cc6499efdadf3a8daa27aaa6ae88ebcdd06904456f3",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/train_10.py",
+      "origin": "DGX project",
+      "sourceSHA256": "9844216c1a9d798a48934c36f26b25ac2c0f37d08ff562eb15f8a3bd79cda334",
+      "publishedSHA256": "9844216c1a9d798a48934c36f26b25ac2c0f37d08ff562eb15f8a3bd79cda334",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "door_experiment/triage_independence.py",
+      "origin": "DGX project",
+      "sourceSHA256": "08d14d732b42e07fe9938c92fedbbfa9c14214b22679a9ceb7bc1461d556c786",
+      "publishedSHA256": "08d14d732b42e07fe9938c92fedbbfa9c14214b22679a9ceb7bc1461d556c786",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/__init__.py",
+      "origin": "DGX project",
+      "sourceSHA256": "42545da426728561d5bd66a6d12f0ee8f0991d70857c49be8493a555aad222b1",
+      "publishedSHA256": "42545da426728561d5bd66a6d12f0ee8f0991d70857c49be8493a555aad222b1",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/assess_candidates.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d0069fb69ed2e6d8702b440345b1dde1cb9529f965b2ce38b79b0684ef8cb69e",
+      "publishedSHA256": "d0069fb69ed2e6d8702b440345b1dde1cb9529f965b2ce38b79b0684ef8cb69e",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/audit_similarity.py",
+      "origin": "DGX project",
+      "sourceSHA256": "df205fca895625b6de5663246c3bc8f50183951e9d58e09a72b0beb2e2f699f9",
+      "publishedSHA256": "df205fca895625b6de5663246c3bc8f50183951e9d58e09a72b0beb2e2f699f9",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/cam_layer_review.html",
+      "origin": "DGX project",
+      "sourceSHA256": "a118269bd117f38469e4f8c4d82589e7bccc331eb20df62f0ef2699013659327",
+      "publishedSHA256": "a118269bd117f38469e4f8c4d82589e7bccc331eb20df62f0ef2699013659327",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/cam_objective_probe.py",
+      "origin": "DGX project",
+      "sourceSHA256": "f772e6098b538a2a76e257528942e245c8505ecdb1b8634387814a4403c8ddb7",
+      "publishedSHA256": "f772e6098b538a2a76e257528942e245c8505ecdb1b8634387814a4403c8ddb7",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/cam_review.html",
+      "origin": "DGX project",
+      "sourceSHA256": "bfc651754928d0f5c211b6ba96f31ca2687868afa699f0b3220b0bbc675dbb24",
+      "publishedSHA256": "bfc651754928d0f5c211b6ba96f31ca2687868afa699f0b3220b0bbc675dbb24",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/cam_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "779b038db7c4af4e7866f9c0871e25ac020c05b1a0f30cc875c51283fea92d72",
+      "publishedSHA256": "779b038db7c4af4e7866f9c0871e25ac020c05b1a0f30cc875c51283fea92d72",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/check.py",
+      "origin": "DGX project",
+      "sourceSHA256": "8580bd46349cea17cbeced39d1bac1e22ade780479e96bfd83cd1d06c3125233",
+      "publishedSHA256": "8580bd46349cea17cbeced39d1bac1e22ade780479e96bfd83cd1d06c3125233",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/compare.py",
+      "origin": "DGX project",
+      "sourceSHA256": "1fc42ee55f96422fcfcf7e9624a920a2cdba6f7e5b4ad3afea952f69e9498c3f",
+      "publishedSHA256": "1fc42ee55f96422fcfcf7e9624a920a2cdba6f7e5b4ad3afea952f69e9498c3f",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/experiments.py",
+      "origin": "DGX project",
+      "sourceSHA256": "4ed128b8f3eaaf2d61fe666cb67a9d6cb1da4efab5fe06f745889a6b50776b1f",
+      "publishedSHA256": "4ed128b8f3eaaf2d61fe666cb67a9d6cb1da4efab5fe06f745889a6b50776b1f",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/input_background.html",
+      "origin": "DGX project",
+      "sourceSHA256": "64e17fa93648cf08ddad14f0745181217379c2d4d9c784234cc64e1578e240a7",
+      "publishedSHA256": "64e17fa93648cf08ddad14f0745181217379c2d4d9c784234cc64e1578e240a7",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/prepare.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7c79c5792d4ec0e745e9f6e89edad84578f2168a4ec66a85fe9bb148805d6f44",
+      "publishedSHA256": "7c79c5792d4ec0e745e9f6e89edad84578f2168a4ec66a85fe9bb148805d6f44",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/prepare_cam_probe.py",
+      "origin": "DGX project",
+      "sourceSHA256": "c9a930e302744f70014a24c0d60253d8eda744f41fe6420d0a67c5e3157e3795",
+      "publishedSHA256": "c9a930e302744f70014a24c0d60253d8eda744f41fe6420d0a67c5e3157e3795",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/prepare_cam_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "762fd6275e2b885ea080f16e1bdac0ec8ab2aebed489bbbebb62d31639e86f78",
+      "publishedSHA256": "762fd6275e2b885ea080f16e1bdac0ec8ab2aebed489bbbebb62d31639e86f78",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/prepare_experiment_plan.py",
+      "origin": "DGX project",
+      "sourceSHA256": "608f0c210feff4325c865f3c3230b3182fbcd8ac25b1c3209641e76b951efe15",
+      "publishedSHA256": "608f0c210feff4325c865f3c3230b3182fbcd8ac25b1c3209641e76b951efe15",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/prepare_input_background.py",
+      "origin": "DGX project",
+      "sourceSHA256": "87d6d5eac41390103cd30b361017e8bb44bd7e2cf7ba76230c68febdee319e88",
+      "publishedSHA256": "87d6d5eac41390103cd30b361017e8bb44bd7e2cf7ba76230c68febdee319e88",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/prepare_scope_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "78892623286ed52e710686bbf39fed4426ad5702925cfde6067f3bfbb024c331",
+      "publishedSHA256": "78892623286ed52e710686bbf39fed4426ad5702925cfde6067f3bfbb024c331",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/run_gpu.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "c4deb857870cfe9557b2ee96b56bc74dbe4fc82e0ae6417a36b1690683b48956",
+      "publishedSHA256": "df756400d47c0b7cd2acc63f8246356b1f615c51e30b8513a3238a7f54cca508",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/scope_review.html",
+      "origin": "DGX project",
+      "sourceSHA256": "1c8143aa489413e1ddc5cb2596c7dc2a1080ea5bbc218cfec31fdb8a1f363f90",
+      "publishedSHA256": "1c8143aa489413e1ddc5cb2596c7dc2a1080ea5bbc218cfec31fdb8a1f363f90",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/summarize_cam_layers.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e2fbd225bffccdb9db8e6c3d42701b55d33088112c1eaef0e664b50988d427ad",
+      "publishedSHA256": "e2fbd225bffccdb9db8e6c3d42701b55d33088112c1eaef0e664b50988d427ad",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/summarize_cam_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "82bcadad1145abe9e3c6c98c644771c060a58254cff9ef65d00016df78aa6fd9",
+      "publishedSHA256": "82bcadad1145abe9e3c6c98c644771c060a58254cff9ef65d00016df78aa6fd9",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/summarize_scope_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d678299699a506de46257c192e10bfc66217b0b77a6b4f804ab61b566514ee5b",
+      "publishedSHA256": "d678299699a506de46257c192e10bfc66217b0b77a6b4f804ab61b566514ee5b",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/summarize_similarity.py",
+      "origin": "DGX project",
+      "sourceSHA256": "cc7f684bf20e9532cb26cbc95f3d0614c7ef7dfcb738a638dcc89d5ec07c59a7",
+      "publishedSHA256": "cc7f684bf20e9532cb26cbc95f3d0614c7ef7dfcb738a638dcc89d5ec07c59a7",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/tests/test_cam_layers.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7f4f474c4f493e6c913a55bbc58a09ae116c71deba2d4013048c74549d22b3f5",
+      "publishedSHA256": "7f4f474c4f493e6c913a55bbc58a09ae116c71deba2d4013048c74549d22b3f5",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/tests/test_cam_probe.py",
+      "origin": "DGX project",
+      "sourceSHA256": "0fcd9f20ea078ba5cafe25ace29505a3e1a1a60ccc3e2e6ad7b7e99dacfca22d",
+      "publishedSHA256": "0fcd9f20ea078ba5cafe25ace29505a3e1a1a60ccc3e2e6ad7b7e99dacfca22d",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/tests/test_cam_review.py",
+      "origin": "DGX project",
+      "sourceSHA256": "368252633bfed2b68cc0187e381766dd1198d3592e8cc77ab1d7624494eae950",
+      "publishedSHA256": "368252633bfed2b68cc0187e381766dd1198d3592e8cc77ab1d7624494eae950",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/tests/test_experiments.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7fd52dd69b7d196db171e6e352479a150e169d8cba3cfb28a1dcfae1b672952c",
+      "publishedSHA256": "7fd52dd69b7d196db171e6e352479a150e169d8cba3cfb28a1dcfae1b672952c",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/tests/test_input_background.py",
+      "origin": "DGX project",
+      "sourceSHA256": "4ef56fabfe279d85ff18af436c6cc1fbc812a0a1582789eff7a1d0ec20cb3ef2",
+      "publishedSHA256": "4ef56fabfe279d85ff18af436c6cc1fbc812a0a1582789eff7a1d0ec20cb3ef2",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/tests/test_similarity.py",
+      "origin": "DGX project",
+      "sourceSHA256": "ef5fc26f3748dc77006f3c0b384a5840e43c8d33358c4cce772234383b8b8376",
+      "publishedSHA256": "ef5fc26f3748dc77006f3c0b384a5840e43c8d33358c4cce772234383b8b8376",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/tests/test_training.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7802cc6aceef40fa4cff3b686e740d5b31acd9ca92bbbb94684b7b729509a4fe",
+      "publishedSHA256": "7802cc6aceef40fa4cff3b686e740d5b31acd9ca92bbbb94684b7b729509a4fe",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/train.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d840240f519069a02baae66c5a055f0a348e74fee3db1dbd6b19ccbf34d7c2f3",
+      "publishedSHA256": "d840240f519069a02baae66c5a055f0a348e74fee3db1dbd6b19ccbf34d7c2f3",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "frame_model/validate_input_background.py",
+      "origin": "DGX project",
+      "sourceSHA256": "5034eb2306ea4afa30632dac2975741419e9e20e5568467db44228e030ef7d31",
+      "publishedSHA256": "5034eb2306ea4afa30632dac2975741419e9e20e5568467db44228e030ef7d31",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cars_ad_e02_offline.0KilRE/cars_ad_e02_offline.py",
+      "origin": "DGX project",
+      "sourceSHA256": "be4e471a6c0c129e06fdf154afaf86d0d4d2bb784f3ee5e91246e54faa7c7866",
+      "publishedSHA256": "be4e471a6c0c129e06fdf154afaf86d0d4d2bb784f3ee5e91246e54faa7c7866",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cars_ad_e02_offline.0KilRE/cars_ad_e02_pilot.py",
+      "origin": "DGX project",
+      "sourceSHA256": "f92c1830fff6fea6fb11c5008f8ede090eefa465066be0d446b6f44025ffcfe7",
+      "publishedSHA256": "f92c1830fff6fea6fb11c5008f8ede090eefa465066be0d446b6f44025ffcfe7",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_gpu_live_20261111.mS4Rj2/deploy_cowl_cuda_8778.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "a213ca9d2cbd7318eb9b5eae0b66435834467995d8f108bbbecdce46ecafc523",
+      "publishedSHA256": "da08b65c0262bc14d39581d9c05cd1fb3f24a9e62464e196c5013bf73d49ffdc",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_gpu_live_20261111.mS4Rj2/launch.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "7a18d2bc41ab7d446e34cd8158be6f7a061d62037ec170ce7acfb7d3ef5d65ef",
+      "publishedSHA256": "c35c4cc9597c06df1ea5686e07970b8c15e25efcfb90e41f21fd9372a3fc2ab9",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_gpu_live_20261111.mS4Rj2/serve_cowl_cuda_trial.py",
+      "origin": "DGX project",
+      "sourceSHA256": "2761ff3b104826dc4f5ed5dc8461234e2b8b5d7e01ada0339d2dfc819f008cc3",
+      "publishedSHA256": "2761ff3b104826dc4f5ed5dc8461234e2b8b5d7e01ada0339d2dfc819f008cc3",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_gpu_smoke_20261109.dO5I7J/cowl_gpu_smoke_with_door_restore.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "d354b78438108e3fe6d22891aa34562dfbb1e2e9e470e10b522672d52590f62a",
+      "publishedSHA256": "ac576e594cf91438d4c2cf4b46fd980fa4d43fc2c207af0b4ebcb3a7b3178a79",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_gpu_trial_20261111.QDGlXg/cowl_gpu_trial_compare.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d4a732052dafe4ede0e3e0f662e82cc519e274a0161fcdd7ffa08d8ac56825d9",
+      "publishedSHA256": "d4a732052dafe4ede0e3e0f662e82cc519e274a0161fcdd7ffa08d8ac56825d9",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_gpu_trial_20261111.QDGlXg/cowl_pin_trial_api.py",
+      "origin": "DGX project",
+      "sourceSHA256": "ea839ea1dc931944a05e713976259862f9a879e5ae4303a10498b583990c1282",
+      "publishedSHA256": "ea839ea1dc931944a05e713976259862f9a879e5ae4303a10498b583990c1282",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_linkage_official_20261110.VxAkw0/evaluate_cowl_linkage_official.py",
+      "origin": "DGX project",
+      "sourceSHA256": "cc43d187597744fc8c54326856a37f4ef814307c3c5a56f3051acffbea3fc97b",
+      "publishedSHA256": "cc43d187597744fc8c54326856a37f4ef814307c3c5a56f3051acffbea3fc97b",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_linkage_split_20261109.SyXrpy/finalize_cowl_linkage_split.py",
+      "origin": "DGX project",
+      "sourceSHA256": "a09292ade6cedc13f9e0a12e4acb24e3378bfa7f45deaf52c124ee579b323501",
+      "publishedSHA256": "a09292ade6cedc13f9e0a12e4acb24e3378bfa7f45deaf52c124ee579b323501",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_linkage_trial_api_20261110.F0bcSB/check_cowl_linkage_miss_cam.py",
+      "origin": "DGX project",
+      "sourceSHA256": "838226ae4899ecd796b01f453b2e36695138d6ef6a1919caa4b2eb476a65aafc",
+      "publishedSHA256": "838226ae4899ecd796b01f453b2e36695138d6ef6a1919caa4b2eb476a65aafc",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_linkage_trial_api_20261110.F0bcSB/cowl_linkage_trial_api.py",
+      "origin": "DGX project",
+      "sourceSHA256": "cb650ffcfbd95e4db341395fb37c32fe9689e93967309690f92c6de91b4f1f4e",
+      "publishedSHA256": "cb650ffcfbd95e4db341395fb37c32fe9689e93967309690f92c6de91b4f1f4e",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_linkage_validation_overlap_20261110.LqxzgI/audit_cowl_linkage_validation.py",
+      "origin": "DGX project",
+      "sourceSHA256": "b3e05d93ac8594e71f40d36118e0d635685a6fc1eb6b924bb12f2de7d6bbb545",
+      "publishedSHA256": "b3e05d93ac8594e71f40d36118e0d635685a6fc1eb6b924bb12f2de7d6bbb545",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_pin_official_20261109.R5u6W0/verify_cowl_pin_policy_official.py",
+      "origin": "DGX project",
+      "sourceSHA256": "564c19824636b95d048b69b8ad42d0fb33c323d3f8b4fb0374d97f61c5de49d3",
+      "publishedSHA256": "564c19824636b95d048b69b8ad42d0fb33c323d3f8b4fb0374d97f61c5de49d3",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_pin_policy_development_20261109.xFQpFZ/evaluate_cowl_pin_policy.py",
+      "origin": "DGX project",
+      "sourceSHA256": "bebaf2b3692c56effda5eb0fc255158fb4f45482ac670a17fd7ab3366bd829ca",
+      "publishedSHA256": "bebaf2b3692c56effda5eb0fc255158fb4f45482ac670a17fd7ab3366bd829ca",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_pin_training_12e_20261109.Vj4ZcV/cowl_pin_training.py",
+      "origin": "DGX project",
+      "sourceSHA256": "8159ee7b4bdb774113faca66b9ddd64910ed72bc1662e44b15ca6c0d1bb35dbf",
+      "publishedSHA256": "5a6fd6ee695575f3b5cad446b5b44cf556a7381fe9885bd3372b4a4afa2d04cb",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_pin_training_12e_20261109.Vj4ZcV/run_cowl_pin.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "ea77cf62b2c6e6a9ab53f4cd632e918e0ea6f6a807f7b56c804993fa1c890e65",
+      "publishedSHA256": "bd5683c38412a58c34cd8cb41bd3b6dcfbbd098934681e7e408296a656451c3a",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_pin_training_prep_20261109.c2TQKc/cowl_pin_training.py",
+      "origin": "DGX project",
+      "sourceSHA256": "966383e5be2b9367dc58c3c54e2e8e1ad4616b6ed0c518db471f97db01d0f5ba",
+      "publishedSHA256": "ce58d5f9ecfa8b9b4c7d62ed877c8b1e67d208a1ca02199c67ace74888fdcdee",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_pin_training_prep_20261109.c2TQKc/run_cowl_pin.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "ea77cf62b2c6e6a9ab53f4cd632e918e0ea6f6a807f7b56c804993fa1c890e65",
+      "publishedSHA256": "bd5683c38412a58c34cd8cb41bd3b6dcfbbd098934681e7e408296a656451c3a",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_pin_trial_api_20261109.TXlm5V/check_cowl_pin_cam.py",
+      "origin": "DGX project",
+      "sourceSHA256": "c15c491e69f65604bc0640879bfe8fe2e08cfb18eff71dab7ae4a392cb5d6235",
+      "publishedSHA256": "c15c491e69f65604bc0640879bfe8fe2e08cfb18eff71dab7ae4a392cb5d6235",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_pin_trial_api_20261109.TXlm5V/cowl_pin_trial_api.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7aca53839842913652732eb35da1c288bb2e6fb55e21cc8d573654a882b7f5c2",
+      "publishedSHA256": "7aca53839842913652732eb35da1c288bb2e6fb55e21cc8d573654a882b7f5c2",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_unified_calibrated_api_20261111.BN4EGS/cowl_unified_calibrated_trial.py",
+      "origin": "DGX project",
+      "sourceSHA256": "9c2960b51eaba898fb03d0b2ce12fb7417effba19cca7d46f075858273b89983",
+      "publishedSHA256": "9c2960b51eaba898fb03d0b2ce12fb7417effba19cca7d46f075858273b89983",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_unified_calibrated_api_20261111.BN4EGS/launch.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "25a571f3bee1f2adc0ebad91e1b5eb2d60c6074326932deacb59f7a6216cef4c",
+      "publishedSHA256": "178a4a4a043d2e00db3e7278a7cb876dbed604ba5d3a1cc05e5be84bc8050473",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_unified_policy_20261110.8sMbOO/evaluate_cowl_unified_policy.py",
+      "origin": "DGX project",
+      "sourceSHA256": "58909241d2ff04b3c04d8fc6464260a46d5d826ce5ebbcaadb889032c5f84417",
+      "publishedSHA256": "58909241d2ff04b3c04d8fc6464260a46d5d826ce5ebbcaadb889032c5f84417",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_unified_policy_20261110.8sMbOO/run.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "e59d6832e0b2230c6f835fb4fe6c2083ec15e608cc3828beb3d95db03aac0fa7",
+      "publishedSHA256": "d28d96d8d6674d7f0a2d411772f402662949c7cca95790717bd48afd86717d54",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_unified_training_20261110.zQKXgx/cowl_unified_training.py",
+      "origin": "DGX project",
+      "sourceSHA256": "021db3e6976919e6e9ef45a518db7eea1a9c62503878c5aa39fa46fc4cdbe259",
+      "publishedSHA256": "021db3e6976919e6e9ef45a518db7eea1a9c62503878c5aa39fa46fc4cdbe259",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_unified_training_20261110.zQKXgx/evaluate_cowl_unified.py",
+      "origin": "DGX project",
+      "sourceSHA256": "a631c368ab92bc3661ad48ed84cb22a147bdd8790218abfad66f83e27a517b18",
+      "publishedSHA256": "a631c368ab92bc3661ad48ed84cb22a147bdd8790218abfad66f83e27a517b18",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_unified_training_20261110.zQKXgx/run_cowl_unified_formal_window.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "de0fa4c1878c83a9f17f14921320925f243e1f6e090b45c949c986938ecbb0c5",
+      "publishedSHA256": "763ebce2149cbd8d3823598b5ee975559af5a10620b937df7d22d8d71e025bf8",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_unified_training_20261110.zQKXgx/wait_and_compare.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "164d75d727507916f70f384d56cf7277a247b4a81287ff94805ac745616e1f78",
+      "publishedSHA256": "6650084d6b3b94f7a00519232f217e788dd253f29acd73f41ee63f5b37054c2f",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/cowl_unified_trial_api_20261110.m6Jwh2/cowl_unified_trial_api.py",
+      "origin": "DGX project",
+      "sourceSHA256": "c512803f2b8494497eb156604b0155035514ba6d63dfc2b5de3dfd308c6269da",
+      "publishedSHA256": "e6bd9af00e296758ac068194b7fc2562a15b589bbb86e7ea7a02db6d209c000d",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": true
+    },
+    {
+      "path": "outputs/door_e02_calibrated_demo_20261117/serve.py",
+      "origin": "DGX project",
+      "sourceSHA256": "09e27457372e33903613722429f75d6a187547766639f1d5e26ea5474386323a",
+      "publishedSHA256": "226384b281fe8c66dc9f799b17b92a9e3b64db8fe8cc9e68c5fee77fea764d78",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/door_e02_calibrated_demo_20261117/serve_door_e02_demo.py",
+      "origin": "DGX project",
+      "sourceSHA256": "09e27457372e33903613722429f75d6a187547766639f1d5e26ea5474386323a",
+      "publishedSHA256": "226384b281fe8c66dc9f799b17b92a9e3b64db8fe8cc9e68c5fee77fea764d78",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/door_policy_trial_20261109.bTH85T/door_calibrated_trial_20261109.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7224f2d131928b8a790f9556c136163335f2f9852188f86771a77ec19c91aae9",
+      "publishedSHA256": "7224f2d131928b8a790f9556c136163335f2f9852188f86771a77ec19c91aae9",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_cam_methods_20261109.0Gw4Bt/frame_cam_compare_20261109.py",
+      "origin": "DGX project",
+      "sourceSHA256": "2e3eb11d27c80acdb08d81d801fab988673b6fcf6e0e1647933de75abb1f9985",
+      "publishedSHA256": "2e3eb11d27c80acdb08d81d801fab988673b6fcf6e0e1647933de75abb1f9985",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_cam_methods_20261109.0Gw4Bt/frame_cam_localization_20261109.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7f42bc445d8a217b49e4c5ca073bc2c59ed0c03b2ae951a389006e0c5d5b20d8",
+      "publishedSHA256": "7f42bc445d8a217b49e4c5ca073bc2c59ed0c03b2ae951a389006e0c5d5b20d8",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_e08_final_20261108.b9jWcj/frame_validation_e08_evaluate_20261108.py",
+      "origin": "DGX project",
+      "sourceSHA256": "1893f7bb43e77473f4216f6b5640413caedab28c7ebaea8720ab999a390e1d36",
+      "publishedSHA256": "1893f7bb43e77473f4216f6b5640413caedab28c7ebaea8720ab999a390e1d36",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_feature_validation_20261109.KBZGNt/frame_auto_pass_20261109.py",
+      "origin": "DGX project",
+      "sourceSHA256": "cb9e01cf05e75628b1c4cacb87b9c2296849b0ac587db9fe71f2cfe8e082b463",
+      "publishedSHA256": "cb9e01cf05e75628b1c4cacb87b9c2296849b0ac587db9fe71f2cfe8e082b463",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_feature_validation_20261109.KBZGNt/frame_cam_localization_20261109.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7f42bc445d8a217b49e4c5ca073bc2c59ed0c03b2ae951a389006e0c5d5b20d8",
+      "publishedSHA256": "7f42bc445d8a217b49e4c5ca073bc2c59ed0c03b2ae951a389006e0c5d5b20d8",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_layercam28_20261109.2V8EMY/8773/frame_layercam28.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e1993e162a561b46e249acc54a0960aaec381515403c282892455b7226cd8579",
+      "publishedSHA256": "e1993e162a561b46e249acc54a0960aaec381515403c282892455b7226cd8579",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_layercam28_20261109.2V8EMY/8773/frame_unified_test_api_20261107.py",
+      "origin": "DGX project",
+      "sourceSHA256": "dfe77500f63fff3bcbbe5c843a8f7cef6545aa944d8b24ecd2e1b1e3d1c934eb",
+      "publishedSHA256": "dfe77500f63fff3bcbbe5c843a8f7cef6545aa944d8b24ecd2e1b1e3d1c934eb",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_layercam28_20261109.2V8EMY/8774/frame_calibrated_trial_adapter.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e89920990a18a93dac112873bbecef29b47b878e0579959b862d3e2c9b7a2985",
+      "publishedSHA256": "e89920990a18a93dac112873bbecef29b47b878e0579959b862d3e2c9b7a2985",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_layercam28_20261109.2V8EMY/8774/frame_layercam28.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e1993e162a561b46e249acc54a0960aaec381515403c282892455b7226cd8579",
+      "publishedSHA256": "e1993e162a561b46e249acc54a0960aaec381515403c282892455b7226cd8579",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_layercam28_20261109.2V8EMY/8774/frame_policy_trial_20261109.py",
+      "origin": "DGX project",
+      "sourceSHA256": "c625cb0931481861d8fa503f8ba7a14d8a4f5045706bda15e1b6247d43e8e821",
+      "publishedSHA256": "c625cb0931481861d8fa503f8ba7a14d8a4f5045706bda15e1b6247d43e8e821",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_layercam28_20261109.2V8EMY/demo.py",
+      "origin": "DGX project",
+      "sourceSHA256": "8e8e46451bdf3f9368284bf10d762fc594d45083effbb9cc9255aedba2d1a25c",
+      "publishedSHA256": "ef9d0d5590bc8403b43b98b9d453ee43ea1eccc197e09f004fdef6cb6103e342",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": true
+    },
+    {
+      "path": "outputs/frame_layercam28_20261109.2V8EMY/frame_layercam28.py",
+      "origin": "DGX project",
+      "sourceSHA256": "e1993e162a561b46e249acc54a0960aaec381515403c282892455b7226cd8579",
+      "publishedSHA256": "e1993e162a561b46e249acc54a0960aaec381515403c282892455b7226cd8579",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_layercam28_20261109.2V8EMY/frame_layercam28_switch.py",
+      "origin": "DGX project",
+      "sourceSHA256": "046e58da51c3cffd576000ef79aa2a8e6d1675f183f4aee52c9f0f69bff4bc98",
+      "publishedSHA256": "5842b149655a7a408135f9dac55829c55aad0228f78f740bc46fe4388bbb7aeb",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_test_api_20261107.d37a92/frame_unified_test_api_20261107.py",
+      "origin": "DGX project",
+      "sourceSHA256": "1b1aba1abc2135149fd7227abcd88641a2c26bd2a28d710884dd7e9d421c267c",
+      "publishedSHA256": "1b1aba1abc2135149fd7227abcd88641a2c26bd2a28d710884dd7e9d421c267c",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_test_api_jet_20261108.0mqEHz/cutover.py",
+      "origin": "DGX project",
+      "sourceSHA256": "d0d4140cd22b95db6c58a883812318984bc51e992d61918fb4272c414ea850bb",
+      "publishedSHA256": "034c8b927356f8b102cddafce6c46f13f2014c25ab61bd2350fc00d78a746770",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": true
+    },
+    {
+      "path": "outputs/frame_test_api_jet_20261108.0mqEHz/frame_unified_test_api_20261107.py",
+      "origin": "DGX project",
+      "sourceSHA256": "eeb26f629f49bd47562a2fdf82ac9e294717cf5464e335ec0fb0693a9792d609",
+      "publishedSHA256": "eeb26f629f49bd47562a2fdf82ac9e294717cf5464e335ec0fb0693a9792d609",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_test_api_jet_20261108.0mqEHz/package.py",
+      "origin": "DGX project",
+      "sourceSHA256": "5b6c6be9372630ceab42892bf4e1eb3b57eb574e0489a5f29ead9176c7a47ca6",
+      "publishedSHA256": "8a103831711fe3179ea95952f12eab1c80dff6383e489e4764b5614c3dd05662",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": true
+    },
+    {
+      "path": "outputs/frame_validation_audit_20261108.AuDWbR/frame_validation_audit_20261108.py",
+      "origin": "DGX project",
+      "sourceSHA256": "909dfc6bdd46bd0bf9bac149fd982af00c247aee067cc1a15e1437ef376b21d8",
+      "publishedSHA256": "909dfc6bdd46bd0bf9bac149fd982af00c247aee067cc1a15e1437ef376b21d8",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "outputs/frame_validation_audit_20261108.AuDWbR/frame_validation_internal_20261108.py",
+      "origin": "DGX project",
+      "sourceSHA256": "a614e1c57efc9716cd6c3d2c52ade02c0d461652300f0a54e1b46ff3b2e7c85f",
+      "publishedSHA256": "a614e1c57efc9716cd6c3d2c52ade02c0d461652300f0a54e1b46ff3b2e7c85f",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/app.py",
+      "origin": "DGX project",
+      "sourceSHA256": "ea9343dc6833acc8c44ce41dee9a7ead1e7e6119e31fc59cf33a94445210b2a2",
+      "publishedSHA256": "ea9343dc6833acc8c44ce41dee9a7ead1e7e6119e31fc59cf33a94445210b2a2",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/audit_cam_classes.py",
+      "origin": "DGX project",
+      "sourceSHA256": "ed3d80373e3d59875f8061b2cd09ea13f78b00a529bf1be3ce99563a6aacd11a",
+      "publishedSHA256": "ed3d80373e3d59875f8061b2cd09ea13f78b00a529bf1be3ce99563a6aacd11a",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/audit_coordinates.py",
+      "origin": "DGX project",
+      "sourceSHA256": "70c761be610bfb4488c816129866d5c94a8124925869509788f2861a750cc719",
+      "publishedSHA256": "70c761be610bfb4488c816129866d5c94a8124925869509788f2861a750cc719",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/check_flow.py",
+      "origin": "DGX project",
+      "sourceSHA256": "f7a43a4c343949a8f15e20f276375f9cb02b450d561fa9334c1162e14152e8f6",
+      "publishedSHA256": "56552205c2c6b1344c5c6258dc27d9e3f73edf7b86cabded464681aaff4ac43f",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/engine.py",
+      "origin": "DGX project",
+      "sourceSHA256": "cee667843e12084f32fce293ad050c8df074ce02a0f3072fe54a8313e204aa03",
+      "publishedSHA256": "5bf277b7969dbfa08eea4a78d53dcee8ddfcd20cbba85d52eec21b0c12559666",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/run_cam_class_audit.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "04357e089522d6985d633356f83e1e8b490e920062ea93963fff38326a398c9a",
+      "publishedSHA256": "707f86125937258d81ad75b4b6d599875dc852cb5f09a5ba8184581487cfc93c",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/run_local.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "de49907c80697588ccc347ef1abbab88eb5931eb8ba9a1f2b383c985fcc9744f",
+      "publishedSHA256": "b9e4d65a192d3752efcbd4d73f8b311287b6448bd052a5a87cf9ad5666f95121",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/static/app.js",
+      "origin": "DGX project",
+      "sourceSHA256": "55d795212e0b3a4e97be251afc673ed5d5e403885fd5d1fee5bd8910378c574d",
+      "publishedSHA256": "55d795212e0b3a4e97be251afc673ed5d5e403885fd5d1fee5bd8910378c574d",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/static/index.html",
+      "origin": "DGX project",
+      "sourceSHA256": "059eb17e663d1cf771dba81961d34f2c66913bf0fbcce98fc5a54ca248b17cb6",
+      "publishedSHA256": "059eb17e663d1cf771dba81961d34f2c66913bf0fbcce98fc5a54ca248b17cb6",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/static/style.css",
+      "origin": "DGX project",
+      "sourceSHA256": "a54874f6c7e2b25b58aa23c4de22a440f555e6d8a63ca3c5ed3bedf41d133ccf",
+      "publishedSHA256": "a54874f6c7e2b25b58aa23c4de22a440f555e6d8a63ca3c5ed3bedf41d133ccf",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/tests/test_workflow.py",
+      "origin": "DGX project",
+      "sourceSHA256": "ae9ecca575e14d6553c896d4f0015ece16a329eaa48d94723666524556fce5f5",
+      "publishedSHA256": "ec56f7b4ca16a3a5d5790c746046d63ef74784633a98a8bb61cd9a2034113798",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "prototype/verify_restart.py",
+      "origin": "DGX project",
+      "sourceSHA256": "7c1f3d8266d9b2bb96d45fbbb7b1870293a1954bfe1fd4820d3756554789b59c",
+      "publishedSHA256": "7c1f3d8266d9b2bb96d45fbbb7b1870293a1954bfe1fd4820d3756554789b59c",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "src/evaluate_door_internal.py",
+      "origin": "DGX project",
+      "sourceSHA256": "08ac3ecdb7139ab7e0f53b8de3bcbf228e47fb780e9b568fedef9e42a63d4325",
+      "publishedSHA256": "526f33ebc186a96992343833b8c20f8a04a856af6e52973b2f7c99a9609b8b62",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "src/reproduce_door_one.py",
+      "origin": "DGX project",
+      "sourceSHA256": "de155dff0661dd888a72b145dd7090d3c313a39b9a0a20514e42641441890f24",
+      "publishedSHA256": "8df7d919cd7fcffbaea71664e1617add46ca709b836b24bb97c547ff692e2a9e",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "src/run_door_internal_docker.sh",
+      "origin": "DGX project",
+      "sourceSHA256": "636054a71b44fff3521ca13270a0be380ede605d7a33bc852c09f638701465c8",
+      "publishedSHA256": "26f0485e1c383a1e6fad49092fcede45ba1137021b3f782fc86136dbffaba40e",
+      "environmentLiteralsChanged": true,
+      "formattingNormalized": false
+    },
+    {
+      "path": "legacy_training/train_door_swin.py",
+      "origin": "DGX original Swin training source",
+      "sourceSHA256": "b5b5244f587c5a1fee633475c84e164257cb1ddad3906c1195bb6f40e6d4c46e",
+      "publishedSHA256": "e37a8bd200a3c4a4d4128dc516821b703c4f427ad6c959980adb01f5e98e1d7c",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": true
+    },
+    {
+      "path": "windows_tools/scripts/analyze_labels.py",
+      "origin": "Windows AI project",
+      "sourceSHA256": "77eb2da1dd236e1db3b4bf9e55f9c46f94015e090f3c7dc366085cc47c5312a4",
+      "publishedSHA256": "77eb2da1dd236e1db3b4bf9e55f9c46f94015e090f3c7dc366085cc47c5312a4",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "windows_tools/scripts/check_environment.py",
+      "origin": "Windows AI project",
+      "sourceSHA256": "b58b5ce9a33d13492fa9a2f04eaafba4ebb1efa54f8add667b58dfa8c2e5493a",
+      "publishedSHA256": "b58b5ce9a33d13492fa9a2f04eaafba4ebb1efa54f8add667b58dfa8c2e5493a",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "windows_tools/scripts/check_exact_duplicates.py",
+      "origin": "Windows AI project",
+      "sourceSHA256": "6f2a3c69c6fc145a9ed062582da50a5eabfac3de1d181edc7235abd93bcf5b6d",
+      "publishedSHA256": "6f2a3c69c6fc145a9ed062582da50a5eabfac3de1d181edc7235abd93bcf5b6d",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "windows_tools/scripts/door_patch_inspector.py",
+      "origin": "Windows AI project",
+      "sourceSHA256": "acbc3c56068b98f2a27e39040a5358f019770cf4e72ef910acf59b3723e428d1",
+      "publishedSHA256": "acbc3c56068b98f2a27e39040a5358f019770cf4e72ef910acf59b3723e428d1",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "windows_tools/scripts/preflight_door_scope_experiment.py",
+      "origin": "Windows AI project",
+      "sourceSHA256": "b8720f6e325d1167c4a951d46dd4d4eec7bbb935e7331ff64cc38ec082d14870",
+      "publishedSHA256": "b8720f6e325d1167c4a951d46dd4d4eec7bbb935e7331ff64cc38ec082d14870",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "windows_tools/scripts/visualize_duplicate_conflict.py",
+      "origin": "Windows AI project",
+      "sourceSHA256": "e53e213b388629fe19523eca137bc5b685bc01d5d62965cc9fcaca2cf1f76862",
+      "publishedSHA256": "e53e213b388629fe19523eca137bc5b685bc01d5d62965cc9fcaca2cf1f76862",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "windows_tools/scripts/visualize_label_samples.py",
+      "origin": "Windows AI project",
+      "sourceSHA256": "762dfee43d1133523c6c0c6486ff8e35f89615565419b67bebf58cad0d2b9bce",
+      "publishedSHA256": "762dfee43d1133523c6c0c6486ff8e35f89615565419b67bebf58cad0d2b9bce",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    },
+    {
+      "path": "windows_tools/tests/test_door_patch_inspector.py",
+      "origin": "Windows AI project",
+      "sourceSHA256": "836b54d0f1f97e44461955fac6bf4d030a75ac6c3ddbe5b2902efc854673c614",
+      "publishedSHA256": "836b54d0f1f97e44461955fac6bf4d030a75ac6c3ddbe5b2902efc854673c614",
+      "environmentLiteralsChanged": false,
+      "formattingNormalized": false
+    }
+  ]
+}

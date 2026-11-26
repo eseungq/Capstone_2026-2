@@ -1,0 +1,40 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>충돌 라벨 검토</title>
+<style>body{font-family:sans-serif;max-width:1450px;margin:24px auto;padding:12px}article{border-top:2px solid #aaa;padding:22px 0}figure{display:inline-block;width:30%;vertical-align:top;margin:1%}img{width:100%}textarea{width:90%;height:70px}select,input,button{padding:8px;margin:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere}#status{position:sticky;top:0;background:#fff4cc;padding:12px}</style>
+<h1>같은 사진의 충돌 라벨 검토 — 10그룹</h1>
+<p>스크래치·외관 손상 중 검사 대상 결함이 하나라도 명확하면 DEFECT 후보입니다. GOOD 후보는 필요한 영역을 충분히 확인하고 검사 대상 결함이 없다고 판단할 때만 선택합니다. 안 보인다는 이유만으로 GOOD으로 바꾸지 마세요. 반사·주석 대응이 불분명하면 판단 보류, 근접·각도로 필요한 영역을 볼 수 없으면 촬영 조건 부적합을 선택하세요.</p>
+<p>빨간 사각형은 주석 좌표 변환 가설입니다. 정답 위치로 확정하지 않았습니다. 원본 링크에서 확대 확인하세요. 아래 선택은 차기 실험용 제안이며 원본 라벨·기존 분할을 수정하지 않습니다. 대표 사진도 임시 후보입니다.</p>
+<label>검토자 <input id="reviewer" placeholder="이름 또는 식별자"></label><button id="export">검토 JSON 내보내기</button><div id="status">준비 중</div><main id="cases"></main>
+<script>
+const data=__DATA__,key='door-label-review:'+data.sourceSHA256;
+let state={reviewer:'',decisions:{}};
+const status=document.getElementById('status');
+try{const saved=JSON.parse(localStorage.getItem(key)||'null');if(saved&&saved.decisions)state=saved;}catch(e){status.textContent='자동 저장을 읽지 못했습니다. 내보내기로 보존하세요.';}
+function save(){try{localStorage.setItem(key,JSON.stringify(state));status.textContent='브라우저에 임시 저장됨 — 완료 후 JSON 내보내기';}catch(e){status.textContent='자동 저장 불가 — JSON 내보내기로 저장하세요.';}}
+document.getElementById('reviewer').value=state.reviewer;
+document.getElementById('reviewer').oninput=e=>{state.reviewer=e.target.value;save();};
+for(const c of data.cases){
+ const a=document.createElement('article');const title=document.createElement('h2');title.textContent='그룹 '+(data.cases.indexOf(c)+1);a.append(title);
+ const link=document.createElement('a');link.href=c.originalUrl;link.target='_blank';link.textContent='원본 사진 확대 열기';a.append(link);
+ for(const [suffix,label] of [['original','EXIF 보정 원본'],['display','JSON → 표시 크기 변환 가설'],['raw_exif','JSON → 원본 크기 → EXIF 가설']]){
+  const f=document.createElement('figure'),cap=document.createElement('figcaption'),im=document.createElement('img');cap.textContent=label;im.src=c.id+'_'+suffix+'.jpg';f.append(cap,im);a.append(f);
+ }
+ const meta=document.createElement('pre');meta.textContent=JSON.stringify({rawSize:c.rawSize,displaySize:c.displaySize,exif:c.exif,sources:c.sources},null,2);a.append(meta);
+ if(!state.decisions[c.groupId])state.decisions[c.groupId]={decision:'',reason:'',visibility:'',coordinateInterpretation:''};
+ const r=state.decisions[c.groupId];
+ function select(field,label,options){const l=document.createElement('label');l.textContent=label;const s=document.createElement('select');for(const [v,t]of options){const o=document.createElement('option');o.value=v;o.textContent=t;s.append(o);}s.value=r[field];s.onchange=()=>{r[field]=s.value;save();};l.append(s);a.append(l);}
+ select('decision','사진 전체 판단',[['','선택'],['DEFECT_CANDIDATE','DEFECT 후보'],['GOOD_CANDIDATE','GOOD 후보'],['HOLD','판단 보류'],['CAPTURE_UNSUITABLE','촬영 조건 부적합']]);
+ select('visibility','원본 결함 가시성',[['','선택'],['CLEAR','명확히 보임'],['AMBIGUOUS','반사 등과 구분 어려움'],['NOT_OBSERVED','관찰되지 않음'],['INSUFFICIENT_VIEW','필요 영역 확인 불가']]);
+ select('coordinateInterpretation','주석 대응',[['','선택'],['DISPLAY','표시 크기 가설이 맞아 보임'],['RAW_EXIF','원본·EXIF 가설이 맞아 보임'],['BOTH','두 가설 모두 맞음/동일'],['NEITHER','둘 다 맞지 않음'],['UNCERTAIN','판단 불가']]);
+ const reason=document.createElement('textarea');reason.placeholder='근거: 실제 보이는 결함, 반사 여부, 확인할 수 없는 영역 등을 기록하세요.';reason.value=r.reason;reason.oninput=()=>{r.reason=reason.value;save();};a.append(reason);document.getElementById('cases').append(a);
+}
+status.textContent='10개 그룹을 확인하고 내보내세요. 저장된 판단은 복원됩니다.';
+document.getElementById('export').onclick=()=>{
+ try{
+  const incomplete=data.cases.filter(c=>{const r=state.decisions[c.groupId];return !r.decision||!r.visibility||!r.coordinateInterpretation||!r.reason.trim();});
+  if(!state.reviewer.trim()||incomplete.length){status.textContent='검토자와 모든 선택·판단 근거를 입력하세요. 미완료 '+incomplete.length+'그룹';return;}
+  const records=data.cases.map(c=>({...c,...state.decisions[c.groupId],proposedClass:state.decisions[c.groupId].decision==='DEFECT_CANDIDATE'?1:state.decisions[c.groupId].decision==='GOOD_CANDIDATE'?0:null}));
+  const result={schema:data.schema,source:data.source,sourceSHA256:data.sourceSHA256,rulesVersion:data.rulesVersion,reviewer:state.reviewer,reviewedAt:new Date().toISOString(),originalsModified:false,applied:false,records};
+  const blob=new Blob([JSON.stringify(result,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='door_label_review_'+new Date().toISOString().replaceAll(':','-')+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);status.textContent='JSON을 내보냈습니다. 다운로드 폴더를 확인하세요.';
+ }catch(e){status.textContent='내보내기 실패: '+e.message;}
+};
+</script></html>
